@@ -379,10 +379,11 @@ begin
   previous_row := case when tg_op = 'UPDATE' then to_jsonb(old) else '{}'::jsonb end;
 
   if tg_op = 'UPDATE' then
-    select coalesce(array_agg(key order by key), '{}')
+    select coalesce(array_agg(changed.key order by changed.key), '{}')
       into fields
-      from jsonb_object_keys(target_row) key
-      where target_row -> key is distinct from previous_row -> key;
+      from jsonb_object_keys(target_row) as changed(key)
+      where target_row -> changed.key
+        is distinct from previous_row -> changed.key;
   elsif tg_op = 'INSERT' then
     fields := array['record_created'];
   else
@@ -410,7 +411,10 @@ begin
     fields
   );
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
 $$;
 
@@ -478,9 +482,9 @@ on public.profiles for update to authenticated
 using (id = auth.uid())
 with check (id = auth.uid());
 
-create policy "users can view own memberships"
+create policy "members can view organization memberships"
 on public.memberships for select to authenticated
-using (user_id = auth.uid());
+using (public.has_organization_access(organization_id));
 
 create policy "directors can manage memberships"
 on public.memberships for all to authenticated
@@ -617,6 +621,25 @@ using (
     array['super_admin', 'director', 'clinical_director']::public.app_role[]
   )
 );
+
+-- Supabase no expone tablas nuevas automáticamente en proyectos recientes.
+-- Los GRANT habilitan la API; RLS continúa decidiendo qué filas son visibles.
+grant usage on schema public to authenticated;
+grant usage on type public.app_role to authenticated;
+grant usage on type public.patient_status to authenticated;
+grant usage on type public.appointment_status to authenticated;
+
+grant select, update on public.organizations to authenticated;
+grant select, insert, update on public.branches to authenticated;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update on public.memberships to authenticated;
+grant select, insert, update on public.patients to authenticated;
+grant select, insert, update on public.appointments to authenticated;
+grant select on public.audit_logs to authenticated;
+
+revoke all on function public.set_updated_at() from public;
+revoke all on function public.handle_new_auth_user() from public;
+revoke all on function public.write_audit_log() from public;
 
 -- No se conceden políticas DELETE para pacientes ni citas. Se utiliza
 -- deleted_at para conservar la trazabilidad clínica.

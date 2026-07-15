@@ -79,7 +79,7 @@ function RegistrationModal({
             ["Teléfono", "+593", "phone", "tel", false],
             ["Correo electrónico", "paciente@correo.com", "email", "email", false],
           ].map(([label, placeholder, name, type, required]) => (
-            <label key={label} className="space-y-2">
+            <label key={label as string} className="space-y-2">
               <span className="text-[11px] font-semibold text-slate-600">{label}</span>
               <input
                 name={name as string}
