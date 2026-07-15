@@ -24,6 +24,7 @@ const TIME_ZONE = "America/Guayaquil";
 const hours = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 const weekdays = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
 const demoOptions: AppointmentOptions = {
+  branchId: "00000000-0000-4000-8000-000000000021",
   patients: [{ id: "00000000-0000-4000-8000-000000000001", name: "Mateo Guerrero" }],
   professionals: [{ id: "00000000-0000-4000-8000-000000000011", name: "Dra. Ana Pérez" }],
 };
@@ -112,6 +113,7 @@ function AppointmentModal({
           </button>
         </div>
         <form className="grid gap-4 p-6 sm:grid-cols-2" onSubmit={handleSubmit}>
+          <input type="hidden" name="branchId" value={options.branchId} />
           <label className="space-y-2 sm:col-span-2">
             <span className="text-[11px] font-semibold text-slate-600">Paciente</span>
             <select name="patientId" required className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs">
@@ -193,27 +195,27 @@ export default function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState(todayKey);
   const [selectedTime, setSelectedTime] = useState("09:00");
   const [options, setOptions] = useState<AppointmentOptions>(demoOptions);
-  const [appointments, setAppointments] = useState<CalendarAppointment[]>(() =>
-    demoAppointments(mondayOf(todayKey)),
-  );
+  const [appointments, setAppointments] = useState<CalendarAppointment[]>([]);
   const days = useMemo(
     () => Array.from({ length: 6 }, (_, index) => addDays(weekStart, index)),
     [weekStart],
   );
+  const visibleAppointments = useMemo(
+    () =>
+      isSupabaseConfigured ? appointments : demoAppointments(weekStart),
+    [appointments, weekStart],
+  );
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setAppointments(demoAppointments(weekStart));
-      return;
-    }
+    if (!isSupabaseConfigured) return;
     const from = new Date(`${weekStart}T00:00:00-05:00`).toISOString();
     const to = new Date(`${addDays(weekStart, 7)}T00:00:00-05:00`).toISOString();
-    void Promise.all([getAppointmentOptions(), listAppointments(from, to)]).then(
-      ([newOptions, records]) => {
-        if (newOptions) setOptions(newOptions);
-        if (records) setAppointments(records);
-      },
-    );
+    void getAppointmentOptions().then(async (newOptions) => {
+      if (!newOptions) return;
+      setOptions(newOptions);
+      const records = await listAppointments(from, to, newOptions.branchId);
+      if (records) setAppointments(records);
+    });
   }, [weekStart, modalOpen]);
 
   function openSlot(date: string, time = "09:00") {
@@ -255,7 +257,7 @@ export default function AgendaPage() {
               <h2 className="ml-2 capitalize text-sm font-bold text-slate-800">{monthLabel}</h2>
             </div>
             <p className="text-[10px] font-semibold text-slate-500">
-              {appointments.length} cita{appointments.length === 1 ? "" : "s"} esta semana
+              {visibleAppointments.length} cita{visibleAppointments.length === 1 ? "" : "s"} esta semana
             </p>
           </div>
 
@@ -279,7 +281,7 @@ export default function AgendaPage() {
                 {days.map((day) => (
                   <div key={day} className={`relative border-r border-slate-100 last:border-r-0 ${day === todayKey ? "bg-indigo-50/20" : ""}`} style={{ height: `${hours.length * 80}px` }}>
                     {hours.map((hour) => <button key={hour} aria-label={`Agendar el ${day} a las ${hour}`} onClick={() => openSlot(day, hour)} className="block h-20 w-full border-b border-slate-100 hover:bg-indigo-50/50" />)}
-                    {appointments
+                    {visibleAppointments
                       .filter((appointment) => ecuadorDateKey(new Date(appointment.startsAt)) === day)
                       .map((appointment) => {
                         const start = new Date(appointment.startsAt);

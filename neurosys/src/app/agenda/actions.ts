@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 const appointmentSchema = z.object({
+  branchId: z.uuid(),
   patientId: z.uuid(),
   professionalId: z.uuid(),
   serviceName: z.string().trim().min(2).max(160),
@@ -17,6 +18,7 @@ const appointmentSchema = z.object({
 });
 
 export type AppointmentOptions = {
+  branchId: string;
   patients: { id: string; name: string }[];
   professionals: { id: string; name: string }[];
 };
@@ -36,16 +38,37 @@ export async function getAppointmentOptions(): Promise<AppointmentOptions | null
   const supabase = await createClient();
   if (!supabase) return null;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: currentMembership } = await supabase
+    .from("memberships")
+    .select("organization_id, branch_id")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .not("branch_id", "is", null)
+    .order("created_at")
+    .limit(1)
+    .maybeSingle();
+  if (!currentMembership?.branch_id) return null;
+
   const [{ data: patientRows }, { data: membershipRows }] = await Promise.all([
     supabase
       .from("patients")
       .select("id, first_names, last_names")
+      .eq("organization_id", currentMembership.organization_id)
+      .eq("branch_id", currentMembership.branch_id)
       .is("deleted_at", null)
       .order("last_names")
       .limit(200),
     supabase
       .from("memberships")
-      .select("user_id, profiles!memberships_user_id_fkey(full_name)")
+      .select(
+        "user_id, branch_id, role, profiles!memberships_user_id_fkey(full_name)",
+      )
+      .eq("organization_id", currentMembership.organization_id)
       .eq("active", true)
       .in("role", [
         "super_admin",
@@ -56,31 +79,43 @@ export async function getAppointmentOptions(): Promise<AppointmentOptions | null
   ]);
 
   return {
+    branchId: currentMembership.branch_id,
     patients: (patientRows ?? []).map((patient) => ({
       id: patient.id,
       name: `${patient.first_names} ${patient.last_names}`,
     })),
-    professionals: (membershipRows ?? []).map((membership) => {
-      const profile = Array.isArray(membership.profiles)
-        ? membership.profiles[0]
-        : membership.profiles;
-      return {
-        id: membership.user_id,
-        name: profile?.full_name ?? "Profesional",
-      };
-    }),
+    professionals: (membershipRows ?? [])
+      .filter(
+        (membership) =>
+          membership.branch_id === currentMembership.branch_id ||
+          membership.branch_id === null ||
+          ["super_admin", "director", "clinical_director"].includes(
+            membership.role,
+          ),
+      )
+      .map((membership) => {
+        const profile = Array.isArray(membership.profiles)
+          ? membership.profiles[0]
+          : membership.profiles;
+        return {
+          id: membership.user_id,
+          name: profile?.full_name ?? "Profesional",
+        };
+      }),
   };
 }
 
 export async function listAppointments(
   from: string,
   to: string,
+  branchId: string,
 ): Promise<CalendarAppointment[] | null> {
   const rangeSchema = z.object({
     from: z.iso.datetime({ offset: true }),
     to: z.iso.datetime({ offset: true }),
+    branchId: z.uuid(),
   });
-  const parsed = rangeSchema.safeParse({ from, to });
+  const parsed = rangeSchema.safeParse({ from, to, branchId });
   if (!parsed.success) return [];
 
   const supabase = await createClient();
@@ -91,6 +126,7 @@ export async function listAppointments(
     .select(
       "id, service_name, room_name, starts_at, ends_at, status, patients!appointments_patient_id_fkey(first_names, last_names), profiles!appointments_professional_id_fkey(full_name)",
     )
+    .eq("branch_id", parsed.data.branchId)
     .is("deleted_at", null)
     .gte("starts_at", parsed.data.from)
     .lt("starts_at", parsed.data.to)
@@ -146,7 +182,8 @@ export async function createAppointment(formData: FormData) {
     .select("organization_id, branch_id")
     .eq("user_id", user.id)
     .eq("active", true)
-    .not("branch_id", "is", null)
+    .eq("branch_id", parsed.data.branchId)
+    .order("created_at")
     .limit(1)
     .maybeSingle();
 
@@ -162,7 +199,7 @@ export async function createAppointment(formData: FormData) {
   );
   const { error } = await supabase.from("appointments").insert({
     organization_id: membership.organization_id,
-    branch_id: membership.branch_id,
+    branch_id: parsed.data.branchId,
     patient_id: parsed.data.patientId,
     professional_id: parsed.data.professionalId,
     service_name: parsed.data.serviceName,

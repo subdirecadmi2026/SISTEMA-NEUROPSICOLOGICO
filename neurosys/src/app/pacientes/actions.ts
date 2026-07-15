@@ -173,6 +173,7 @@ export async function createPatient(
     .eq("user_id", user.id)
     .eq("active", true)
     .not("branch_id", "is", null)
+    .order("created_at")
     .limit(1)
     .maybeSingle();
 

@@ -49,6 +49,28 @@ create trigger clinical_notes_audit
 after insert or update or delete on public.clinical_notes
 for each row execute function public.write_audit_log();
 
+create or replace function public.normalize_new_clinical_note()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.created_at = now();
+  new.updated_at = now();
+  new.deleted_at = null;
+  if new.status = 'signed' then
+    new.signed_at = now();
+  else
+    new.signed_at = null;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger clinical_notes_normalize_insert
+before insert on public.clinical_notes
+for each row execute function public.normalize_new_clinical_note();
+
 alter table public.clinical_notes enable row level security;
 
 create policy "clinical staff can view clinical notes"
@@ -70,6 +92,7 @@ create policy "clinical staff can create clinical notes"
 on public.clinical_notes for insert to authenticated
 with check (
   author_id = auth.uid()
+  and deleted_at is null
   and exists (
     select 1
     from public.patients
@@ -102,10 +125,29 @@ using (
   )
 )
 with check (
-  author_id = auth.uid()
-  or public.has_organization_role(
+  deleted_at is null
+  and (
+    author_id = auth.uid()
+    or public.has_organization_role(
+      organization_id,
+      array['super_admin', 'director', 'clinical_director']::public.app_role[]
+    )
+  )
+  and public.has_organization_role(
     organization_id,
-    array['super_admin', 'director', 'clinical_director']::public.app_role[]
+    array[
+      'super_admin',
+      'director',
+      'clinical_director',
+      'professional'
+    ]::public.app_role[]
+  )
+  and exists (
+    select 1
+    from public.patients
+    where id = patient_id
+      and organization_id = clinical_notes.organization_id
+      and branch_id = clinical_notes.branch_id
   )
 );
 
@@ -119,15 +161,35 @@ language plpgsql
 set search_path = public
 as $$
 begin
+  if tg_op = 'DELETE' then
+    raise exception 'Los registros clínicos no se pueden eliminar';
+  end if;
   if old.status = 'signed' then
     raise exception 'Las evoluciones firmadas no se pueden modificar';
+  end if;
+  if new.id is distinct from old.id
+    or new.organization_id is distinct from old.organization_id
+    or new.branch_id is distinct from old.branch_id
+    or new.patient_id is distinct from old.patient_id
+    or new.appointment_id is distinct from old.appointment_id
+    or new.author_id is distinct from old.author_id
+    or new.created_at is distinct from old.created_at
+  then
+    raise exception 'La identidad de una evolución no se puede modificar';
+  end if;
+  new.deleted_at = null;
+  if new.status = 'signed' then
+    new.signed_at = now();
+  else
+    new.signed_at = null;
   end if;
   return new;
 end;
 $$;
 
 create trigger clinical_notes_protect_signed
-before update on public.clinical_notes
+before update or delete on public.clinical_notes
 for each row execute function public.protect_signed_clinical_note();
 
+revoke all on function public.normalize_new_clinical_note() from public;
 revoke all on function public.protect_signed_clinical_note() from public;

@@ -15,6 +15,10 @@
 3. Confirma en **Database > Migrations** que se aplicaron:
    - `20260715000000_initial_clinical_core.sql`
    - `20260715010000_clinical_records.sql`
+   - `20260715020000_tenant_integrity.sql`
+   Si el proyecto ya contiene datos, crea una copia antes de `db push`. La
+   tercera migración rechazará registros históricos que relacionen
+   organizaciones o sedes distintas; corrige esas filas antes de reintentar.
 4. En **Authentication > URL Configuration**, configura:
    - Site URL: el dominio final de Vercel.
    - Redirect URLs: el dominio final y `https://*-TU-EQUIPO.vercel.app/**`
