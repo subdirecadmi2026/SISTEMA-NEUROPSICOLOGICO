@@ -7,6 +7,9 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 
 const stats = [
   {
@@ -56,7 +59,18 @@ const statusStyles: Record<string, string> = {
   "Por confirmar": "bg-amber-50 text-amber-700",
 };
 
-export default function Home() {
+export default async function Home() {
+  if (isSupabaseConfigured) {
+    const supabase = await createClient();
+    const { data: membership } = await supabase!
+      .from("memberships")
+      .select("id")
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+    if (!membership) redirect("/onboarding");
+  }
+
   const occupancy = [48, 64, 57, 76, 87, 68, 44];
 
   return (

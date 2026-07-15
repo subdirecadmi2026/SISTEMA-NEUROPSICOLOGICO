@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { patients } from "@/lib/demo-data";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createPatient, listPatients } from "./actions";
 
 const statusStyles = {
   Activo: "bg-emerald-50 text-emerald-700 ring-emerald-600/10",
@@ -27,7 +29,20 @@ function RegistrationModal({
   open: boolean;
   close: () => void;
 }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState("");
+
   if (!open) return null;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setFeedback("");
+    const result = await createPatient(new FormData(event.currentTarget));
+    setSubmitting(false);
+    setFeedback(result.message);
+    if (result.ok) close();
+  }
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm">
@@ -54,24 +69,23 @@ function RegistrationModal({
         </div>
         <form
           className="grid gap-4 p-6 sm:grid-cols-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            close();
-          }}
+          onSubmit={handleSubmit}
         >
           {[
-            ["Nombres", "Ej. Mateo Alejandro"],
-            ["Apellidos", "Ej. Guerrero López"],
-            ["Documento de identidad", "Cédula o pasaporte"],
-            ["Fecha de nacimiento", "dd/mm/aaaa"],
-            ["Teléfono", "+593"],
-            ["Correo electrónico", "paciente@correo.com"],
-          ].map(([label, placeholder]) => (
+            ["Nombres", "Ej. Mateo Alejandro", "firstNames", "text", true],
+            ["Apellidos", "Ej. Guerrero López", "lastNames", "text", true],
+            ["Documento de identidad", "Cédula o pasaporte", "documentNumber", "text", false],
+            ["Fecha de nacimiento", "", "birthDate", "date", true],
+            ["Teléfono", "+593", "phone", "tel", false],
+            ["Correo electrónico", "paciente@correo.com", "email", "email", false],
+          ].map(([label, placeholder, name, type, required]) => (
             <label key={label} className="space-y-2">
               <span className="text-[11px] font-semibold text-slate-600">{label}</span>
               <input
-                required
-                placeholder={placeholder}
+                name={name as string}
+                type={type as string}
+                required={required as boolean}
+                placeholder={placeholder as string}
                 className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
               />
             </label>
@@ -81,11 +95,20 @@ function RegistrationModal({
               Motivo inicial de consulta
             </span>
             <textarea
+              name="referralReason"
               rows={3}
               placeholder="Describe brevemente el motivo de atención..."
               className="w-full resize-none rounded-xl border border-slate-200 p-3.5 text-xs outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50"
             />
           </label>
+          {feedback && (
+            <p
+              role="status"
+              className="rounded-xl bg-amber-50 p-3 text-[10px] text-amber-800 sm:col-span-2"
+            >
+              {feedback}
+            </p>
+          )}
           <div className="mt-2 flex justify-end gap-3 sm:col-span-2">
             <button
               type="button"
@@ -96,9 +119,10 @@ function RegistrationModal({
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-200"
+              disabled={submitting}
+              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-200 disabled:opacity-50"
             >
-              Crear expediente
+              {submitting ? "Guardando..." : "Crear expediente"}
             </button>
           </div>
         </form>
@@ -111,14 +135,23 @@ function PatientsContent() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(searchParams.get("nuevo") === "1");
+  const [patientRecords, setPatientRecords] = useState(patients);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    void listPatients().then((records) => {
+      if (records) setPatientRecords(records);
+    });
+  }, [modalOpen]);
+
   const filteredPatients = useMemo(
     () =>
-      patients.filter((patient) =>
+      patientRecords.filter((patient) =>
         `${patient.name} ${patient.document} ${patient.diagnosis}`
           .toLowerCase()
           .includes(query.toLowerCase()),
       ),
-    [query],
+    [patientRecords, query],
   );
 
   return (
@@ -133,6 +166,15 @@ function PatientsContent() {
             <p className="mt-2 text-xs text-slate-500">
               Consulta y administra los expedientes del centro.
             </p>
+            <span
+              className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[9px] font-bold ${
+                isSupabaseConfigured
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {isSupabaseConfigured ? "Datos conectados" : "Modo demostrativo"}
+            </span>
           </div>
           <button
             onClick={() => setModalOpen(true)}
@@ -145,7 +187,7 @@ function PatientsContent() {
 
         <div className="mt-7 grid gap-4 sm:grid-cols-3">
           {[
-            ["Pacientes registrados", "1.486", "text-indigo-600"],
+            ["Pacientes registrados", isSupabaseConfigured ? String(patientRecords.length) : "1.486", "text-indigo-600"],
             ["En atención activa", "1.248", "text-emerald-600"],
             ["Nuevos este mes", "32", "text-violet-600"],
           ].map(([label, value, color]) => (

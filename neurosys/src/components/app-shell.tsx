@@ -9,6 +9,7 @@ import {
   FileChartColumn,
   HeartPulse,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageCircleMore,
   MoreHorizontal,
@@ -20,8 +21,10 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const navigation = [
   { label: "Inicio", icon: LayoutDashboard, href: "/" },
@@ -65,6 +68,15 @@ function Sidebar({
   close: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function signOut() {
+    const supabase = createClient();
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <>
@@ -164,7 +176,18 @@ function Sidebar({
                 Director clínico
               </p>
             </div>
-            <MoreHorizontal size={16} className="text-slate-400" />
+            {isSupabaseConfigured ? (
+              <button
+                onClick={signOut}
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-rose-500"
+              >
+                <LogOut size={15} />
+              </button>
+            ) : (
+              <MoreHorizontal size={16} className="text-slate-400" />
+            )}
           </div>
         </div>
       </aside>
@@ -174,6 +197,9 @@ function Sidebar({
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname === "/login" || pathname === "/onboarding") return <>{children}</>;
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] text-slate-900">

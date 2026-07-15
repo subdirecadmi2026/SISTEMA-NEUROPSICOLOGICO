@@ -11,7 +11,13 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  createAppointment,
+  getAppointmentOptions,
+  type AppointmentOptions,
+} from "./actions";
 
 const days = [
   { weekday: "LUN", number: 13 },
@@ -110,11 +116,26 @@ const appointments = [
 function AppointmentModal({
   open,
   close,
+  options,
 }: {
   open: boolean;
   close: () => void;
+  options: AppointmentOptions;
 }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState("");
+
   if (!open) return null;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setFeedback("");
+    const result = await createAppointment(new FormData(event.currentTarget));
+    setSubmitting(false);
+    setFeedback(result.message);
+    if (result.ok) close();
+  }
 
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm">
@@ -141,53 +162,105 @@ function AppointmentModal({
         </div>
         <form
           className="grid gap-4 p-6 sm:grid-cols-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            close();
-          }}
+          onSubmit={handleSubmit}
         >
           <label className="space-y-2 sm:col-span-2">
             <span className="text-[11px] font-semibold text-slate-600">
               Paciente
             </span>
-            <select className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400">
-              <option>Mateo Guerrero</option>
-              <option>Sofía Andrade</option>
-              <option>Julián Torres</option>
-              <option>Valentina Ruiz</option>
+            <select
+              name="patientId"
+              required
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400"
+            >
+              {options.patients.map((patient) => (
+                <option key={patient.id} value={patient.id}>
+                  {patient.name}
+                </option>
+              ))}
             </select>
           </label>
-          {[
-            ["Servicio", ["Neurorehabilitación", "Evaluación neuropsicológica", "Psicoterapia infantil"]],
-            ["Profesional", ["Dra. Ana Pérez", "Ps. Carlos Mena", "Lic. María León"]],
-            ["Fecha", ["15 de julio de 2026", "16 de julio de 2026", "17 de julio de 2026"]],
-            ["Hora", ["08:30", "09:00", "10:30", "14:00"]],
-          ].map(([label, values]) => (
-            <label key={label as string} className="space-y-2">
-              <span className="text-[11px] font-semibold text-slate-600">
-                {label as string}
-              </span>
-              <select className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400">
-                {(values as string[]).map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </label>
-          ))}
+          <label className="space-y-2">
+            <span className="text-[11px] font-semibold text-slate-600">
+              Servicio
+            </span>
+            <select
+              name="serviceName"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400"
+            >
+              {[
+                "Neurorehabilitación",
+                "Evaluación neuropsicológica",
+                "Psicoterapia infantil",
+              ].map((service) => (
+                <option key={service}>{service}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-[11px] font-semibold text-slate-600">
+              Profesional
+            </span>
+            <select
+              name="professionalId"
+              required
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400"
+            >
+              {options.professionals.map((professional) => (
+                <option key={professional.id} value={professional.id}>
+                  {professional.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-[11px] font-semibold text-slate-600">Fecha</span>
+            <input
+              name="date"
+              type="date"
+              required
+              defaultValue="2026-07-15"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-[11px] font-semibold text-slate-600">Hora</span>
+            <input
+              name="time"
+              type="time"
+              required
+              defaultValue="09:00"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs outline-none focus:border-indigo-400"
+            />
+          </label>
           <label className="space-y-2 sm:col-span-2">
             <span className="text-[11px] font-semibold text-slate-600">
               Nota para recepción
             </span>
             <textarea
+              name="notes"
               rows={3}
               placeholder="Indicaciones opcionales..."
               className="w-full resize-none rounded-xl border border-slate-200 p-3.5 text-xs outline-none focus:border-indigo-400"
             />
           </label>
           <label className="flex items-center gap-2 text-[10px] text-slate-600 sm:col-span-2">
-            <input type="checkbox" defaultChecked className="accent-indigo-600" />
+            <input
+              name="reminderConsent"
+              type="checkbox"
+              defaultChecked
+              className="accent-indigo-600"
+            />
             Enviar confirmación automática al paciente
           </label>
+          {feedback && (
+            <p
+              role="status"
+              className="rounded-xl bg-amber-50 p-3 text-[10px] text-amber-800 sm:col-span-2"
+            >
+              {feedback}
+            </p>
+          )}
           <div className="mt-2 flex justify-end gap-3 sm:col-span-2">
             <button
               type="button"
@@ -198,9 +271,11 @@ function AppointmentModal({
             </button>
             <button
               type="submit"
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-200"
+              disabled={submitting}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-200 disabled:opacity-50"
             >
-              <Check size={15} /> Confirmar cita
+              <Check size={15} />
+              {submitting ? "Guardando..." : "Confirmar cita"}
             </button>
           </div>
         </form>
@@ -211,6 +286,26 @@ function AppointmentModal({
 
 export default function AgendaPage() {
   const [modalOpen, setModalOpen] = useState(false);
+  const [appointmentOptions, setAppointmentOptions] =
+    useState<AppointmentOptions>({
+      patients: [
+        { id: "00000000-0000-4000-8000-000000000001", name: "Mateo Guerrero" },
+        { id: "00000000-0000-4000-8000-000000000002", name: "Sofía Andrade" },
+        { id: "00000000-0000-4000-8000-000000000003", name: "Julián Torres" },
+      ],
+      professionals: [
+        { id: "00000000-0000-4000-8000-000000000011", name: "Dra. Ana Pérez" },
+        { id: "00000000-0000-4000-8000-000000000012", name: "Ps. Carlos Mena" },
+        { id: "00000000-0000-4000-8000-000000000013", name: "Lic. María León" },
+      ],
+    });
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    void getAppointmentOptions().then((options) => {
+      if (options) setAppointmentOptions(options);
+    });
+  }, [modalOpen]);
 
   return (
     <>
@@ -224,6 +319,15 @@ export default function AgendaPage() {
             <p className="mt-2 text-xs text-slate-500">
               Coordina profesionales, consultorios y servicios.
             </p>
+            <span
+              className={`mt-3 inline-flex rounded-full px-2.5 py-1 text-[9px] font-bold ${
+                isSupabaseConfigured
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {isSupabaseConfigured ? "Agenda conectada" : "Modo demostrativo"}
+            </span>
           </div>
           <button
             onClick={() => setModalOpen(true)}
@@ -383,7 +487,11 @@ export default function AgendaPage() {
           ))}
         </div>
       </main>
-      <AppointmentModal open={modalOpen} close={() => setModalOpen(false)} />
+      <AppointmentModal
+        open={modalOpen}
+        close={() => setModalOpen(false)}
+        options={appointmentOptions}
+      />
     </>
   );
 }
