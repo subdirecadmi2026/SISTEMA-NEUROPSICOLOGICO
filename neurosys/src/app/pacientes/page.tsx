@@ -20,6 +20,8 @@ const statusStyles = {
   Activo: "bg-emerald-50 text-emerald-700 ring-emerald-600/10",
   Seguimiento: "bg-amber-50 text-amber-700 ring-amber-600/10",
   Evaluación: "bg-violet-50 text-violet-700 ring-violet-600/10",
+  Alta: "bg-sky-50 text-sky-700 ring-sky-600/10",
+  Inactivo: "bg-slate-100 text-slate-600 ring-slate-500/10",
 };
 
 function RegistrationModal({
@@ -265,7 +267,7 @@ function PatientsContent() {
                             {patient.name}
                           </Link>
                           <p className="mt-1 text-[10px] text-slate-400">
-                            {patient.id} · {patient.age} años
+                            {patient.recordNumber} · {patient.age} años
                           </p>
                         </div>
                       </div>

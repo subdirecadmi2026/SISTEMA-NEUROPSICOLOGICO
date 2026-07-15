@@ -6,7 +6,15 @@ import {
 } from "@/lib/supabase/config";
 
 export async function proxy(request: NextRequest) {
-  if (!isSupabaseConfigured) return NextResponse.next();
+  if (!isSupabaseConfigured) {
+    if (process.env.VERCEL) {
+      return new NextResponse(
+        "NeuroSys requiere NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en Vercel.",
+        { status: 503 },
+      );
+    }
+    return NextResponse.next();
+  }
 
   let response = NextResponse.next({ request });
   const { url, publishableKey } = getSupabaseConfig();
@@ -31,19 +39,46 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  const isOnboardingRoute = request.nextUrl.pathname.startsWith("/onboarding");
+  const isHealthRoute = request.nextUrl.pathname === "/api/health";
+
+  function redirectWithCookies(pathname: string, next?: string) {
+    const url = request.nextUrl.clone();
+    url.pathname = pathname;
+    url.search = "";
+    if (next) url.searchParams.set("next", next);
+    const redirectResponse = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie);
+    });
+    return redirectResponse;
+  }
+
+  if (isHealthRoute) return response;
 
   if (!user && !isAuthRoute) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return redirectWithCookies("/login", request.nextUrl.pathname);
   }
 
   if (user && isAuthRoute) {
-    const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = "/";
-    homeUrl.search = "";
-    return NextResponse.redirect(homeUrl);
+    return redirectWithCookies("/");
+  }
+
+  if (user) {
+    const { data: membership } = await supabase
+      .from("memberships")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!membership && !isOnboardingRoute) {
+      return redirectWithCookies("/onboarding");
+    }
+    if (membership && isOnboardingRoute) {
+      return redirectWithCookies("/");
+    }
   }
 
   return response;

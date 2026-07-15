@@ -1,70 +1,70 @@
 import {
-  Activity,
   AlertTriangle,
   CalendarDays,
-  CheckCircle2,
   ChevronLeft,
   ClipboardList,
   FileText,
   HeartPulse,
   Mail,
-  MessageCircle,
+  MapPin,
   Phone,
-  Plus,
   ShieldCheck,
-  Sparkles,
-  Stethoscope,
-  Target,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { featuredPatient } from "@/lib/demo-data";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getPatientById, type PatientDetail } from "../actions";
+import { listClinicalNotes, type ClinicalNote } from "./actions";
+import { NewEvolutionForm } from "./new-evolution-form";
 
-const timeline = [
+const demoNotes: ClinicalNote[] = [
   {
-    date: "14 JUL",
+    id: "demo-evolution",
+    noteType: "evolution",
     title: "Sesión de neurorehabilitación",
-    detail:
-      "Mejor desempeño en tareas de memoria de trabajo. Persisten dificultades en control inhibitorio.",
+    subjective: "La familia refiere mayor autonomía en las tareas escolares.",
+    objective: "Mejor desempeño en tareas de memoria de trabajo.",
+    assessment:
+      "Se observa progreso sostenido. Persisten dificultades leves en control inhibitorio.",
+    plan: "Continuar intervención semanal y reevaluar funciones ejecutivas.",
+    occurredAt: "2026-07-14T14:00:00-05:00",
+    signedAt: "2026-07-14T14:45:00-05:00",
     author: "Dra. Ana Pérez",
-    icon: HeartPulse,
-    tone: "bg-emerald-50 text-emerald-600",
-  },
-  {
-    date: "08 JUL",
-    title: "Aplicación de escala Conners",
-    detail:
-      "Protocolo completado por representante. Resultados pendientes de interpretación profesional.",
-    author: "Dra. Ana Pérez",
-    icon: ClipboardList,
-    tone: "bg-violet-50 text-violet-600",
-  },
-  {
-    date: "02 JUL",
-    title: "Informe neuropsicológico emitido",
-    detail:
-      "Documento revisado, firmado electrónicamente y compartido con el representante autorizado.",
-    author: "Sistema · validado por Dra. Ana Pérez",
-    icon: FileText,
-    tone: "bg-indigo-50 text-indigo-600",
-  },
-  {
-    date: "24 JUN",
-    title: "Actualización del plan terapéutico",
-    detail:
-      "Se incorporan objetivos para atención sostenida, memoria de trabajo y regulación emocional.",
-    author: "Equipo clínico",
-    icon: Target,
-    tone: "bg-amber-50 text-amber-600",
   },
 ];
 
-const goals = [
-  { name: "Atención sostenida", progress: 78, color: "bg-indigo-500" },
-  { name: "Memoria de trabajo", progress: 64, color: "bg-violet-500" },
-  { name: "Control inhibitorio", progress: 48, color: "bg-amber-500" },
-  { name: "Regulación emocional", progress: 71, color: "bg-emerald-500" },
-];
+function demoPatient(id: string): PatientDetail {
+  return {
+    id,
+    recordNumber: featuredPatient.recordNumber,
+    initials: featuredPatient.initials,
+    name: featuredPatient.name,
+    document: featuredPatient.document,
+    birthDate: "2017-03-18",
+    age: featuredPatient.age,
+    diagnosis: featuredPatient.diagnosis,
+    referralReason: "Evaluación y acompañamiento de funciones ejecutivas.",
+    status: "active",
+    phone: featuredPatient.phone,
+    email: featuredPatient.email,
+    address: "Quito, Ecuador",
+    guardian: featuredPatient.guardian,
+    guardianPhone: featuredPatient.phone,
+    insurance: featuredPatient.insurance,
+    allergies: featuredPatient.allergies,
+    medications: featuredPatient.medications,
+  };
+}
+
+const noteTypeLabels: Record<string, string> = {
+  initial: "Valoración inicial",
+  evolution: "Evolución",
+  evaluation: "Evaluación",
+  discharge: "Alta clínica",
+  other: "Registro clínico",
+};
 
 export default async function PatientDetailPage({
   params,
@@ -72,10 +72,17 @@ export default async function PatientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const patient = { ...featuredPatient, id };
+  const [storedPatient, storedNotes] = await Promise.all([
+    getPatientById(id),
+    listClinicalNotes(id),
+  ]);
+
+  if (isSupabaseConfigured && !storedPatient) notFound();
+  const patient = storedPatient ?? demoPatient(id);
+  const notes = storedNotes ?? demoNotes;
 
   return (
-    <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-7 lg:px-9">
+    <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-7 lg:px-9">
       <Link
         href="/pacientes"
         className="mb-5 flex w-fit items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600"
@@ -84,70 +91,39 @@ export default async function PatientDetailPage({
       </Link>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className="h-24 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 sm:h-28" />
+        <div className="h-24 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600" />
         <div className="px-5 pb-5 sm:px-7">
-          <div className="-mt-10 flex flex-col justify-between gap-4 sm:-mt-9 sm:flex-row sm:items-end">
+          <div className="-mt-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div className="flex items-end gap-4">
               <div className="grid size-20 shrink-0 place-items-center rounded-2xl border-4 border-white bg-indigo-100 text-xl font-bold text-indigo-700 shadow-md">
                 {patient.initials}
               </div>
               <div className="pb-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-bold text-slate-950">
-                    {patient.name}
-                  </h1>
+                  <h1 className="text-xl font-bold text-slate-950">{patient.name}</h1>
                   <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700">
-                    Paciente activo
+                    {patient.status === "active" ? "Paciente activo" : "En seguimiento"}
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  {patient.id} · {patient.age} años · {patient.document}
+                  {patient.recordNumber} · {patient.age} años · {patient.document}
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-semibold text-slate-600">
-                <MessageCircle size={15} /> Contactar
-              </button>
-              <button className="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-200">
-                <Plus size={15} /> Nueva evolución
-              </button>
-            </div>
+            <NewEvolutionForm patientId={patient.id} />
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 sm:px-6">
-          {[
-            "Resumen",
-            "Línea de tiempo",
-            "Historia clínica",
-            "Evaluaciones",
-            "Tratamiento",
-            "Documentos",
-          ].map((tab, index) => (
-            <button
-              key={tab}
-              className={`whitespace-nowrap border-b-2 px-3 py-3.5 text-[11px] font-semibold ${
-                index === 0
-                  ? "border-indigo-600 text-indigo-600"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
       </section>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_320px]">
         <div className="space-y-5">
-          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-4 sm:grid-cols-3">
             {[
-              [Activity, "IPN actual", "72 / 100", "Favorable", "text-indigo-600"],
-              [CalendarDays, "Asistencia", "94%", "23 de 25 sesiones", "text-emerald-600"],
-              [Target, "Objetivos", "4 activos", "1 cumplido", "text-violet-600"],
-              [Stethoscope, "Última atención", "14 jul", "Neurorehabilitación", "text-amber-600"],
-            ].map(([Icon, label, value, detail, color]) => {
-              const MetricIcon = Icon as typeof Activity;
+              [FileText, "Evoluciones firmadas", String(notes.length), "text-indigo-600"],
+              [CalendarDays, "Edad", `${patient.age} años`, "text-violet-600"],
+              [HeartPulse, "Estado", patient.status === "active" ? "Activo" : "Seguimiento", "text-emerald-600"],
+            ].map(([Icon, label, value, color]) => {
+              const MetricIcon = Icon as typeof FileText;
               return (
                 <article
                   key={label as string}
@@ -160,22 +136,17 @@ export default async function PatientDetailPage({
                   <p className="mt-1 text-lg font-bold text-slate-900">
                     {value as string}
                   </p>
-                  <p className="mt-1 text-[9px] text-slate-400">
-                    {detail as string}
-                  </p>
                 </article>
               );
             })}
           </section>
 
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Resumen clínico
-                </h2>
+                <h2 className="text-sm font-bold text-slate-900">Resumen clínico</h2>
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Información esencial del expediente
+                  Información vigente del expediente
                 </p>
               </div>
               <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-bold text-indigo-600">
@@ -183,68 +154,19 @@ export default async function PatientDetailPage({
               </span>
             </div>
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Diagnóstico principal
-                </p>
-                <p className="mt-2 text-xs font-semibold text-slate-700">
-                  {patient.diagnosis}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Profesional responsable
-                </p>
-                <p className="mt-2 text-xs font-semibold text-slate-700">
-                  {patient.professional}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Medicación registrada
-                </p>
-                <p className="mt-2 text-xs font-semibold text-slate-700">
-                  {patient.medications}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Alergias
-                </p>
-                <p className="mt-2 text-xs font-semibold text-slate-700">
-                  {patient.allergies}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Evolución de objetivos
-                </h2>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Progreso registrado por el equipo tratante
-                </p>
-              </div>
-              <button className="text-[10px] font-bold text-indigo-600">
-                Ver plan
-              </button>
-            </div>
-            <div className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2">
-              {goals.map((goal) => (
-                <div key={goal.name}>
-                  <div className="flex justify-between text-[10px]">
-                    <span className="font-semibold text-slate-600">{goal.name}</span>
-                    <span className="font-bold text-slate-800">{goal.progress}%</span>
-                  </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full ${goal.color}`}
-                      style={{ width: `${goal.progress}%` }}
-                    />
-                  </div>
+              {[
+                ["Diagnóstico principal", patient.diagnosis],
+                ["Motivo de consulta", patient.referralReason],
+                ["Medicación registrada", patient.medications],
+                ["Alergias", patient.allergies],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {label}
+                  </p>
+                  <p className="mt-2 text-xs font-semibold leading-5 text-slate-700">
+                    {value}
+                  </p>
                 </div>
               ))}
             </div>
@@ -252,85 +174,84 @@ export default async function PatientDetailPage({
 
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6">
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Línea de tiempo</h2>
+              <h2 className="text-sm font-bold text-slate-900">Historia clínica</h2>
               <p className="mt-1 text-[11px] text-slate-500">
-                Actividad clínica reciente
+                Evoluciones firmadas en orden cronológico
               </p>
             </div>
-            <div className="mt-6 space-y-6">
-              {timeline.map((event, index) => {
-                const Icon = event.icon;
-                return (
-                  <div key={event.title} className="flex gap-4">
-                    <div className="w-11 shrink-0 pt-1 text-center text-[9px] font-bold text-slate-400">
-                      {event.date}
+            {notes.length === 0 ? (
+              <div className="mt-6 rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                <ClipboardList className="mx-auto text-slate-300" size={24} />
+                <p className="mt-3 text-xs font-semibold text-slate-600">
+                  Aún no hay evoluciones
+                </p>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  Registra la primera atención clínica de este paciente.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-5">
+                {notes.map((note) => (
+                  <article
+                    key={note.id}
+                    className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600">
+                          {noteTypeLabels[note.noteType] ?? "Registro clínico"}
+                        </span>
+                        <h3 className="mt-1 text-xs font-bold text-slate-800">
+                          {note.title}
+                        </h3>
+                      </div>
+                      <time className="text-[9px] font-medium text-slate-400">
+                        {new Intl.DateTimeFormat("es-EC", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                          timeZone: "America/Guayaquil",
+                        }).format(new Date(note.occurredAt))}
+                      </time>
                     </div>
-                    <div className="relative">
-                      {index < timeline.length - 1 && (
-                        <span className="absolute left-4 top-8 h-[calc(100%+24px)] w-px bg-slate-200" />
-                      )}
-                      <span
-                        className={`relative grid size-8 place-items-center rounded-full ${event.tone}`}
-                      >
-                        <Icon size={14} />
-                      </span>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {[
+                        ["Subjetivo", note.subjective],
+                        ["Objetivo", note.objective],
+                        ["Valoración", note.assessment],
+                        ["Plan", note.plan],
+                      ]
+                        .filter(([, value]) => value)
+                        .map(([label, value]) => (
+                          <div key={label as string}>
+                            <p className="text-[9px] font-bold uppercase text-slate-400">
+                              {label as string}
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap text-[11px] leading-5 text-slate-600">
+                              {value as string}
+                            </p>
+                          </div>
+                        ))}
                     </div>
-                    <div className="pb-1">
-                      <p className="text-xs font-bold text-slate-800">
-                        {event.title}
-                      </p>
-                      <p className="mt-1.5 max-w-2xl text-[11px] leading-5 text-slate-500">
-                        {event.detail}
-                      </p>
-                      <p className="mt-2 text-[9px] font-medium text-slate-400">
-                        {event.author}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    <p className="mt-4 flex items-center gap-1.5 border-t border-slate-100 pt-3 text-[9px] font-medium text-slate-400">
+                      <ShieldCheck size={11} className="text-emerald-500" />
+                      Firmado por {note.author}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200">
-            <div className="flex items-center gap-2">
-              <Sparkles size={17} />
-              <h2 className="text-sm font-bold">Memoria Clínica</h2>
-            </div>
-            <p className="mt-3 text-[11px] leading-5 text-indigo-100">
-              Prepara una síntesis autorizada de este expediente para revisión
-              profesional.
-            </p>
-            <button className="mt-4 w-full rounded-xl bg-white py-2.5 text-[10px] font-bold text-indigo-700">
-              Consultar expediente
-            </button>
-          </section>
-
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <div className="flex items-center gap-2 text-amber-700">
-              <AlertTriangle size={16} />
-              <h2 className="text-xs font-bold">Alerta de seguimiento</h2>
-            </div>
-            <p className="mt-2 text-[10px] leading-5 text-amber-800/70">
-              La reevaluación de funciones ejecutivas debe programarse durante
-              las próximas dos semanas.
-            </p>
-            <button className="mt-3 text-[10px] font-bold text-amber-800">
-              Programar ahora
-            </button>
-          </section>
-
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5">
-            <h2 className="text-sm font-bold text-slate-900">
-              Datos del paciente
-            </h2>
+            <h2 className="text-sm font-bold text-slate-900">Datos del paciente</h2>
             <div className="mt-5 space-y-4">
               {[
                 [UserRound, "Representante", patient.guardian],
                 [Phone, "Teléfono", patient.phone],
                 [Mail, "Correo", patient.email],
+                [MapPin, "Dirección", patient.address],
                 [ShieldCheck, "Cobertura", patient.insurance],
               ].map(([Icon, label, value]) => {
                 const DetailIcon = Icon as typeof UserRound;
@@ -341,7 +262,7 @@ export default async function PatientDetailPage({
                       <p className="text-[9px] font-medium text-slate-400">
                         {label as string}
                       </p>
-                      <p className="mt-1 text-[10px] font-semibold text-slate-700">
+                      <p className="mt-1 break-all text-[10px] font-semibold text-slate-700">
                         {value as string}
                       </p>
                     </div>
@@ -350,21 +271,15 @@ export default async function PatientDetailPage({
               })}
             </div>
           </section>
-
-          <section className="rounded-2xl border border-slate-200/80 bg-white p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-900">Próxima cita</h2>
-              <CheckCircle2 size={16} className="text-emerald-500" />
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <div className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle size={16} />
+              <h2 className="text-xs font-bold">Confidencialidad clínica</h2>
             </div>
-            <p className="mt-4 text-xs font-bold text-slate-800">
-              Viernes, 17 de julio
+            <p className="mt-2 text-[10px] leading-5 text-amber-800/70">
+              Las evoluciones firmadas son inmutables y cada operación queda
+              registrada en la auditoría institucional.
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">
-              09:00 · Neurorehabilitación
-            </p>
-            <button className="mt-4 w-full rounded-xl border border-slate-200 py-2.5 text-[10px] font-bold text-slate-600">
-              Ver en agenda
-            </button>
           </section>
         </aside>
       </div>

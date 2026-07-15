@@ -20,6 +20,41 @@ export type PatientActionResult = {
   message: string;
 };
 
+export type PatientDetail = {
+  id: string;
+  recordNumber: string;
+  initials: string;
+  name: string;
+  document: string;
+  birthDate: string;
+  age: number;
+  diagnosis: string;
+  referralReason: string;
+  status: string;
+  phone: string;
+  email: string;
+  address: string;
+  guardian: string;
+  guardianPhone: string;
+  insurance: string;
+  allergies: string;
+  medications: string;
+};
+
+function calculateAge(birthDateValue: string) {
+  const birthDate = new Date(`${birthDateValue}T00:00:00`);
+  const today = new Date();
+  return Math.max(
+    0,
+    today.getFullYear() -
+      birthDate.getFullYear() -
+      (today <
+      new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate())
+        ? 1
+        : 0),
+  );
+}
+
 export async function listPatients(): Promise<Patient[] | null> {
   const supabase = await createClient();
   if (!supabase) return null;
@@ -39,35 +74,22 @@ export async function listPatients(): Promise<Patient[] | null> {
     active: "Activo",
     follow_up: "Seguimiento",
     evaluation: "Evaluación",
-    discharged: "Seguimiento",
-    inactive: "Seguimiento",
+    discharged: "Alta",
+    inactive: "Inactivo",
   } as const;
 
   return data.map((patient) => {
-    const birthDate = new Date(`${patient.birth_date}T00:00:00`);
-    const age = Math.max(
-      0,
-      new Date().getFullYear() -
-        birthDate.getFullYear() -
-        (new Date() <
-        new Date(
-          new Date().getFullYear(),
-          birthDate.getMonth(),
-          birthDate.getDate(),
-        )
-          ? 1
-          : 0),
-    );
     const firstNames = patient.first_names.trim();
     const lastNames = patient.last_names.trim();
     const initials = `${firstNames[0] ?? ""}${lastNames[0] ?? ""}`.toUpperCase();
 
     return {
       id: patient.id,
+      recordNumber: patient.clinical_record_number,
       initials,
       name: `${firstNames} ${lastNames}`,
       document: patient.document_number ?? "Sin documento",
-      age,
+      age: calculateAge(patient.birth_date),
       diagnosis: patient.primary_diagnosis ?? "Evaluación inicial",
       professional: "Sin asignar",
       lastVisit: "Sin atenciones",
@@ -76,6 +98,48 @@ export async function listPatients(): Promise<Patient[] | null> {
       color: "bg-indigo-100 text-indigo-700",
     };
   });
+}
+
+export async function getPatientById(id: string): Promise<PatientDetail | null> {
+  const parsedId = z.uuid().safeParse(id);
+  if (!parsedId.success) return null;
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("patients")
+    .select(
+      "id, clinical_record_number, first_names, last_names, document_number, birth_date, phone, email, address, legal_guardian_name, legal_guardian_phone, insurance_provider, status, referral_reason, primary_diagnosis, allergies, medications",
+    )
+    .eq("id", parsedId.data)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const firstNames = data.first_names.trim();
+  const lastNames = data.last_names.trim();
+  return {
+    id: data.id,
+    recordNumber: data.clinical_record_number,
+    initials: `${firstNames[0] ?? ""}${lastNames[0] ?? ""}`.toUpperCase(),
+    name: `${firstNames} ${lastNames}`,
+    document: data.document_number ?? "Sin documento",
+    birthDate: data.birth_date,
+    age: calculateAge(data.birth_date),
+    diagnosis: data.primary_diagnosis ?? "Sin diagnóstico registrado",
+    referralReason: data.referral_reason ?? "Sin motivo de consulta registrado",
+    status: data.status,
+    phone: data.phone ?? "Sin teléfono",
+    email: data.email ?? "Sin correo",
+    address: data.address ?? "Sin dirección",
+    guardian: data.legal_guardian_name ?? "No registrado",
+    guardianPhone: data.legal_guardian_phone ?? "Sin teléfono",
+    insurance: data.insurance_provider ?? "Particular",
+    allergies: data.allergies ?? "Ninguna registrada",
+    medications: data.medications ?? "Ninguna registrada",
+  };
 }
 
 export async function createPatient(

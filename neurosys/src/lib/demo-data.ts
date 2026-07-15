@@ -1,7 +1,13 @@
-export type PatientStatus = "Activo" | "Seguimiento" | "Evaluación";
+export type PatientStatus =
+  | "Activo"
+  | "Seguimiento"
+  | "Evaluación"
+  | "Alta"
+  | "Inactivo";
 
 export type Patient = {
   id: string;
+  recordNumber: string;
   initials: string;
   name: string;
   document: string;
@@ -17,6 +23,7 @@ export type Patient = {
 export const patients: Patient[] = [
   {
     id: "NW-2026-00124",
+    recordNumber: "NW-2026-00124",
     initials: "MG",
     name: "Mateo Guerrero",
     document: "1750234198",
@@ -30,6 +37,7 @@ export const patients: Patient[] = [
   },
   {
     id: "NW-2026-00108",
+    recordNumber: "NW-2026-00108",
     initials: "SA",
     name: "Sofía Andrade",
     document: "1726381045",
@@ -43,6 +51,7 @@ export const patients: Patient[] = [
   },
   {
     id: "NW-2026-00096",
+    recordNumber: "NW-2026-00096",
     initials: "JT",
     name: "Julián Torres",
     document: "1751034872",
@@ -56,6 +65,7 @@ export const patients: Patient[] = [
   },
   {
     id: "NW-2026-00081",
+    recordNumber: "NW-2026-00081",
     initials: "VR",
     name: "Valentina Ruiz",
     document: "1729046317",
@@ -69,6 +79,7 @@ export const patients: Patient[] = [
   },
   {
     id: "NW-2026-00067",
+    recordNumber: "NW-2026-00067",
     initials: "EM",
     name: "Emilia Morales",
     document: "1752094381",

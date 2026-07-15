@@ -8,8 +8,10 @@ const appointmentSchema = z.object({
   patientId: z.uuid(),
   professionalId: z.uuid(),
   serviceName: z.string().trim().min(2).max(160),
+  roomName: z.string().trim().max(120).optional().or(z.literal("")),
   date: z.iso.date(),
   time: z.string().regex(/^\d{2}:\d{2}$/),
+  duration: z.coerce.number().int().min(30).max(240),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
   reminderConsent: z.literal("on").optional(),
 });
@@ -17,6 +19,17 @@ const appointmentSchema = z.object({
 export type AppointmentOptions = {
   patients: { id: string; name: string }[];
   professionals: { id: string; name: string }[];
+};
+
+export type CalendarAppointment = {
+  id: string;
+  patient: string;
+  service: string;
+  professional: string;
+  room: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
 };
 
 export async function getAppointmentOptions(): Promise<AppointmentOptions | null> {
@@ -34,7 +47,12 @@ export async function getAppointmentOptions(): Promise<AppointmentOptions | null
       .from("memberships")
       .select("user_id, profiles!memberships_user_id_fkey(full_name)")
       .eq("active", true)
-      .in("role", ["professional", "clinical_director", "director"]),
+      .in("role", [
+        "super_admin",
+        "professional",
+        "clinical_director",
+        "director",
+      ]),
   ]);
 
   return {
@@ -52,6 +70,55 @@ export async function getAppointmentOptions(): Promise<AppointmentOptions | null
       };
     }),
   };
+}
+
+export async function listAppointments(
+  from: string,
+  to: string,
+): Promise<CalendarAppointment[] | null> {
+  const rangeSchema = z.object({
+    from: z.iso.datetime({ offset: true }),
+    to: z.iso.datetime({ offset: true }),
+  });
+  const parsed = rangeSchema.safeParse({ from, to });
+  if (!parsed.success) return [];
+
+  const supabase = await createClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(
+      "id, service_name, room_name, starts_at, ends_at, status, patients!appointments_patient_id_fkey(first_names, last_names), profiles!appointments_professional_id_fkey(full_name)",
+    )
+    .is("deleted_at", null)
+    .gte("starts_at", parsed.data.from)
+    .lt("starts_at", parsed.data.to)
+    .order("starts_at")
+    .limit(500);
+
+  if (error) return [];
+
+  return data.map((appointment) => {
+    const patient = Array.isArray(appointment.patients)
+      ? appointment.patients[0]
+      : appointment.patients;
+    const professional = Array.isArray(appointment.profiles)
+      ? appointment.profiles[0]
+      : appointment.profiles;
+    return {
+      id: appointment.id,
+      patient: patient
+        ? `${patient.first_names} ${patient.last_names}`
+        : "Paciente",
+      service: appointment.service_name,
+      professional: professional?.full_name ?? "Profesional",
+      room: appointment.room_name ?? "Sin sala",
+      startsAt: appointment.starts_at,
+      endsAt: appointment.ends_at,
+      status: appointment.status,
+    };
+  });
 }
 
 export async function createAppointment(formData: FormData) {
@@ -90,13 +157,16 @@ export async function createAppointment(formData: FormData) {
   const startsAt = new Date(
     `${parsed.data.date}T${parsed.data.time}:00-05:00`,
   );
-  const endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
+  const endsAt = new Date(
+    startsAt.getTime() + parsed.data.duration * 60 * 1000,
+  );
   const { error } = await supabase.from("appointments").insert({
     organization_id: membership.organization_id,
     branch_id: membership.branch_id,
     patient_id: parsed.data.patientId,
     professional_id: parsed.data.professionalId,
     service_name: parsed.data.serviceName,
+    room_name: parsed.data.roomName || null,
     starts_at: startsAt.toISOString(),
     ends_at: endsAt.toISOString(),
     notes: parsed.data.notes || null,
@@ -113,5 +183,6 @@ export async function createAppointment(formData: FormData) {
   if (error) return { ok: false, message: "No fue posible guardar la cita." };
 
   revalidatePath("/agenda");
+  revalidatePath("/");
   return { ok: true, message: "Cita programada correctamente." };
 }
