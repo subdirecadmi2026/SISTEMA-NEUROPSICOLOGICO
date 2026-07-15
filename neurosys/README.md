@@ -1,8 +1,8 @@
 # NeuroSys ERP
 
 ERP clínico para el Centro Neuroterapéutico Integral Ñampi Wasi. Incluye
-dashboard, pacientes, expediente 360°, agenda y la base de autenticación y
-persistencia multiempresa.
+dashboard conectado, pacientes, agenda semanal, expediente 360°, evoluciones
+clínicas firmadas, autenticación y persistencia multiempresa.
 
 ## Tecnologías
 
@@ -35,10 +35,23 @@ npx supabase link --project-ref TU_PROJECT_REF
 npx supabase db push
 ```
 
-La migración crea organizaciones, sedes, perfiles, membresías, pacientes,
-citas, auditoría y políticas RLS. Después de crear el primer usuario en
-Supabase Auth, inicia sesión en NeuroSys. El asistente inicial creará la
-organización y su primera sede.
+Las migraciones crean organizaciones, sedes, perfiles, membresías, pacientes,
+citas, evoluciones clínicas, auditoría y políticas RLS. Después de crear el
+primer usuario en Supabase Auth, inicia sesión en NeuroSys. El asistente inicial
+creará la organización y su primera sede.
 
 No utilices una clave `service_role` en el frontend. Las acciones normales usan
 la clave pública y quedan limitadas por las políticas RLS.
+
+## Calidad
+
+```sh
+npm run lint
+npm run typecheck
+npm run build
+```
+
+## Producción
+
+Consulta [`DEPLOY.md`](./DEPLOY.md) para configurar Supabase Auth, aplicar las
+migraciones y desplegar en Vercel con `neurosys` como directorio raíz.
