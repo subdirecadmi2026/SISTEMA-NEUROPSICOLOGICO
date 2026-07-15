@@ -2,7 +2,8 @@
 
 ERP clínico para el Centro Neuroterapéutico Integral Ñampi Wasi. Incluye
 dashboard conectado, pacientes, agenda semanal, expediente 360°, evoluciones
-clínicas firmadas, autenticación y persistencia multiempresa.
+clínicas firmadas, evaluaciones, planes terapéuticos, informes, comunicaciones,
+facturación interna, autenticación y persistencia multiempresa.
 
 ## Tecnologías
 
@@ -36,7 +37,8 @@ npx supabase db push
 ```
 
 Las migraciones crean organizaciones, sedes, perfiles, membresías, pacientes,
-citas, evoluciones clínicas, auditoría y políticas RLS. Después de crear el
+citas, evoluciones, evaluaciones, terapias, informes, comunicaciones,
+comprobantes internos, pagos, auditoría y políticas RLS. Después de crear el
 primer usuario en Supabase Auth, inicia sesión en NeuroSys. El asistente inicial
 creará la organización y su primera sede.
 

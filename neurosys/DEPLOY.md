@@ -16,6 +16,7 @@
    - `20260715000000_initial_clinical_core.sql`
    - `20260715010000_clinical_records.sql`
    - `20260715020000_tenant_integrity.sql`
+   - `20260715030000_operational_modules.sql`
    Si el proyecto ya contiene datos, crea una copia antes de `db push`. La
    tercera migración rechazará registros históricos que relacionen
    organizaciones o sedes distintas; corrige esas filas antes de reintentar.
@@ -64,6 +65,9 @@ responde `503` en vez de exponer el modo demostrativo.
 Las evoluciones firmadas son inmutables; una corrección debe registrarse como
 una nueva evolución. Los cambios quedan trazados en `audit_logs` sin copiar
 contenido clínico.
+
+El módulo de facturación genera comprobantes y saldos internos. No sustituye la
+facturación electrónica ni la autorización tributaria del SRI.
 
 ## 4. Verificación antes de producción
 
