@@ -58,17 +58,17 @@ export default async function ModulePage({
   params: Promise<{ module: string }>;
 }) {
   const { module: moduleSlug } = await params;
-  const module = modules[moduleSlug];
-  if (!module) notFound();
+  const moduleConfig = modules[moduleSlug];
+  if (!moduleConfig) notFound();
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:px-7 lg:px-9">
       <p className="text-xs font-medium text-indigo-600">Módulo NeuroSys</p>
       <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
-        {module.title}
+        {moduleConfig.title}
       </h1>
       <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-500">
-        {module.description}
+        {moduleConfig.description}
       </p>
 
       <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -81,7 +81,7 @@ export default async function ModulePage({
           </p>
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-3">
-          {module.next.map((item, index) => (
+          {moduleConfig.next.map((item, index) => (
             <article key={item} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
               <div className="flex items-center justify-between">
                 {index === 0 ? (
