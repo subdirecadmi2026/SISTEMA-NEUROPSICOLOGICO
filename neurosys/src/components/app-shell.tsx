@@ -29,7 +29,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 const navigation = [
   { label: "Inicio", icon: LayoutDashboard, href: "/" },
   { label: "Pacientes", icon: Users, href: "/pacientes" },
-  { label: "Agenda", icon: CalendarDays, href: "/agenda", count: "8" },
+  { label: "Agenda", icon: CalendarDays, href: "/agenda" },
   { label: "Historia clínica", icon: ClipboardPlus, href: "/historia-clinica" },
   { label: "Evaluaciones", icon: BrainCircuit, href: "/evaluaciones" },
   { label: "Terapias", icon: HeartPulse, href: "/terapias" },
@@ -148,11 +148,6 @@ function Sidebar({
                     className={active ? "text-indigo-600" : "text-slate-400"}
                   />
                   <span className="flex-1">{item.label}</span>
-                  {item.count && (
-                    <span className="rounded-md bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600">
-                      {item.count}
-                    </span>
-                  )}
                 </Link>
               );
             })}
