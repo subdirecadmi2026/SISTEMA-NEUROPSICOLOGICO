@@ -264,7 +264,7 @@ begin
     new.evaluator_id is distinct from old.evaluator_id
     or new.started_at is distinct from old.started_at
     or (
-      old.status in ('completed', 'authorized')
+      old.status in ('completed', 'authorized', 'cancelled')
       and (
         new.evaluation_type is distinct from old.evaluation_type
         or new.clinical_summary is distinct from old.clinical_summary
@@ -280,7 +280,7 @@ begin
     new.lead_professional_id is distinct from old.lead_professional_id
     or new.started_on is distinct from old.started_on
     or (
-      old.status = 'completed'
+      old.status in ('completed', 'cancelled')
       and (
         new.title is distinct from old.title
         or new.objectives is distinct from old.objectives
@@ -311,7 +311,7 @@ begin
         and new.sent_at is distinct from old.sent_at
       )
       or (
-        old.status = 'sent'
+        old.status in ('sent', 'failed', 'cancelled')
         and (
           new.channel is distinct from old.channel
           or new.recipient is distinct from old.recipient
@@ -358,7 +358,7 @@ begin
   then
     raise exception 'Transición de informe no permitida';
   end if;
-  if old.status in ('signed', 'delivered') and (
+  if old.status in ('signed', 'delivered', 'voided') and (
     new.title is distinct from old.title
     or new.content is distinct from old.content
     or new.report_type is distinct from old.report_type
