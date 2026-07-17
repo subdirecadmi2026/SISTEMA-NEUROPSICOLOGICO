@@ -1,0 +1,2 @@
+-- Los datos clínicos reales nunca deben formar parte del repositorio.
+-- Agrega aquí únicamente catálogos no sensibles para desarrollo local.
