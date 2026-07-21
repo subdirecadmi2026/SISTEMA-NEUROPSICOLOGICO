@@ -118,7 +118,7 @@ function LoginForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+          <form method="post" onSubmit={handleSubmit} className="mt-7 space-y-4">
             <label className="block space-y-2">
               <span className="text-[11px] font-semibold text-slate-600">
                 Correo electrónico
