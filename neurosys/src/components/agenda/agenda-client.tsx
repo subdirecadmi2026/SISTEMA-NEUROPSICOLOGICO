@@ -193,21 +193,36 @@ export function AgendaClient({ demoMode }: { demoMode: boolean }) {
     const time = String(formData.get("time"));
     const duration = Number(formData.get("duration"));
     const startsAt = appointmentIso(date, time);
+    const endsAt = new Date(
+      new Date(startsAt).getTime() + duration * 60_000,
+    ).toISOString();
+    const professionalName =
+      options.professionals.find(
+        (professional) => professional.id === professionalId,
+      )?.name ?? "Profesional";
+    const overlaps = appointments.some(
+      (appointment) =>
+        appointment.professional === professionalName &&
+        !["cancelled", "no_show"].includes(appointment.status) &&
+        new Date(startsAt) < new Date(appointment.endsAt) &&
+        new Date(endsAt) > new Date(appointment.startsAt),
+    );
+    if (overlaps) {
+      return {
+        ok: false,
+        message: "El profesional ya tiene una cita en ese horario.",
+      };
+    }
     const appointment: CalendarAppointment = {
       id: `demo-local-${Date.now()}`,
       patient:
         options.patients.find((patient) => patient.id === patientId)?.name ??
         "Paciente",
-      professional:
-        options.professionals.find(
-          (professional) => professional.id === professionalId,
-        )?.name ?? "Profesional",
+      professional: professionalName,
       service: String(formData.get("serviceName")),
       room: String(formData.get("roomName") || "Sin sala"),
       startsAt,
-      endsAt: new Date(
-        new Date(startsAt).getTime() + duration * 60_000,
-      ).toISOString(),
+      endsAt,
       status: "pending",
       cancellationReason: null,
       checkedInAt: null,
