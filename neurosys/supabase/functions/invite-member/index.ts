@@ -127,8 +127,8 @@ Deno.serve(async (request) => {
 
   const { data: invited, error: inviteError } =
     await admin.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: fullName },
-      redirectTo: `${appOrigin}/auth/callback`,
+      data: { full_name: fullName, must_set_password: true },
+      redirectTo: `${appOrigin}/auth/callback?next=%2Fconfiguracion%2Fcuenta`,
     });
   if (inviteError || !invited.user) {
     return json({ error: "No fue posible crear la invitación." }, 409);

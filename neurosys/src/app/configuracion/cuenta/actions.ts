@@ -72,7 +72,10 @@ export async function updateAccountPassword(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "La sesión expiró. Ingresa nuevamente." };
 
-  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data,
+    data: { must_set_password: false },
+  });
   if (error) {
     return {
       ok: false,
