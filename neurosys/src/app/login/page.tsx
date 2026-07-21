@@ -1,6 +1,7 @@
 "use client";
 
 import { BrainCircuit, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -11,7 +12,16 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const callbackError = searchParams.get("error");
+    if (callbackError === "enlace_expirado") {
+      return "El enlace expiró o ya fue utilizado. Solicita uno nuevo.";
+    }
+    if (callbackError === "enlace_invalido") {
+      return "El enlace de acceso no es válido.";
+    }
+    return "";
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,13 +36,27 @@ function LoginForm() {
       return;
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: String(formData.get("email")),
-      password: String(formData.get("password")),
-    });
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: String(formData.get("email")),
+        password: String(formData.get("password")),
+      });
 
-    if (authError) {
-      setError("Correo o contraseña incorrectos.");
+      if (authError) {
+        const networkFailure =
+          authError.status === 0 ||
+          authError.name === "AuthRetryableFetchError" ||
+          authError.message.toLowerCase().includes("fetch");
+        setError(
+          networkFailure
+            ? "No pudimos conectarnos. Revisa tu red e inténtalo nuevamente."
+            : "Correo o contraseña incorrectos.",
+        );
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("No pudimos conectarnos. Revisa tu red e inténtalo nuevamente.");
       setLoading(false);
       return;
     }
@@ -141,6 +165,14 @@ function LoginForm() {
                 </button>
               </span>
             </label>
+            <div className="text-right">
+              <Link
+                href="/recuperar-contrasena"
+                className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             {error && (
               <p role="alert" className="text-[10px] font-medium text-rose-600">
                 {error}
