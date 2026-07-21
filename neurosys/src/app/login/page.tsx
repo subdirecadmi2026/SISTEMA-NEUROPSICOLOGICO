@@ -4,8 +4,8 @@ import { BrainCircuit, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { signIn } from "./actions";
 
 function LoginForm() {
   const router = useRouter();
@@ -29,34 +29,9 @@ function LoginForm() {
     setError("");
 
     const formData = new FormData(event.currentTarget);
-    const supabase = createClient();
-    if (!supabase) {
-      setError("Supabase aún no está configurado.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: String(formData.get("email")),
-        password: String(formData.get("password")),
-      });
-
-      if (authError) {
-        const networkFailure =
-          authError.status === 0 ||
-          authError.name === "AuthRetryableFetchError" ||
-          authError.message.toLowerCase().includes("fetch");
-        setError(
-          networkFailure
-            ? "No pudimos conectarnos. Revisa tu red e inténtalo nuevamente."
-            : "Correo o contraseña incorrectos.",
-        );
-        setLoading(false);
-        return;
-      }
-    } catch {
-      setError("No pudimos conectarnos. Revisa tu red e inténtalo nuevamente.");
+    const result = await signIn(formData);
+    if (!result.ok) {
+      setError(result.message);
       setLoading(false);
       return;
     }
