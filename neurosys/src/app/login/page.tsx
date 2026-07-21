@@ -1,17 +1,27 @@
 "use client";
 
 import { BrainCircuit, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { signIn } from "./actions";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const callbackError = searchParams.get("error");
+    if (callbackError === "enlace_expirado") {
+      return "El enlace expiró o ya fue utilizado. Solicita uno nuevo.";
+    }
+    if (callbackError === "enlace_invalido") {
+      return "El enlace de acceso no es válido.";
+    }
+    return "";
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,20 +29,9 @@ function LoginForm() {
     setError("");
 
     const formData = new FormData(event.currentTarget);
-    const supabase = createClient();
-    if (!supabase) {
-      setError("Supabase aún no está configurado.");
-      setLoading(false);
-      return;
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: String(formData.get("email")),
-      password: String(formData.get("password")),
-    });
-
-    if (authError) {
-      setError("Correo o contraseña incorrectos.");
+    const result = await signIn(formData);
+    if (!result.ok) {
+      setError(result.message);
       setLoading(false);
       return;
     }
@@ -94,7 +93,7 @@ function LoginForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+          <form method="post" onSubmit={handleSubmit} className="mt-7 space-y-4">
             <label className="block space-y-2">
               <span className="text-[11px] font-semibold text-slate-600">
                 Correo electrónico
@@ -141,6 +140,14 @@ function LoginForm() {
                 </button>
               </span>
             </label>
+            <div className="text-right">
+              <Link
+                href="/recuperar-contrasena"
+                className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             {error && (
               <p role="alert" className="text-[10px] font-medium text-rose-600">
                 {error}

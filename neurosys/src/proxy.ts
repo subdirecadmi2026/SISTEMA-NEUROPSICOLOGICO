@@ -38,8 +38,12 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
+  const pathname = request.nextUrl.pathname;
+  const isLoginRoute = pathname.startsWith("/login");
+  const isRecoveryRoute = pathname.startsWith("/recuperar-contrasena");
+  const isCallbackRoute = pathname.startsWith("/auth/callback");
   const isOnboardingRoute = request.nextUrl.pathname.startsWith("/onboarding");
+  const isAccountRoute = pathname.startsWith("/configuracion/cuenta");
   const isHealthRoute = request.nextUrl.pathname === "/api/health";
 
   function redirectWithCookies(pathname: string, next?: string) {
@@ -54,13 +58,20 @@ export async function proxy(request: NextRequest) {
     return redirectResponse;
   }
 
-  if (isHealthRoute) return response;
+  if (isHealthRoute || isRecoveryRoute || isCallbackRoute) return response;
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isLoginRoute) {
     return redirectWithCookies("/login", request.nextUrl.pathname);
   }
 
-  if (user && isAuthRoute) {
+  if (
+    user?.user_metadata.must_set_password === true &&
+    !isAccountRoute
+  ) {
+    return redirectWithCookies("/configuracion/cuenta");
+  }
+
+  if (user && isLoginRoute) {
     return redirectWithCookies("/");
   }
 

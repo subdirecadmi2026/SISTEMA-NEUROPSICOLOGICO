@@ -155,10 +155,30 @@ function Sidebar({
         </nav>
 
         <div className="border-t border-slate-100 p-3">
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
+          <Link
+            href="/configuracion/cuenta"
+            onClick={close}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium ${
+              pathname.startsWith("/configuracion/cuenta")
+                ? "bg-indigo-50 text-indigo-700"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
             <Settings size={18} className="text-slate-400" />
             Configuración
-          </button>
+          </Link>
+          <Link
+            href="/configuracion/usuarios"
+            onClick={close}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium ${
+              pathname.startsWith("/configuracion/usuarios")
+                ? "bg-indigo-50 text-indigo-700"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Users size={18} className="text-slate-400" />
+            Equipo
+          </Link>
           <div className="mt-2 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
             <div className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-indigo-100 to-violet-200 text-xs font-bold text-indigo-700">
               DR
@@ -194,7 +214,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  if (pathname === "/login" || pathname === "/onboarding") return <>{children}</>;
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/onboarding") ||
+    pathname.startsWith("/recuperar-contrasena") ||
+    pathname.startsWith("/auth/callback")
+  ) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-[#f6f7fb] text-slate-900">
