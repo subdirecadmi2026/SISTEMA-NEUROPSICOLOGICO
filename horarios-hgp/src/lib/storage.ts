@@ -1,22 +1,31 @@
+import type { ScheduleDoc, SavedIndexItem } from '../types'
+
+export type { SavedIndexItem }
+
 const STORAGE_KEY = 'hgp-horarios-v1'
 
-import type { ScheduleDoc } from '../types'
-
-export type SavedIndexItem = {
-  id: string
-  label: string
-  serviceType: ScheduleDoc['serviceType']
-  unitName: string
-  month: number
-  year: number
-  updatedAt: string
+function migrate(doc: ScheduleDoc): ScheduleDoc {
+  return {
+    ...doc,
+    status: doc.status ?? 'BORRADOR',
+    version: doc.version ?? 1,
+    signatures: doc.signatures ?? [],
+    audit: doc.audit ?? [],
+    coverageRule: doc.coverageRule ?? {
+      minStaffPerDay: 2,
+      minHoursPerDay: 16,
+    },
+  }
 }
 
 function readAll(): Record<string, ScheduleDoc> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return {}
-    return JSON.parse(raw) as Record<string, ScheduleDoc>
+    const parsed = JSON.parse(raw) as Record<string, ScheduleDoc>
+    const out: Record<string, ScheduleDoc> = {}
+    for (const [k, v] of Object.entries(parsed)) out[k] = migrate(v)
+    return out
   } catch {
     return {}
   }
@@ -37,12 +46,13 @@ export function listSavedSchedules(): SavedIndexItem[] {
       month: d.month,
       year: d.year,
       updatedAt: d.updatedAt,
+      status: d.status,
     }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
 export function saveSchedule(doc: ScheduleDoc): ScheduleDoc {
-  const next = { ...doc, updatedAt: new Date().toISOString() }
+  const next = migrate({ ...doc, updatedAt: new Date().toISOString() })
   const all = readAll()
   all[next.id] = next
   writeAll(all)
@@ -50,11 +60,28 @@ export function saveSchedule(doc: ScheduleDoc): ScheduleDoc {
 }
 
 export function loadSchedule(id: string): ScheduleDoc | null {
-  return readAll()[id] ?? null
+  const doc = readAll()[id]
+  return doc ? migrate(doc) : null
 }
 
 export function deleteSchedule(id: string) {
   const all = readAll()
   delete all[id]
   writeAll(all)
+}
+
+export function findScheduleByPeriod(
+  serviceType: ScheduleDoc['serviceType'],
+  unitName: string,
+  year: number,
+  month: number,
+): ScheduleDoc | null {
+  const found = Object.values(readAll()).find(
+    (d) =>
+      d.serviceType === serviceType &&
+      d.unitName === unitName &&
+      d.year === year &&
+      d.month === month,
+  )
+  return found ? migrate(found) : null
 }

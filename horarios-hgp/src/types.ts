@@ -1,5 +1,19 @@
 export type ServiceType = 'enfermeria' | 'medico'
 
+export type UserRole =
+  | 'lider_servicio'
+  | 'gestion_enfermeria'
+  | 'subdireccion'
+  | 'direccion_asistencial'
+  | 'talento_humano'
+  | 'admin'
+
+export type ScheduleStatus =
+  | 'BORRADOR'
+  | 'EN_REVISION'
+  | 'APROBADO'
+  | 'ARCHIVADO'
+
 export type ShiftCode = {
   code: string
   label: string
@@ -23,6 +37,8 @@ export type StaffMember = {
   codigoPersonal: string
   order: number
   section?: string
+  serviceUnit?: string
+  active?: boolean
   /** Columnas extras (plantilla Enfermería HGP) */
   horasMedicas?: number
   horasViolenciaDomestica?: number
@@ -38,6 +54,30 @@ export type ContingencyRow = {
   name: string
   coverage: string
   phone: string
+}
+
+export type ApprovalSignature = {
+  role: UserRole | 'elaborado' | 'revisado' | 'aprobado' | 'talento_humano'
+  name: string
+  cargo: string
+  at: string
+  userId?: string
+}
+
+export type AuditEntry = {
+  id: string
+  at: string
+  userId?: string
+  userName: string
+  action: string
+  detail?: string
+}
+
+export type CoverageRule = {
+  /** Mínimo de personal con turno productivo por día */
+  minStaffPerDay: number
+  /** Mínimo de horas cubiertas por día */
+  minHoursPerDay: number
 }
 
 export type ScheduleDoc = {
@@ -61,7 +101,21 @@ export type ScheduleDoc = {
   revisadoPor: string
   aprobadoPor: string
   talentoHumano: string
+  status: ScheduleStatus
+  version: number
+  signatures: ApprovalSignature[]
+  audit: AuditEntry[]
+  coverageRule: CoverageRule
   updatedAt: string
+  createdBy?: string
+}
+
+export type AppUser = {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  serviceUnits: string[]
 }
 
 export const MONTHS_ES = [
@@ -81,15 +135,38 @@ export const MONTHS_ES = [
 
 export const WEEKDAYS_ES = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 
-/** Feriados nacionales Ecuador 2026 (referencia institucional). */
-export const FERIADOS_2026 = [
-  '01/01 Año Nuevo',
-  '16–17/02 Carnaval',
-  '03/04 Viernes Santo',
-  '01/05 Día del Trabajo',
-  '25/05 Batalla de Pichincha',
-  '10/08 Primer Grito de Independencia',
-  '09/10 Independencia de Guayaquil',
-  '02–03/11 Difuntos',
-  '25/12 Navidad',
-]
+export const ROLE_LABEL: Record<UserRole, string> = {
+  lider_servicio: 'Líder de servicio',
+  gestion_enfermeria: 'Gestión de Enfermería',
+  subdireccion: 'Subdirección Médica',
+  direccion_asistencial: 'Dirección Asistencial',
+  talento_humano: 'Talento Humano',
+  admin: 'Administrador',
+}
+
+export const STATUS_LABEL: Record<ScheduleStatus, string> = {
+  BORRADOR: 'Borrador',
+  EN_REVISION: 'En revisión',
+  APROBADO: 'Aprobado',
+  ARCHIVADO: 'Archivado',
+}
+
+export const DEFAULT_COVERAGE: CoverageRule = {
+  minStaffPerDay: 2,
+  minHoursPerDay: 16,
+}
+
+export type SavedIndexItem = {
+  id: string
+  label: string
+  serviceType: ServiceType
+  unitName: string
+  month: number
+  year: number
+  updatedAt: string
+  status?: ScheduleStatus
+}
+
+export function uid(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
+}

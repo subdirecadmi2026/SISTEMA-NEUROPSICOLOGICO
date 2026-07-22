@@ -1,8 +1,5 @@
 import type { ScheduleDoc, StaffMember } from '../types'
-
-function uid(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
-}
+import { DEFAULT_COVERAGE, uid } from '../types'
 
 export function demoNursingStaff(): StaffMember[] {
   const rows: Array<[string, string, string, string, string, string]> = [
@@ -26,6 +23,8 @@ export function demoNursingStaff(): StaffMember[] {
     relacionLaboral,
     codigoPersonal,
     section,
+    serviceUnit: 'Centro Obstétrico',
+    active: true,
     order: i + 1,
     horasMedicas: 0,
     horasViolenciaDomestica: 0,
@@ -52,6 +51,8 @@ export function demoMedicalStaff(): StaffMember[] {
     relacionLaboral,
     codigoPersonal,
     section: 'Personal médico',
+    serviceUnit: 'Medicina interna',
+    active: true,
     order: i + 1,
     horasMedicas: 0,
     horasViolenciaDomestica: 0,
@@ -84,32 +85,41 @@ export function createBlankSchedule(
   serviceType: ScheduleDoc['serviceType'],
   year: number,
   month: number,
+  options?: { withDemo?: boolean; unitName?: string; staff?: StaffMember[] },
 ): ScheduleDoc {
+  const withDemo = options?.withDemo ?? true
   const staff =
-    serviceType === 'enfermeria' ? demoNursingStaff() : demoMedicalStaff()
+    options?.staff ??
+    (withDemo
+      ? serviceType === 'enfermeria'
+        ? demoNursingStaff()
+        : demoMedicalStaff()
+      : [])
 
   const cells =
-    serviceType === 'enfermeria'
-      ? seedDemoCells(
-          staff,
-          year,
-          month,
-          {
-            ENF: ['D1', 'D1', 'N1', 'N1', 'L', 'L', 'D1', 'N1'],
-            INT: ['M', 'M', 'T', 'T', 'L', 'L', 'M', 'T'],
-            AUX: ['M', 'T', 'MN', 'L', 'M', 'T', 'L', 'MN'],
-          },
-          ['D1', 'N1', 'L'],
-        )
-      : seedDemoCells(
-          staff,
-          year,
-          month,
-          {
-            MED: ['CE', 'CE', 'H', 'PT1', 'L', 'CE', 'PT2', 'L'],
-          },
-          ['CE', 'H', 'L'],
-        )
+    withDemo && staff.length > 0
+      ? serviceType === 'enfermeria'
+        ? seedDemoCells(
+            staff,
+            year,
+            month,
+            {
+              ENF: ['D1', 'D1', 'N1', 'N1', 'L', 'L', 'D1', 'N1'],
+              INT: ['M', 'M', 'T', 'T', 'L', 'L', 'M', 'T'],
+              AUX: ['M', 'T', 'MN', 'L', 'M', 'T', 'L', 'MN'],
+            },
+            ['D1', 'N1', 'L'],
+          )
+        : seedDemoCells(
+            staff,
+            year,
+            month,
+            {
+              MED: ['CE', 'CE', 'H', 'PT1', 'L', 'CE', 'PT2', 'L'],
+            },
+            ['CE', 'H', 'L'],
+          )
+      : {}
 
   const base = {
     id: uid('sch'),
@@ -130,6 +140,19 @@ export function createBlankSchedule(
     ],
     llamado: false,
     vacacionesFlag: false,
+    status: 'BORRADOR' as const,
+    version: 1,
+    signatures: [],
+    audit: [
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Sistema',
+        action: 'creado',
+        detail: 'Horario creado',
+      },
+    ],
+    coverageRule: { ...DEFAULT_COVERAGE },
     updatedAt: new Date().toISOString(),
   }
 
@@ -137,7 +160,7 @@ export function createBlankSchedule(
     return {
       ...base,
       department: 'Gestión de Cuidados de Enfermería',
-      unitName: 'Centro Obstétrico',
+      unitName: options?.unitName ?? 'Centro Obstétrico',
       jefeServicio: 'Lic. Ana Parra',
       notes: '',
       contingencyPlan: '',
@@ -151,7 +174,7 @@ export function createBlankSchedule(
   return {
     ...base,
     department: 'Unidad de Administración de Talento Humano',
-    unitName: 'Medicina interna',
+    unitName: options?.unitName ?? 'Medicina interna',
     jefeServicio: '',
     notes:
       'Todas las actividades extras deben anotarse y enviarse mensualmente. Registrar interconsultas en la matriz.',
