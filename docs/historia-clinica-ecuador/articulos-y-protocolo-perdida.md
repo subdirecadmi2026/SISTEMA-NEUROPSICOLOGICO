@@ -339,4 +339,4 @@ Historias clínicas físicas, digitales y electrónicas; formularios, resultados
 
 ---
 
-*Documento de trabajo para NeuroSys / establecimientos de salud. No sustituye asesoría jurídica institucional ni la normativa interna del MSP vigente al momento de su aplicación.*
+*Documento de apoyo normativo para establecimientos de salud. No sustituye asesoría jurídica institucional ni la normativa interna del MSP vigente al momento de su aplicación.*
