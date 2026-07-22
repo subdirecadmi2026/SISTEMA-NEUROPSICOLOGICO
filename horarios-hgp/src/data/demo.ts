@@ -6,7 +6,6 @@ function uid(prefix: string) {
 
 export function demoNursingStaff(): StaffMember[] {
   const rows: Array<[string, string, string, string, string, string]> = [
-    // name, fun, role, relacion, codigo, section
     ['Lic. María Guatatuca', 'ENF', 'Enfermera', 'LOSEP', 'D1', 'Enfermeras/os y Auxiliar de Enfermería'],
     ['Lic. Ana Chimbo', 'ENF', 'Enfermera', 'LOSEP', 'D1', 'Enfermeras/os y Auxiliar de Enfermería'],
     ['Lic. Rosa Tanguila', 'ENF', 'Enfermera', 'LOSEP', 'N1', 'Enfermeras/os y Auxiliar de Enfermería'],
@@ -28,6 +27,11 @@ export function demoNursingStaff(): StaffMember[] {
     codigoPersonal,
     section,
     order: i + 1,
+    horasMedicas: 0,
+    horasViolenciaDomestica: 0,
+    horasLactancia: fun === 'ENF' && i === 1 ? 2 : 0,
+    horasExtras: 0,
+    observaciones: '',
   }))
 }
 
@@ -49,10 +53,14 @@ export function demoMedicalStaff(): StaffMember[] {
     codigoPersonal,
     section: 'Personal médico',
     order: i + 1,
+    horasMedicas: 0,
+    horasViolenciaDomestica: 0,
+    horasLactancia: 0,
+    horasExtras: 0,
+    observaciones: '',
   }))
 }
 
-/** Rellena patrón de turnos para demostración usando claves oficiales. */
 export function seedDemoCells(
   staff: StaffMember[],
   year: number,
@@ -103,18 +111,34 @@ export function createBlankSchedule(
           ['CE', 'H', 'L'],
         )
 
+  const base = {
+    id: uid('sch'),
+    hospital: 'Hospital General Puyo',
+    provincial: 'Dirección Provincial de Salud de Pastaza',
+    serviceType,
+    month,
+    year,
+    staff,
+    cells,
+    contingencyStaff: [
+      {
+        id: uid('cont'),
+        name: '',
+        coverage: '',
+        phone: '',
+      },
+    ],
+    llamado: false,
+    vacacionesFlag: false,
+    updatedAt: new Date().toISOString(),
+  }
+
   if (serviceType === 'enfermeria') {
     return {
-      hospital: 'Hospital General Puyo',
-      provincial: 'Dirección Provincial de Salud de Pastaza',
-      serviceType,
+      ...base,
       department: 'Gestión de Cuidados de Enfermería',
       unitName: 'Centro Obstétrico',
       jefeServicio: 'Lic. Ana Parra',
-      month,
-      year,
-      staff,
-      cells,
       notes: '',
       contingencyPlan: '',
       elaboradoPor: 'Lic. Ana Parra — Líder del servicio',
@@ -125,16 +149,10 @@ export function createBlankSchedule(
   }
 
   return {
-    hospital: 'Hospital General Puyo',
-    provincial: 'Dirección Provincial de Salud de Pastaza',
-    serviceType,
+    ...base,
     department: 'Unidad de Administración de Talento Humano',
     unitName: 'Medicina interna',
     jefeServicio: '',
-    month,
-    year,
-    staff,
-    cells,
     notes:
       'Todas las actividades extras deben anotarse y enviarse mensualmente. Registrar interconsultas en la matriz.',
     contingencyPlan:

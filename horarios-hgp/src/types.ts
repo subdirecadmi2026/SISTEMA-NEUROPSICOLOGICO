@@ -23,11 +23,25 @@ export type StaffMember = {
   codigoPersonal: string
   order: number
   section?: string
+  /** Columnas extras (plantilla Enfermería HGP) */
+  horasMedicas?: number
+  horasViolenciaDomestica?: number
+  horasLactancia?: number
+  horasExtras?: number
+  observaciones?: string
 }
 
 export type ScheduleCell = Record<string, string> // `${staffId}:${day}` -> code
 
+export type ContingencyRow = {
+  id: string
+  name: string
+  coverage: string
+  phone: string
+}
+
 export type ScheduleDoc = {
+  id: string
   hospital: string
   provincial: string
   serviceType: ServiceType
@@ -40,10 +54,14 @@ export type ScheduleDoc = {
   cells: ScheduleCell
   notes: string
   contingencyPlan: string
+  contingencyStaff: ContingencyRow[]
+  llamado: boolean
+  vacacionesFlag: boolean
   elaboradoPor: string
   revisadoPor: string
   aprobadoPor: string
   talentoHumano: string
+  updatedAt: string
 }
 
 export const MONTHS_ES = [

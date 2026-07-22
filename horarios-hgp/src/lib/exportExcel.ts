@@ -4,9 +4,11 @@ import type { ScheduleDoc } from '../types'
 import { FERIADOS_2026, MONTHS_ES } from '../types'
 import {
   countCodeForStaff,
+  coverageByDay,
   daysInMonth,
   plannedHours,
   plannedShifts,
+  totalPaidHours,
   weekdayLetter,
 } from './calendar'
 import { SERVICE_LABEL, shiftsFor } from '../data/templates'
@@ -16,6 +18,7 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
   const service = SERVICE_LABEL[doc.serviceType]
   const period = `${MONTHS_ES[doc.month - 1].toUpperCase()} ${doc.year}`
   const staffSorted = [...doc.staff].sort((a, b) => a.order - b.order)
+  const isEnf = doc.serviceType === 'enfermeria'
 
   const header: (string | number)[][] = [
     [doc.provincial],
@@ -29,9 +32,27 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
       `AÑO: ${doc.year}`,
       `MES: ${MONTHS_ES[doc.month - 1].toUpperCase()}`,
     ],
-    [`Tipo: ${service} · Período: ${period}`],
+    [
+      `Tipo: ${service} · Período: ${period}`,
+      doc.llamado ? 'LLAMADO: SÍ' : 'LLAMADO: NO',
+      doc.vacacionesFlag ? 'VACACIONES: SÍ' : 'VACACIONES: NO',
+    ],
     [],
   ]
+
+  const summaryHeaders = isEnf
+    ? [
+        'TURNOS PLANIF.',
+        'HORAS PLANIF.',
+        'DÍAS VAC.',
+        'H. MÉDICAS',
+        'H. VIOL. DOM.',
+        'LACTANCIA',
+        'H. EXTRAS',
+        'TOTAL H. PAGADAS',
+        'OBSERVACIONES',
+      ]
+    : ['HORAS', 'OBSERVACIONES']
 
   const dayNums: (string | number)[] = [
     'N°',
@@ -40,10 +61,7 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
     'RELACIÓN LABORAL',
     'CÓDIGO',
     ...Array.from({ length: days }, (_, i) => i + 1),
-    'TURNOS PLANIF.',
-    'HORAS PLANIF.',
-    'DÍAS VACACIONES',
-    'OBSERVACIONES',
+    ...summaryHeaders,
   ]
 
   const dayLetters: (string | number)[] = [
@@ -55,10 +73,7 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
     ...Array.from({ length: days }, (_, i) =>
       weekdayLetter(doc.year, doc.month, i + 1),
     ),
-    '',
-    '',
-    '',
-    '',
+    ...summaryHeaders.map(() => ''),
   ]
 
   const body = staffSorted.map((s, idx) => {
@@ -72,30 +87,37 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
     for (let d = 1; d <= days; d++) {
       row.push(doc.cells[`${s.id}:${d}`] ?? '')
     }
-    row.push(plannedShifts(doc, s.id))
-    row.push(plannedHours(doc, s.id))
-    row.push(countCodeForStaff(doc, s.id, 'V'))
-    row.push('')
+    if (isEnf) {
+      row.push(
+        plannedShifts(doc, s.id),
+        plannedHours(doc, s.id),
+        countCodeForStaff(doc, s.id, 'V'),
+        s.horasMedicas ?? 0,
+        s.horasViolenciaDomestica ?? 0,
+        s.horasLactancia ?? 0,
+        s.horasExtras ?? 0,
+        totalPaidHours(doc, s),
+        s.observaciones ?? '',
+      )
+    } else {
+      row.push(plannedHours(doc, s.id), s.observaciones ?? '')
+    }
     return row
   })
 
-  const legendTitle = [['CLAVES / DESCRIPCIÓN DE SIGLAS']]
   const legend = shiftsFor(doc.serviceType).map((s) => [
     s.code,
     `${s.label}${s.timeRange ? ` · ${s.timeRange}` : ''}${s.note ? ` (${s.note})` : ''} · ${s.hours} h`,
   ])
 
-  const footer: (string | number)[][] = [
-    [],
-    ['PLAN DE CONTINGENCIA', doc.contingencyPlan],
-    ['OBSERVACIONES', doc.notes],
-    ['FERIADOS 2026', FERIADOS_2026.join(' | ')],
-    [],
-    ['ELABORADO POR', doc.elaboradoPor],
-    ['REVISADO POR', doc.revisadoPor],
-    ['APROBADO POR', doc.aprobadoPor],
-    ['TALENTO HUMANO', doc.talentoHumano],
-  ]
+  const contRows = doc.contingencyStaff.map((c, i) => [
+    i + 1,
+    c.name,
+    c.coverage,
+    c.phone,
+  ])
+
+  const dist = coverageByDay(doc)
 
   const aoa: (string | number)[][] = [
     ...header,
@@ -103,9 +125,20 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
     dayLetters,
     ...body,
     [],
-    ...legendTitle,
+    ['CLAVES / DESCRIPCIÓN DE SIGLAS'],
     ...legend,
-    ...footer,
+    [],
+    ['PLAN DE CONTINGENCIA', doc.contingencyPlan],
+    ['N°', 'NOMBRE', 'COBERTURA', 'TELÉFONO'],
+    ...contRows,
+    [],
+    ['OBSERVACIONES', doc.notes],
+    ['FERIADOS 2026', FERIADOS_2026.join(' | ')],
+    [],
+    ['ELABORADO POR', doc.elaboradoPor],
+    ['REVISADO POR', doc.revisadoPor],
+    ['APROBADO POR', doc.aprobadoPor],
+    ['TALENTO HUMANO', doc.talentoHumano],
   ]
 
   const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -116,14 +149,10 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
     { wch: 16 },
     { wch: 8 },
     ...Array.from({ length: days }, () => ({ wch: 4 })),
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 14 },
+    ...summaryHeaders.map(() => ({ wch: 12 })),
   ]
 
-  // Hoja CLAVES separada (como en la plantilla médica)
-  const clavesAoa: (string | number)[][] = [
+  const wsClaves = XLSX.utils.aoa_to_sheet([
     ['CLAVES — ' + service],
     ['CÓDIGO', 'DESCRIPCIÓN', 'HORARIO', 'HORAS', 'GRUPO'],
     ...shiftsFor(doc.serviceType).map((s) => [
@@ -133,8 +162,7 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
       s.hours,
       s.group,
     ]),
-  ]
-  const wsClaves = XLSX.utils.aoa_to_sheet(clavesAoa)
+  ])
   wsClaves['!cols'] = [
     { wch: 8 },
     { wch: 36 },
@@ -143,9 +171,21 @@ export function exportScheduleExcel(doc: ScheduleDoc) {
     { wch: 10 },
   ]
 
+  const wsDist = XLSX.utils.aoa_to_sheet([
+    ['DISTRIBUCIÓN DE COBERTURA — ' + period],
+    ['DÍA', 'LETRA', 'PERSONAL CON TURNO', 'HORAS CUBIERTAS'],
+    ...dist.map((d) => [
+      d.day,
+      weekdayLetter(doc.year, doc.month, d.day),
+      d.count,
+      d.hours,
+    ]),
+  ])
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'HORARIO')
   XLSX.utils.book_append_sheet(wb, wsClaves, 'CLAVES')
+  XLSX.utils.book_append_sheet(wb, wsDist, 'DISTRIBUCION')
   const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
   const name = `Horario_${service}_${doc.unitName.replace(/\s+/g, '_')}_${doc.year}-${String(doc.month).padStart(2, '0')}.xlsx`
   saveAs(new Blob([buf], { type: 'application/octet-stream' }), name)

@@ -35,13 +35,19 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
 @media print {
+  @page {
+    size: landscape;
+    margin: 0.6cm;
+  }
+
   body {
-    background: white;
+    background: white !important;
   }
 
   .no-print {
@@ -50,6 +56,12 @@ select {
 
   .print-area {
     box-shadow: none !important;
-    border: none !important;
+    border: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    break-inside: avoid;
+  }
+
+  .print-area table {
+    font-size: 8px !important;
   }
 }

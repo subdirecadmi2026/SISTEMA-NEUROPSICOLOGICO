@@ -1,5 +1,5 @@
 import { WEEKDAYS_ES } from '../types'
-import type { ScheduleDoc } from '../types'
+import type { ScheduleDoc, StaffMember } from '../types'
 import { hoursForCode } from '../data/templates'
 
 export function daysInMonth(year: number, month: number): number {
@@ -54,4 +54,31 @@ export function countCodeForStaff(
     if (doc.cells[cellKey(staffId, d)] === code) n += 1
   }
   return n
+}
+
+/** Total horas pagadas ≈ planificadas + extras − (ajusta lactancia/permisos si aplica). */
+export function totalPaidHours(doc: ScheduleDoc, staff: StaffMember): number {
+  const planned = plannedHours(doc, staff.id)
+  const extras = staff.horasExtras ?? 0
+  return planned + extras
+}
+
+export function coverageByDay(doc: ScheduleDoc): { day: number; count: number; hours: number }[] {
+  const days = daysInMonth(doc.year, doc.month)
+  return Array.from({ length: days }, (_, i) => {
+    const day = i + 1
+    let count = 0
+    let hours = 0
+    for (const s of doc.staff) {
+      const code = doc.cells[cellKey(s.id, day)]
+      if (code) {
+        const h = hoursForCode(doc.serviceType, code)
+        if (h > 0) {
+          count += 1
+          hours += h
+        }
+      }
+    }
+    return { day, count, hours }
+  })
 }
