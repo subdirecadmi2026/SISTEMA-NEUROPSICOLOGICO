@@ -36,6 +36,7 @@ import { ShiftPalette } from './components/ShiftPalette'
 import { ScheduleTable } from './components/ScheduleTable'
 import { CreateScheduleWizard } from './components/CreateScheduleWizard'
 import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
+import { NamesEditor } from './components/NamesEditor'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId = 'horario' | 'claves' | 'distribucion' | 'contingencia' | 'personal'
@@ -57,6 +58,7 @@ export default function App() {
   const [user, setUser] = useState<AppUser | null>(() => loadSession())
   const [saving, setSaving] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [highlightNames, setHighlightNames] = useState(false)
 
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
@@ -273,6 +275,18 @@ export default function App() {
             >
               + Crear horario nuevo
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab('horario')
+                setHighlightNames(true)
+                flash('Escriba los nombres en la lista de abajo')
+                window.setTimeout(() => setHighlightNames(false), 5000)
+              }}
+              className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+            >
+              Editar nombres
+            </button>
             {!readOnly && (
               <>
                 <button
@@ -288,16 +302,6 @@ export default function App() {
                   className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
                 >
                   + 5 personal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTab('personal')
-                    flash('Complete nombres, FUN y código de cada especialista')
-                  }}
-                  className="rounded-lg border border-teal bg-white px-3 py-2 text-sm font-semibold text-teal hover:bg-teal/5"
-                >
-                  Completar personal
                 </button>
               </>
             )}
@@ -585,6 +589,12 @@ export default function App() {
 
         {tab === 'personal' && (
           <>
+            <NamesEditor
+              doc={doc}
+              readOnly={readOnly}
+              onChange={patchDoc}
+              highlight={highlightNames}
+            />
             <ScheduleStaffEditor
               doc={doc}
               readOnly={readOnly}
@@ -642,19 +652,27 @@ export default function App() {
         )}
 
         {tab === 'horario' && (
-          <ScheduleTable
-            doc={doc}
-            readOnly={readOnly}
-            paintMode={paintMode}
-            activeCode={activeCode}
-            onChange={patchDoc}
-            onAddStaff={addStaff}
-            onNewDemo={() =>
-              setDoc(
-                createBlankSchedule(doc.serviceType, doc.year, doc.month),
-              )
-            }
-          />
+          <>
+            <NamesEditor
+              doc={doc}
+              readOnly={readOnly}
+              onChange={patchDoc}
+              highlight={highlightNames}
+            />
+            <ScheduleTable
+              doc={doc}
+              readOnly={readOnly}
+              paintMode={paintMode}
+              activeCode={activeCode}
+              onChange={patchDoc}
+              onAddStaff={addStaff}
+              onNewDemo={() =>
+                setDoc(
+                  createBlankSchedule(doc.serviceType, doc.year, doc.month),
+                )
+              }
+            />
+          </>
         )}
 
         {/* Vista móvil: resumen consultable */}
@@ -691,10 +709,12 @@ export default function App() {
               ?.code ?? '',
           )
           setClaveTab('todas')
-          setTab('personal')
+          setTab('horario')
+          setHighlightNames(true)
           flash(
-            `Horario creado: ${next.unitName} · ${next.staff.length} plaza(s). Complete los nombres.`,
+            `Horario creado: ${next.unitName}. Escriba los nombres de los médicos/personal abajo.`,
           )
+          window.setTimeout(() => setHighlightNames(false), 8000)
         }}
       />
     </div>
