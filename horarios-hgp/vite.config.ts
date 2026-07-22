@@ -7,4 +7,9 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1600,
   },
+  server: {
+    host: true,
+    // Permite túneles públicos (Cloudflare / localtunnel) en demos
+    allowedHosts: true,
+  },
 })
