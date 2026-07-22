@@ -555,4 +555,4 @@ del incidente. No destruir hasta el cierre (Acta 06).
 
 ---
 
-*Documento de protocolo institucional. Complementa la compilación normativa en `articulos-y-protocolo-perdida.md`. No constituye asesoría jurídica externa; su aplicación corresponde a la autoridad del establecimiento conforme a la normativa del MSP vigente.*
+*Documento de protocolo institucional del Hospital General Puyo (MSP). Complementa la compilación normativa en `articulos-y-protocolo-perdida.md`. No constituye asesoría jurídica externa; su aplicación corresponde a la autoridad del establecimiento conforme a la normativa del MSP vigente.*
