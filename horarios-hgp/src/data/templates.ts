@@ -430,6 +430,8 @@ export const UNITS_ENFERMERIA = [
   'Consulta externa',
   'Centro de esterilización',
   'Nefrología',
+  'Neonatología',
+  'Hospitalización gineco-obstétrica',
 ]
 
 export const UNITS_MEDICO = [
@@ -441,4 +443,16 @@ export const UNITS_MEDICO = [
   'Anestesiología',
   'Traumatología',
   'Consulta externa',
+  'Cardiología',
+  'Neurología',
+  'Nefrología',
+  'Urología',
+  'Oftalmología',
+  'Otorrinolaringología',
+  'Dermatología',
+  'Psiquiatría',
+  'Imagenología',
+  'Laboratorio clínico',
+  'Medicina familiar',
+  'Terapia respiratoria',
 ]

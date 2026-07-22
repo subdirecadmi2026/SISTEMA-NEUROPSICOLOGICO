@@ -3,7 +3,6 @@ import type {
   AppUser,
   ScheduleDoc,
   ServiceType,
-  StaffMember,
 } from './types'
 import { MONTHS_ES, STATUS_LABEL, uid } from './types'
 import { createBlankSchedule } from './data/demo'
@@ -35,7 +34,9 @@ import { DistributionPanel } from './components/DistributionPanel'
 import { ContingencyPanel } from './components/ContingencyPanel'
 import { ShiftPalette } from './components/ShiftPalette'
 import { ScheduleTable } from './components/ScheduleTable'
-import { cloneStaffForSchedule } from './lib/staffLibrary'
+import { CreateScheduleWizard } from './components/CreateScheduleWizard'
+import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
+import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId = 'horario' | 'claves' | 'distribucion' | 'contingencia' | 'personal'
 
@@ -55,10 +56,14 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [user, setUser] = useState<AppUser | null>(() => loadSession())
   const [saving, setSaving] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
 
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
   const readOnly = !assertEditable(doc, user)
+  const namedStaff = doc.staff.filter((s) => s.name.trim().length > 0).length
+  const emptySlots = doc.staff.length - namedStaff
+  const staffOk = namedStaff >= 1
 
   useEffect(() => {
     setSaved(listSavedSchedules())
@@ -88,26 +93,26 @@ export default function App() {
   }
 
   function addStaff() {
-    const isEnf = doc.serviceType === 'enfermeria'
-    const member: StaffMember = {
-      id: uid(isEnf ? 'enf' : 'med'),
-      name: 'Nuevo personal',
-      fun: isEnf ? 'ENF' : 'MED',
-      role: isEnf ? 'Enfermera' : 'Médico',
-      relacionLaboral: 'LOSEP',
-      codigoPersonal: isEnf ? 'D1' : 'CE',
-      section: isEnf
-        ? 'Enfermeras/os y Auxiliar de Enfermería'
-        : 'Personal médico',
+    const member = {
+      ...createEmptyStaff(doc.serviceType, doc.unitName),
+      id: uid(doc.serviceType === 'enfermeria' ? 'enf' : 'med'),
+      name: '',
       order: doc.staff.length + 1,
-      horasMedicas: 0,
-      horasViolenciaDomestica: 0,
-      horasLactancia: 0,
-      horasExtras: 0,
-      observaciones: '',
-      active: true,
     }
     patchDoc({ ...doc, staff: [...doc.staff, member] })
+  }
+
+  function addManyStaff(count: number) {
+    if (readOnly) return
+    const extras = Array.from({ length: count }, (_, i) => ({
+      ...createEmptyStaff(doc.serviceType, doc.unitName),
+      id: uid(doc.serviceType === 'enfermeria' ? 'enf' : 'med'),
+      name: '',
+      order: doc.staff.length + i + 1,
+    }))
+    patchDoc({ ...doc, staff: [...doc.staff, ...extras] })
+    flash(`Agregadas ${count} filas de personal`)
+    setTab('personal')
   }
 
   async function handleSave() {
@@ -196,6 +201,13 @@ export default function App() {
             />
             <button
               type="button"
+              onClick={() => setShowCreate(true)}
+              className="rounded-lg bg-teal-soft px-3 py-2 text-sm font-bold text-navy-deep hover:brightness-105"
+            >
+              + Crear horario
+            </button>
+            <button
+              type="button"
               disabled={saving}
               onClick={() => void handleSave()}
               className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
@@ -212,7 +224,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => void handleExport()}
-              className="rounded-lg bg-teal-soft px-3 py-2 text-sm font-semibold text-navy-deep hover:brightness-105"
+              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
             >
               Exportar Excel
             </button>
@@ -235,6 +247,63 @@ export default function App() {
       )}
 
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
+        {/* Banner crear + estado de personal */}
+        <section className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3">
+          <div>
+            <p className="font-display text-lg text-navy">
+              {doc.unitName} · {MONTHS_ES[doc.month - 1]} {doc.year}
+            </p>
+            <p className="text-sm text-muted">
+              Personal en este horario:{' '}
+              <strong className="text-navy">{namedStaff}</strong> con nombre ·{' '}
+              <strong>{doc.staff.length}</strong> filas
+              {emptySlots > 0 ? ` · ${emptySlots} por completar` : ''}
+              {!staffOk && (
+                <span className="ml-2 font-semibold text-red-700">
+                  Debe constar al menos 1 especialista
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-deep"
+            >
+              + Crear horario nuevo
+            </button>
+            {!readOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => addManyStaff(1)}
+                  className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
+                >
+                  + 1 personal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addManyStaff(5)}
+                  className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
+                >
+                  + 5 personal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab('personal')
+                    flash('Complete nombres, FUN y código de cada especialista')
+                  }}
+                  className="rounded-lg border border-teal bg-white px-3 py-2 text-sm font-semibold text-teal hover:bg-teal/5"
+                >
+                  Completar personal
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+
         <section className="no-print mb-4 grid gap-3 lg:grid-cols-[1.1fr_1fr]">
           <div className="rounded-2xl border border-line bg-white/85 p-4 shadow-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
@@ -515,22 +584,35 @@ export default function App() {
         </div>
 
         {tab === 'personal' && (
-          <StaffManager
-            serviceType={doc.serviceType}
-            unitName={doc.unitName}
-            onFlash={flash}
-            onLoadIntoSchedule={(staff) => {
-              if (readOnly) {
-                flash('Horario bloqueado')
-                return
-              }
-              patchDoc({
-                ...doc,
-                staff: cloneStaffForSchedule(staff),
-              })
-              setTab('horario')
-            }}
-          />
+          <>
+            <ScheduleStaffEditor
+              doc={doc}
+              readOnly={readOnly}
+              onChange={patchDoc}
+              onFlash={flash}
+            />
+            <StaffManager
+              serviceType={doc.serviceType}
+              unitName={doc.unitName}
+              onFlash={flash}
+              onLoadIntoSchedule={(staff) => {
+                if (readOnly) {
+                  flash('Horario bloqueado')
+                  return
+                }
+                if (staff.length < 1) {
+                  flash('La biblioteca no tiene personal activo')
+                  return
+                }
+                patchDoc({
+                  ...doc,
+                  staff: cloneStaffForSchedule(staff),
+                })
+                setTab('horario')
+                flash(`Cargados ${staff.length} al horario`)
+              }}
+            />
+          </>
         )}
 
         {(tab === 'horario' || tab === 'claves') && (
@@ -596,6 +678,25 @@ export default function App() {
           Horarios HGP · HORARIO · CLAVES · DISTRIBUCIÓN · CONTINGENCIA · PERSONAL
         </p>
       </main>
+
+      <CreateScheduleWizard
+        open={showCreate}
+        defaultMonth={doc.month}
+        defaultYear={doc.year}
+        onClose={() => setShowCreate(false)}
+        onCreate={(next) => {
+          setDoc(next)
+          setActiveCode(
+            shiftsFor(next.serviceType).find((s) => s.group === 'turno')
+              ?.code ?? '',
+          )
+          setClaveTab('todas')
+          setTab('personal')
+          flash(
+            `Horario creado: ${next.unitName} · ${next.staff.length} plaza(s). Complete los nombres.`,
+          )
+        }}
+      />
     </div>
   )
 }

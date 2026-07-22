@@ -232,8 +232,11 @@ export function ScheduleTable({
                     <td className="sticky left-[3.25rem] z-10 border border-line bg-white px-1 py-0.5">
                       <input
                         disabled={readOnly}
-                        className="w-full rounded border-0 bg-transparent px-1 py-1 font-medium outline-none focus:bg-sand/60 disabled:opacity-70"
+                        className={`w-full rounded border-0 bg-transparent px-1 py-1 font-medium outline-none focus:bg-sand/60 disabled:opacity-70 ${
+                          !s.name.trim() ? 'placeholder:text-red-400' : ''
+                        }`}
                         value={s.name}
+                        placeholder="Escriba nombres y apellidos *"
                         onChange={(e) =>
                           updateStaff(s.id, { name: e.target.value })
                         }
