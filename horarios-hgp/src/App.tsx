@@ -43,9 +43,16 @@ import { CreateScheduleWizard } from './components/CreateScheduleWizard'
 import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
 import { NamesEditor } from './components/NamesEditor'
 import { SchedulesHome } from './components/SchedulesHome'
+import { PrintSheet } from './components/PrintSheet'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
-type TabId = 'horario' | 'claves' | 'distribucion' | 'contingencia' | 'personal'
+type TabId =
+  | 'horario'
+  | 'claves'
+  | 'distribucion'
+  | 'contingencia'
+  | 'personal'
+  | 'imprimir'
 
 const now = new Date()
 
@@ -294,6 +301,36 @@ export default function App() {
       )}
 
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
+        {/* Checklist operativo */}
+        <section className="no-print mb-4 rounded-2xl border border-line bg-white/90 p-4 shadow-sm">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+            Pasos del mes
+          </p>
+          <ol className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+            {(
+              [
+                [!!user, '1. Entrar (Líder)'],
+                [saved.length > 0 || namedStaff > 0, '2. Crear horario'],
+                [staffOk, '3. Nombres médicos'],
+                [Object.keys(doc.cells).length > 0, '4. Pintar turnos'],
+                [doc.status !== 'BORRADOR', '5. Enviar / aprobar'],
+              ] as const
+            ).map(([done, label]) => (
+              <li
+                key={label}
+                className={`rounded-lg border px-3 py-2 ${
+                  done
+                    ? 'border-teal/40 bg-teal/10 font-semibold text-navy'
+                    : 'border-line bg-sand/40 text-muted'
+                }`}
+              >
+                {done ? '✓ ' : '○ '}
+                {label}
+              </li>
+            ))}
+          </ol>
+        </section>
+
         {/* Banner crear + estado de personal */}
         <section className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3">
           <div>
@@ -596,6 +633,7 @@ export default function App() {
               ['distribucion', 'DISTRIBUCIÓN'],
               ['contingencia', 'CONTINGENCIA'],
               ['personal', 'PERSONAL'],
+              ['imprimir', 'IMPRIMIR'],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -701,6 +739,8 @@ export default function App() {
           </>
         )}
 
+        {tab === 'imprimir' && <PrintSheet doc={doc} />}
+
         {/* Vista móvil: resumen consultable */}
         <section className="no-print mt-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm md:hidden">
           <h2 className="font-display text-lg text-navy">Consulta móvil</h2>
@@ -720,6 +760,7 @@ export default function App() {
 
         <p className="no-print mt-4 text-center text-xs text-muted">
           Horarios HGP · HORARIO · CLAVES · DISTRIBUCIÓN · CONTINGENCIA · PERSONAL
+          · IMPRIMIR
         </p>
       </main>
 

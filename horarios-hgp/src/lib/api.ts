@@ -148,6 +148,38 @@ export async function persistSchedule(
     )
   }
 
+  // Firmas → tabla approvals (reemplazo por schedule)
+  await sb.from('approvals').delete().eq('schedule_id', local.id)
+  if (local.signatures.length > 0) {
+    const { error: sigErr } = await sb.from('approvals').insert(
+      local.signatures.map((s) => ({
+        schedule_id: local.id,
+        role: String(s.role),
+        name: s.name,
+        cargo: s.cargo,
+        signed_at: s.at,
+        user_id: s.userId ?? null,
+      })),
+    )
+    if (sigErr) throw new Error(sigErr.message)
+  }
+
+  // Contingencia
+  await sb.from('contingency').delete().eq('schedule_id', local.id)
+  const contRows = local.contingencyStaff
+    .filter((c) => c.name.trim() || c.coverage.trim() || c.phone.trim())
+    .map((c) => ({
+      id: c.id,
+      schedule_id: local.id,
+      name: c.name,
+      coverage: c.coverage,
+      phone: c.phone,
+    }))
+  if (contRows.length > 0) {
+    const { error: cErr } = await sb.from('contingency').insert(contRows)
+    if (cErr) throw new Error(cErr.message)
+  }
+
   return local
 }
 
