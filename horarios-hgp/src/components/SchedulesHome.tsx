@@ -6,7 +6,7 @@ type Props = {
   remote: boolean
   loading?: boolean
   onOpen: (id: string) => void
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void | Promise<void>
   onCreate: () => void
   onRefresh: () => void
 }

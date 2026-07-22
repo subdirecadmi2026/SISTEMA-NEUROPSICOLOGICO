@@ -70,6 +70,8 @@ npm run lint      # oxlint
 
 ## Despliegue (Vercel)
 
+Ver guía completa en [`DEPLOY.md`](./DEPLOY.md).
+
 1. Importar el repo; **Root Directory** = `horarios-hgp`.
 2. Configurar `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 3. Deploy. `vercel.json` ya apunta al build de Vite.

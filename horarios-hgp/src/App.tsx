@@ -25,7 +25,13 @@ import {
   duplicatePreviousMonth,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
-import { persistSchedule, isRemoteEnabled, listAllSchedules, loadAnySchedule } from './lib/api'
+import {
+  persistSchedule,
+  isRemoteEnabled,
+  listAllSchedules,
+  loadAnySchedule,
+  deleteRemoteSchedule,
+} from './lib/api'
 import { AuthBar } from './components/AuthBar'
 import { StaffManager } from './components/StaffManager'
 import { ApprovalPanel } from './components/ApprovalPanel'
@@ -180,10 +186,22 @@ export default function App() {
     }
   }
 
-  function handleDeleteSaved(id: string) {
+  async function handleDeleteSaved(id: string) {
+    if (!window.confirm('¿Eliminar este horario del navegador y del servidor?')) {
+      return
+    }
     deleteSchedule(id)
-    void refreshList()
-    flash('Eliminado del navegador (el de servidor se mantiene hasta borrar allá)')
+    try {
+      if (isRemoteEnabled()) await deleteRemoteSchedule(id)
+      flash('Horario eliminado')
+    } catch (e) {
+      flash(
+        e instanceof Error
+          ? `Eliminado local · remoto: ${e.message}`
+          : 'Eliminado solo en navegador',
+      )
+    }
+    await refreshList()
   }
 
   async function handleExport() {
@@ -552,7 +570,7 @@ export default function App() {
           onCreate={() => setShowCreate(true)}
           onRefresh={() => void refreshList()}
           onOpen={(id) => void handleLoad(id)}
-          onDelete={handleDeleteSaved}
+          onDelete={(id) => void handleDeleteSaved(id)}
         />
 
         <ApprovalPanel

@@ -223,6 +223,18 @@ export async function loadAnySchedule(id: string): Promise<ScheduleDoc | null> {
   return loadSchedule(id)
 }
 
+/** Elimina horario del servidor (y deja que el caller limpie local). */
+export async function deleteRemoteSchedule(id: string): Promise<void> {
+  const sb = getSupabase()
+  if (!sb) return
+  await sb.from('schedule_cells').delete().eq('schedule_id', id)
+  await sb.from('audit_log').delete().eq('schedule_id', id)
+  await sb.from('approvals').delete().eq('schedule_id', id)
+  await sb.from('contingency').delete().eq('schedule_id', id)
+  const { error } = await sb.from('schedules').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export function statusBadge(status: SavedIndexItem['status']): string {
   return status ? STATUS_LABEL[status] : '—'
 }
