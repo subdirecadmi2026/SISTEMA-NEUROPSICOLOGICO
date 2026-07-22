@@ -16,7 +16,6 @@ import { exportScheduleExcel } from './lib/exportExcel'
 import {
   deleteSchedule,
   listSavedSchedules,
-  loadSchedule,
   saveSchedule,
   type SavedIndexItem,
 } from './lib/storage'
@@ -26,7 +25,7 @@ import {
   duplicatePreviousMonth,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
-import { persistSchedule, isRemoteEnabled } from './lib/api'
+import { persistSchedule, isRemoteEnabled, listAllSchedules, loadAnySchedule } from './lib/api'
 import { AuthBar } from './components/AuthBar'
 import { StaffManager } from './components/StaffManager'
 import { ApprovalPanel } from './components/ApprovalPanel'
@@ -37,6 +36,7 @@ import { ScheduleTable } from './components/ScheduleTable'
 import { CreateScheduleWizard } from './components/CreateScheduleWizard'
 import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
 import { NamesEditor } from './components/NamesEditor'
+import { SchedulesHome } from './components/SchedulesHome'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId = 'horario' | 'claves' | 'distribucion' | 'contingencia' | 'personal'
@@ -59,6 +59,7 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [highlightNames, setHighlightNames] = useState(false)
+  const [listLoading, setListLoading] = useState(false)
 
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
@@ -67,8 +68,20 @@ export default function App() {
   const emptySlots = doc.staff.length - namedStaff
   const staffOk = namedStaff >= 1
 
+  async function refreshList() {
+    setListLoading(true)
+    try {
+      const items = await listAllSchedules()
+      setSaved(items)
+    } catch {
+      setSaved(listSavedSchedules())
+    } finally {
+      setListLoading(false)
+    }
+  }
+
   useEffect(() => {
-    setSaved(listSavedSchedules())
+    void refreshList()
   }, [])
 
   function flash(msg: string) {
@@ -118,21 +131,26 @@ export default function App() {
   }
 
   async function handleSave() {
+    if (!staffOk) {
+      flash('Escriba al menos 1 nombre de médico/personal antes de guardar')
+      setHighlightNames(true)
+      setTab('horario')
+      return
+    }
     setSaving(true)
     try {
       const savedDoc = await persistSchedule(doc, user)
       setDoc(savedDoc)
-      setSaved(listSavedSchedules())
+      await refreshList()
       flash(
         isRemoteEnabled()
-          ? 'Horario guardado (local + servidor)'
+          ? 'Horario guardado en servidor (Supabase)'
           : 'Horario guardado en este navegador',
       )
     } catch (e) {
-      // Fallback local si remoto falla
       const local = saveSchedule(doc)
       setDoc(local)
-      setSaved(listSavedSchedules())
+      await refreshList()
       flash(
         e instanceof Error
           ? `Guardado local OK · remoto: ${e.message}`
@@ -143,20 +161,29 @@ export default function App() {
     }
   }
 
-  function handleLoad(id: string) {
-    const loaded = loadSchedule(id)
-    if (!loaded) return
-    setDoc(loaded)
-    setActiveCode(
-      shiftsFor(loaded.serviceType).find((s) => s.group === 'turno')?.code ?? '',
-    )
-    flash('Horario cargado')
+  async function handleLoad(id: string) {
+    try {
+      const loaded = await loadAnySchedule(id)
+      if (!loaded) {
+        flash('No se pudo cargar el horario')
+        return
+      }
+      setDoc(loaded)
+      setActiveCode(
+        shiftsFor(loaded.serviceType).find((s) => s.group === 'turno')?.code ??
+          '',
+      )
+      setTab('horario')
+      flash('Horario cargado')
+    } catch (e) {
+      flash(e instanceof Error ? e.message : 'Error al cargar')
+    }
   }
 
   function handleDeleteSaved(id: string) {
     deleteSchedule(id)
-    setSaved(listSavedSchedules())
-    flash('Horario eliminado')
+    void refreshList()
+    flash('Eliminado del navegador (el de servidor se mantiene hasta borrar allá)')
   }
 
   async function handleExport() {
@@ -518,46 +545,27 @@ export default function App() {
           </button>
         </section>
 
-        {saved.length > 0 && (
-          <section className="no-print mb-4 rounded-2xl border border-line bg-white/85 p-3 shadow-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              Horarios guardados
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {saved.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-1 rounded-lg border border-line bg-sand/40 px-2 py-1 text-xs"
-                >
-                  <button
-                    type="button"
-                    className="font-semibold text-navy hover:underline"
-                    onClick={() => handleLoad(s.id)}
-                  >
-                    {s.label}
-                    {s.status ? ` · ${STATUS_LABEL[s.status]}` : ''}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-red-700"
-                    onClick={() => handleDeleteSaved(s.id)}
-                    title="Eliminar"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        <SchedulesHome
+          items={saved}
+          remote={isRemoteEnabled()}
+          loading={listLoading}
+          onCreate={() => setShowCreate(true)}
+          onRefresh={() => void refreshList()}
+          onOpen={(id) => void handleLoad(id)}
+          onDelete={handleDeleteSaved}
+        />
 
         <ApprovalPanel
           doc={doc}
           user={user}
           onChange={(d) => {
             setDoc(d)
-            saveSchedule(d)
-            setSaved(listSavedSchedules())
+            void persistSchedule(d, user)
+              .then(() => refreshList())
+              .catch(() => {
+                saveSchedule(d)
+                void refreshList()
+              })
           }}
           onFlash={flash}
         />
