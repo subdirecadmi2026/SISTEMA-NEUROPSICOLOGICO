@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "DM Sans", "Segoe UI", sans-serif;
+  --color-navy: #1c3a5c;
+  --color-navy-deep: #132844;
+  --color-teal: #2e7d84;
+  --color-teal-soft: #5bb8b0;
+  --color-sand: #f3efe6;
+  --color-ink: #1e2a36;
+  --color-muted: #5a6b7a;
+  --color-line: #d5dee6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #d9ebe9 0%, transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, #e7eef5 0%, transparent 50%),
+    linear-gradient(180deg, #f7f4ee 0%, #eef2f5 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.6cm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-area {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    break-inside: avoid;
+  }
+
+  .print-area table {
+    font-size: 8px !important;
+  }
+}
