@@ -232,8 +232,11 @@ Obligación de registrar diagnóstico, tratamiento, evolución y seguimiento en 
 
 ## 7. Borrador de Protocolo Institucional ante Pérdida de Historia Clínica
 
+> **Versión adaptada a Ñampi Wasi (HCU electrónica NeuroSys) con actas listas para usar:**  
+> [`protocolo-perdida-nampi-wasi.md`](./protocolo-perdida-nampi-wasi.md)
+
 > Alineado a Acuerdo 00115-2021 Arts. 13–19 y Acuerdo 00005216-A Arts. 8, 11, 14–20.  
-> Adaptar a la realidad del establecimiento (solo físico / híbrido / electrónico).
+> El borrador genérico siguiente sirve de referencia; para operación diaria usar el protocolo de Ñampi Wasi.
 
 ### 7.1. Objetivo
 Garantizar la disponibilidad, integridad y confidencialidad de la HCU ante pérdida, extravío, deterioro, destrucción parcial/total o indisponibilidad del sistema, sin interrumpir la atención y respetando los derechos del paciente (LOS Art. 7.f; CRE Arts. 66, 92, 362).
