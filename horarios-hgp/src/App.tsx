@@ -23,6 +23,7 @@ import {
   applyHolidaysToEmptyCells,
   clearMonthCells,
   duplicatePreviousMonth,
+  copyStaffFromPreviousMonth,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
 import {
@@ -32,6 +33,7 @@ import {
   loadAnySchedule,
   deleteRemoteSchedule,
 } from './lib/api'
+import { seedServicesIfEmpty } from './lib/seedServices'
 import { AuthBar } from './components/AuthBar'
 import { StaffManager } from './components/StaffManager'
 import { ApprovalPanel } from './components/ApprovalPanel'
@@ -58,9 +60,12 @@ const now = new Date()
 
 export default function App() {
   const [doc, setDoc] = useState<ScheduleDoc>(() =>
-    createBlankSchedule('enfermeria', now.getFullYear(), now.getMonth() + 1),
+    createBlankSchedule('medico', now.getFullYear(), now.getMonth() + 1, {
+      withDemo: false,
+      staff: [],
+    }),
   )
-  const [activeCode, setActiveCode] = useState('D1')
+  const [activeCode, setActiveCode] = useState('CE')
   const [paintMode, setPaintMode] = useState(true)
   const [claveTab, setClaveTab] = useState<'turno' | 'area' | 'ausencia' | 'todas'>(
     'todas',
@@ -70,7 +75,7 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [user, setUser] = useState<AppUser | null>(() => loadSession())
   const [saving, setSaving] = useState(false)
-  const [showCreate, setShowCreate] = useState(false)
+  const [showCreate, setShowCreate] = useState(true)
   const [highlightNames, setHighlightNames] = useState(false)
   const [listLoading, setListLoading] = useState(false)
 
@@ -95,6 +100,11 @@ export default function App() {
 
   useEffect(() => {
     void refreshList()
+    if (isRemoteEnabled()) {
+      void seedServicesIfEmpty().catch(() => {
+        /* silencioso: no bloquear UI */
+      })
+    }
   }, [])
 
   function flash(msg: string) {
@@ -574,18 +584,42 @@ export default function App() {
             type="button"
             disabled={readOnly}
             onClick={() => {
-              const next = duplicatePreviousMonth(doc)
-              patchDoc(next)
-              const failed = next.audit.at(-1)?.action === 'duplicar_mes_fallido'
-              flash(
-                failed
-                  ? 'No hay mes anterior guardado para este servicio'
-                  : 'Mes anterior duplicado',
-              )
+              void (async () => {
+                const next = await duplicatePreviousMonth(doc)
+                patchDoc(next)
+                const failed =
+                  next.audit.at(-1)?.action === 'duplicar_mes_fallido'
+                flash(
+                  failed
+                    ? 'No hay mes anterior guardado para este servicio'
+                    : 'Mes anterior duplicado (personal y turnos)',
+                )
+              })()
             }}
             className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
           >
             Duplicar mes anterior
+          </button>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => {
+              void (async () => {
+                const res = await copyStaffFromPreviousMonth(doc)
+                if (!res.ok) {
+                  flash(res.error)
+                  return
+                }
+                patchDoc({ ...doc, staff: res.staff, cells: {} })
+                setHighlightNames(true)
+                flash(
+                  `Copiados ${res.staff.length} nombres del mes anterior. Ajuste turnos.`,
+                )
+              })()
+            }}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
+          >
+            Copiar nombres del mes anterior
           </button>
           <button
             type="button"

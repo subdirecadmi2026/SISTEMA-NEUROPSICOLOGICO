@@ -8,6 +8,7 @@ import {
   UNITS_MEDICO,
 } from '../data/templates'
 import { createEmptyStaff, listStaff } from '../lib/staffLibrary'
+import { copyStaffFromPreviousMonth } from '../lib/scheduleOps'
 
 export type CreateScheduleInput = {
   serviceType: ServiceType
@@ -62,6 +63,8 @@ export function CreateScheduleWizard({
   const [jefeServicio, setJefeServicio] = useState('')
   const [staffCount, setStaffCount] = useState(5)
   const [useLibrary, setUseLibrary] = useState(true)
+  const [copyPrevStaff, setCopyPrevStaff] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const units = serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
 
@@ -84,39 +87,64 @@ export function CreateScheduleWizard({
     setUnitName(t === 'enfermeria' ? UNITS_ENFERMERIA[0] : UNITS_MEDICO[0])
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!resolvedUnit) return
     if (staffCount < MIN_STAFF) return
+    setCreating(true)
+    try {
+      const lib = listStaff(serviceType, resolvedUnit).filter(
+        (s) => s.active !== false,
+      )
 
-    const lib = listStaff(serviceType, resolvedUnit).filter(
-      (s) => s.active !== false,
-    )
-
-    let staff: StaffMember[]
-    if (useLibrary && lib.length > 0) {
-      // Tomar biblioteca y completar hasta staffCount
-      staff = lib.slice(0, staffCount).map((s, i) => ({ ...s, order: i + 1 }))
-      while (staff.length < staffCount) {
-        const slot = createEmptyStaff(serviceType, resolvedUnit)
-        staff.push({
-          ...slot,
-          id: uid(serviceType === 'enfermeria' ? 'enf' : 'med'),
-          name: '',
-          order: staff.length + 1,
+      let staff: StaffMember[]
+      if (copyPrevStaff) {
+        const probe = createBlankSchedule(serviceType, year, month, {
+          withDemo: false,
+          unitName: resolvedUnit,
+          staff: [],
         })
+        const prev = await copyStaffFromPreviousMonth(probe)
+        if (prev.ok && prev.staff.length > 0) {
+          staff = prev.staff
+          while (staff.length < staffCount) {
+            const slot = createEmptyStaff(serviceType, resolvedUnit)
+            staff.push({
+              ...slot,
+              id: uid(serviceType === 'enfermeria' ? 'enf' : 'med'),
+              name: '',
+              order: staff.length + 1,
+            })
+          }
+          if (staff.length > staffCount) staff = staff.slice(0, staffCount)
+        } else {
+          staff = makeSlots(serviceType, resolvedUnit, staffCount)
+        }
+      } else if (useLibrary && lib.length > 0) {
+        staff = lib.slice(0, staffCount).map((s, i) => ({ ...s, order: i + 1 }))
+        while (staff.length < staffCount) {
+          const slot = createEmptyStaff(serviceType, resolvedUnit)
+          staff.push({
+            ...slot,
+            id: uid(serviceType === 'enfermeria' ? 'enf' : 'med'),
+            name: '',
+            order: staff.length + 1,
+          })
+        }
+      } else {
+        staff = makeSlots(serviceType, resolvedUnit, staffCount)
       }
-    } else {
-      staff = makeSlots(serviceType, resolvedUnit, staffCount)
-    }
 
-    const doc = createBlankSchedule(serviceType, year, month, {
-      withDemo: false,
-      unitName: resolvedUnit,
-      staff,
-    })
-    doc.jefeServicio = jefeServicio.trim()
-    onCreate(doc)
-    onClose()
+      const doc = createBlankSchedule(serviceType, year, month, {
+        withDemo: false,
+        unitName: resolvedUnit,
+        staff,
+      })
+      doc.jefeServicio = jefeServicio.trim()
+      onCreate(doc)
+      onClose()
+    } finally {
+      setCreating(false)
+    }
   }
 
   const canCreate =
@@ -328,6 +356,14 @@ export function CreateScheduleWizard({
                 biblioteca) y completar hasta {staffCount}
               </label>
             )}
+            <label className="mt-2 flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={copyPrevStaff}
+                onChange={(e) => setCopyPrevStaff(e.target.checked)}
+              />
+              Traer nombres del mes anterior (mismo servicio), si existe
+            </label>
           </section>
         </div>
 
@@ -341,11 +377,13 @@ export function CreateScheduleWizard({
           </button>
           <button
             type="button"
-            disabled={!canCreate}
-            onClick={handleCreate}
+            disabled={!canCreate || creating}
+            onClick={() => void handleCreate()}
             className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
           >
-            Crear horario · {SERVICE_LABEL[serviceType]} · {resolvedUnit || '…'}
+            {creating
+              ? 'Creando…'
+              : `Crear horario · ${SERVICE_LABEL[serviceType]} · ${resolvedUnit || '…'}`}
           </button>
         </div>
       </div>
