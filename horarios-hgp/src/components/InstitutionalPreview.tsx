@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ScheduleDoc } from '../types'
 import { InstitutionalPrintBody } from './PrintSheet'
 import { buildSchedulePdfBlob, downloadBlob, pdfFileName } from '../lib/exportPdf'
@@ -6,14 +6,53 @@ import { buildSchedulePdfBlob, downloadBlob, pdfFileName } from '../lib/exportPd
 type Props = {
   doc: ScheduleDoc
   onFlash?: (msg: string) => void
+  /** Abrir la vista institucional al montar (útil en validador). */
+  defaultOpen?: boolean
+}
+
+async function waitForQrImages(root: HTMLElement | null, ms = 800) {
+  if (!root) {
+    await new Promise((r) => setTimeout(r, 200))
+    return
+  }
+  const imgs = Array.from(
+    root.querySelectorAll<HTMLImageElement>('img.print-sign-qr'),
+  )
+  if (!imgs.length) {
+    await new Promise((r) => setTimeout(r, 280))
+    return
+  }
+  await Promise.race([
+    Promise.all(
+      imgs.map(
+        (img) =>
+          new Promise<void>((resolve) => {
+            if (img.complete && img.naturalWidth > 0) {
+              resolve()
+              return
+            }
+            img.onload = () => resolve()
+            img.onerror = () => resolve()
+          }),
+      ),
+    ),
+    new Promise<void>((r) => setTimeout(r, ms)),
+  ])
 }
 
 /**
- * Vista institucional + descarga PDF (revisor / validador / impresión previa).
+ * Vista institucional + PDF + impresión (revisor / validador).
+ * El área imprimible siempre está montada (visible u offscreen).
+ * Importante: no envolver el print-area con `.no-print` (rompe la impresión).
  */
-export function InstitutionalPreview({ doc, onFlash }: Props) {
-  const [open, setOpen] = useState(false)
+export function InstitutionalPreview({
+  doc,
+  onFlash,
+  defaultOpen = false,
+}: Props) {
+  const [open, setOpen] = useState(defaultOpen)
   const [busy, setBusy] = useState(false)
+  const printWrapRef = useRef<HTMLDivElement>(null)
 
   async function downloadPdf() {
     setBusy(true)
@@ -30,20 +69,26 @@ export function InstitutionalPreview({ doc, onFlash }: Props) {
     }
   }
 
-  function printNow() {
+  async function printNow() {
     setOpen(true)
-    window.setTimeout(() => window.print(), 220)
+    await new Promise((r) => setTimeout(r, 80))
+    await waitForQrImages(printWrapRef.current)
+    document.body.dataset.printing = '1'
+    window.print()
+    window.setTimeout(() => {
+      delete document.body.dataset.printing
+    }, 600)
   }
 
   return (
-    <section className="no-print mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-sand/40 px-4 py-3">
+    <section className="mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-line bg-sand/40 px-4 py-3">
         <div>
           <h2 className="font-display text-lg text-navy">
             Formato institucional
           </h2>
           <p className="text-xs text-muted">
-            Mismo encabezado y firmas que imprime el médico / PDF del validador
+            Firmas con código QR · mismo formato que imprime el médico
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -64,20 +109,26 @@ export function InstitutionalPreview({ doc, onFlash }: Props) {
           </button>
           <button
             type="button"
-            onClick={printNow}
-            className="rounded-xl border border-teal/40 bg-teal/10 px-3 py-1.5 text-xs font-semibold text-navy"
+            onClick={() => void printNow()}
+            className="rounded-xl border border-teal/40 bg-teal px-3 py-1.5 text-xs font-semibold text-white"
           >
             Imprimir
           </button>
         </div>
       </div>
-      {open && (
+
+      {/* Siempre montado: en pantalla offscreen si está cerrado; al imprimir se ve */}
+      <div
+        ref={printWrapRef}
+        className={open ? undefined : 'print-sheet-offscreen'}
+        aria-hidden={!open}
+      >
         <div className="print-area overflow-x-auto bg-white p-2">
           <div className="print-fit-one-page min-w-[900px]">
             <InstitutionalPrintBody doc={doc} />
           </div>
         </div>
-      )}
+      </div>
     </section>
   )
 }

@@ -175,7 +175,7 @@ export function ReviewCardsModule({
               ? 'Firmar y aprobar (Revisor)'
               : 'Firmar y validar'
           }
-          subtitle="Puede firmar con nombre o electrónicamente con FirmaEC (.p12)."
+          subtitle="Puede firmar con nombre o electrónicamente con FirmaEC (.p12). Se genera código QR."
           defaultName={user.name}
           confirmLabel={
             signNext === 'APROBADO' ? 'Firmar y aprobar' : 'Firmar y validar'
@@ -186,6 +186,8 @@ export function ReviewCardsModule({
               : 'revisor'
           }
           user={user}
+          scheduleId={detail.id}
+          unitName={detail.unitName}
           onCancel={() => setSignNext(null)}
           onConfirm={(result) => {
             if (!signNext) return
@@ -276,7 +278,7 @@ export function ReviewCardsModule({
         )}
 
         <MonthSummary doc={detail} />
-        <InstitutionalPreview doc={detail} onFlash={onFlash} />
+        <InstitutionalPreview doc={detail} onFlash={onFlash} defaultOpen />
 
         {errors > 0 && (
           <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">

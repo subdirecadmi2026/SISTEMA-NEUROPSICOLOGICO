@@ -178,6 +178,19 @@ textarea {
     margin-top: 12px !important;
   }
 
+  .print-sign-qr {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .print-sign-box {
+    padding: 3px 4px !important;
+  }
+
+  .print-sign-stamp {
+    gap: 4px !important;
+  }
+
   .print-notes-text {
     max-height: 3.2em !important;
     overflow: hidden !important;

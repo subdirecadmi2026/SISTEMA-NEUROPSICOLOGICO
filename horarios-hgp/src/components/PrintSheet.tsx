@@ -12,6 +12,7 @@ import {
 } from '../lib/calendar'
 import { shiftMeta } from '../data/templates'
 import { formatHolidaysLabel } from '../lib/holidays'
+import { SignatureStampBox } from './SignatureStampBox'
 
 type Props = {
   doc: ScheduleDoc
@@ -42,16 +43,19 @@ export function InstitutionalPrintBody({ doc }: Props) {
     {
       label: 'Jefe de servicio (Elaborado)',
       value: doc.elaboradoPor,
+      slot: 'jefe' as const,
       electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'jefe'),
     },
     {
       label: 'Revisor (Aprobado)',
       value: doc.revisadoPor || doc.aprobadoPor,
+      slot: 'revisor' as const,
       electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'revisor'),
     },
     {
       label: 'Validador (Validado)',
       value: doc.talentoHumano,
+      slot: 'validador' as const,
       electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'validador'),
     },
   ] as const
@@ -213,27 +217,15 @@ export function InstitutionalPrintBody({ doc }: Props) {
         </div>
         <div className="grid grid-cols-3 gap-2">
           {signatures.map((s) => (
-            <div
+            <SignatureStampBox
               key={s.label}
-              className={`print-sign rounded border px-2 py-2 ${
-                s.electronic ? 'border-teal bg-teal/5' : 'border-line'
-              }`}
-            >
-              <p className="text-[9px] uppercase leading-tight text-muted">
-                {s.label}
-                {s.electronic ? ' · FirmaEC' : ''}
-              </p>
-              {s.electronic?.imageDataUrl ? (
-                <img
-                  src={s.electronic.imageDataUrl}
-                  alt="Firma"
-                  className="mx-auto mt-2 max-h-10 object-contain"
-                />
-              ) : null}
-              <p className="mt-2 border-t border-line pt-1 text-[10px] font-medium leading-snug whitespace-pre-line">
-                {s.value || '________________'}
-              </p>
-            </div>
+              label={s.label}
+              value={s.value}
+              slot={s.slot}
+              electronic={s.electronic}
+              scheduleId={doc.id}
+              unitName={doc.unitName}
+            />
           ))}
         </div>
       </div>

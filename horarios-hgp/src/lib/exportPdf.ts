@@ -2,8 +2,9 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import type { ScheduleDoc } from '../types'
+import type { ElectronicSignRecord, ScheduleDoc } from '../types'
 import { InstitutionalPrintBody } from '../components/PrintSheet'
+import { ensureElectronicQr } from './signatureQr'
 
 function safeName(s: string): string {
   return s
@@ -36,11 +37,52 @@ function waitFrames(ms = 120): Promise<void> {
   })
 }
 
+async function enrichSigns(doc: ScheduleDoc): Promise<ScheduleDoc> {
+  const signs = doc.electronicSigns ?? []
+  if (!signs.length) {
+    // Generar QR sintético desde textos de casilla para PDF/impresión
+    const synthetic: ElectronicSignRecord[] = []
+    const pushIf = (
+      slot: ElectronicSignRecord['slot'],
+      text: string | undefined,
+    ) => {
+      const name = text?.split('\n')[0]?.split('—')[0]?.trim()
+      if (!name) return
+      synthetic.push({
+        slot,
+        subjectCn: name,
+        signedAt: doc.updatedAt || new Date().toISOString(),
+        method: 'nombre_qr',
+        stampText: text || name,
+      })
+    }
+    pushIf('jefe', doc.elaboradoPor)
+    pushIf('revisor', doc.revisadoPor || doc.aprobadoPor)
+    pushIf('validador', doc.talentoHumano)
+    if (!synthetic.length) return doc
+    const withQr = await Promise.all(
+      synthetic.map((s) =>
+        ensureElectronicQr(s, { scheduleId: doc.id, unitName: doc.unitName }),
+      ),
+    )
+    return { ...doc, electronicSigns: withQr }
+  }
+
+  const withQr = await Promise.all(
+    signs.map((s) =>
+      ensureElectronicQr(s, { scheduleId: doc.id, unitName: doc.unitName }),
+    ),
+  )
+  return { ...doc, electronicSigns: withQr }
+}
+
 /**
  * Genera PDF A4 horizontal con el mismo formato institucional que imprime el médico
- * (encabezado MSP, grilla, firmas de Jefe / Revisor / Validador).
+ * (encabezado MSP, grilla, firmas de Jefe / Revisor / Validador con QR).
  */
 export async function buildSchedulePdfBlob(doc: ScheduleDoc): Promise<Blob> {
+  const enriched = await enrichSigns(doc)
+
   const host = document.createElement('div')
   host.setAttribute('data-pdf-capture', '1')
   host.style.cssText = [
@@ -56,8 +98,9 @@ export async function buildSchedulePdfBlob(doc: ScheduleDoc): Promise<Blob> {
 
   const root = createRoot(host)
   try {
-    root.render(createElement(InstitutionalPrintBody, { doc }))
-    await waitFrames(180)
+    root.render(createElement(InstitutionalPrintBody, { doc: enriched }))
+    // Esperar pintado de imágenes QR
+    await waitFrames(350)
 
     const target =
       (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host

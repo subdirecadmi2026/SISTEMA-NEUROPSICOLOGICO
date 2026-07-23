@@ -149,11 +149,13 @@ export function ApprovalPanel({
       <SignatureGate
         open={!!signIntent}
         title={signTitle}
-        subtitle="Puede firmar con nombre o electrónicamente con su certificado FirmaEC (.p12)."
+        subtitle="Puede firmar con nombre o electrónicamente con su certificado FirmaEC (.p12). Se genera código QR."
         defaultName={user?.name ?? ''}
         confirmLabel={signConfirm}
         slot={signSlot}
         user={user}
+        scheduleId={doc.id}
+        unitName={doc.unitName}
         onCancel={() => setSignIntent(null)}
         onConfirm={(result) => {
           if (!signIntent) return

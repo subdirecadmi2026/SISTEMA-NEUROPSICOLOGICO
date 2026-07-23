@@ -11,6 +11,7 @@ import {
   type FirmaEcSlot,
   type ElectronicSignResult,
 } from '../lib/firmaEc'
+import { buildSignatureQrDataUrl } from '../lib/signatureQr'
 
 export type SignatureConfirmResult = {
   signedName: string
@@ -26,12 +27,15 @@ type Props = {
   /** Casilla institucional donde se estampa la firma. */
   slot: FirmaEcSlot
   user: AppUser | null
+  scheduleId?: string
+  unitName?: string
   onCancel: () => void
   onConfirm: (result: SignatureConfirmResult) => void
 }
 
 /**
- * Modal de firma: nombre simple o firma electrónica FirmaEC (.p12).
+ * Modal de firma: nombre simple o firma electrónica FirmaEC (.p12),
+ * siempre con QR estilo FirmaEC en la casilla.
  */
 export function SignatureGate({
   open,
@@ -41,6 +45,8 @@ export function SignatureGate({
   confirmLabel,
   slot,
   user,
+  scheduleId,
+  unitName,
   onCancel,
   onConfirm,
 }: Props) {
@@ -86,8 +92,47 @@ export function SignatureGate({
   const canSimple = name.trim().length >= 3 && ack && !useElectronic
   const canElectronic = useElectronic && ack && !!user && (hasCert || hasImage)
 
-  function submitSimple() {
-    onConfirm({ signedName: name.trim() })
+  async function finishWithQr(
+    base: Omit<ElectronicSignRecord, 'qrDataUrl'>,
+  ): Promise<ElectronicSignRecord> {
+    const qrDataUrl = await buildSignatureQrDataUrl({
+      subjectCn: base.subjectCn,
+      slot: base.slot,
+      signedAt: base.signedAt,
+      serialNumber: base.serialNumber,
+      issuerCn: base.issuerCn,
+      method: base.method,
+      scheduleId,
+      unitName,
+    })
+    return { ...base, qrDataUrl }
+  }
+
+  async function submitSimple() {
+    if (!user) {
+      onConfirm({ signedName: name.trim() })
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      const signedAt = new Date().toISOString()
+      const subjectCn = name.trim()
+      const stampText = `${subjectCn}\nFirmado electrónicamente · HGP\n${new Date(signedAt).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })}`
+      const electronic = await finishWithQr({
+        slot,
+        subjectCn,
+        signedAt,
+        method: 'nombre_qr',
+        stampText,
+        imageDataUrl: getSignatureImage(user.id) ?? undefined,
+      })
+      onConfirm({ signedName: subjectCn, electronic })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo generar el QR')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function submitElectronic() {
@@ -101,7 +146,7 @@ export function SignatureGate({
         password,
       )
       const stampText = formatElectronicStamp(result)
-      const electronic: ElectronicSignRecord = {
+      const electronic = await finishWithQr({
         slot: result.slot,
         subjectCn: result.subjectCn,
         serialNumber: result.serialNumber,
@@ -110,7 +155,7 @@ export function SignatureGate({
         method: result.method,
         stampText,
         imageDataUrl: result.imageDataUrl,
-      }
+      })
       onConfirm({ signedName: result.subjectCn, electronic })
     } catch (e) {
       setError(
@@ -142,6 +187,7 @@ export function SignatureGate({
         ) : null}
         <p className="mt-2 rounded-lg bg-sand/60 px-3 py-2 text-xs text-muted">
           Casilla: <strong className="text-navy">{slotLabel(slot)}</strong>
+          {' · '}Se estampará con <strong>código QR</strong> (estilo FirmaEC).
         </p>
 
         {hasCert || hasImage ? (
@@ -157,14 +203,13 @@ export function SignatureGate({
                 <strong>
                   {hasCert
                     ? '¿Firmar con certificado FirmaEC (.p12)?'
-                    : '¿Estampar imagen de firma?'}
+                    : '¿Incluir imagen de firma + QR?'}
                 </strong>
                 <br />
                 <span className="text-xs text-muted">
                   {hasCert
                     ? `Certificado: ${certCn || 'cargado'}${hasImage ? ' + imagen' : ''}`
-                    : 'Solo imagen (no es firma criptográfica FirmaEC)'}
-                  {' · '}casilla {slotLabel(slot)}.
+                    : 'Imagen de firma + QR de verificación'}
                 </span>
               </span>
             </label>
@@ -184,9 +229,8 @@ export function SignatureGate({
           </div>
         ) : (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            Para firma electrónica, pulse <strong>FirmaEC</strong> arriba y
-            cargue su <strong>.p12</strong> o una imagen de firma. Mientras
-            tanto puede firmar con su nombre.
+            Puede firmar con su nombre (se genera QR). Para certificado .p12 o
+            imagen, use <strong>FirmaEC</strong> arriba.
           </p>
         )}
 
@@ -215,8 +259,8 @@ export function SignatureGate({
             {useElectronic
               ? hasCert
                 ? ' con mi certificado de firma electrónica.'
-                : ' estampando mi imagen de firma (no criptográfica).'
-              : ' y que los datos son correctos.'}
+                : ' con imagen de firma y QR.'
+              : ' (se generará código QR de verificación).'}
           </span>
         </label>
 
@@ -240,12 +284,12 @@ export function SignatureGate({
               busy || (useElectronic ? !canElectronic : !canSimple)
             }
             onClick={() =>
-              useElectronic ? void submitElectronic() : submitSimple()
+              void (useElectronic ? submitElectronic() : submitSimple())
             }
             className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-deep disabled:opacity-40"
           >
             {busy
-              ? 'Firmando…'
+              ? 'Generando QR…'
               : useElectronic
                 ? 'Confirmar firma electrónica'
                 : confirmLabel}

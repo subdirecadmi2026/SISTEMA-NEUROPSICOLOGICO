@@ -236,11 +236,13 @@ export function ValidadorWorkspace({
         <SignatureGate
           open={signOpen}
           title="Firmar y validar horario"
-          subtitle="Puede firmar con certificado FirmaEC (.p12) o imagen. Se genera el PDF institucional y se notifica al jefe."
+          subtitle="Puede firmar con certificado FirmaEC (.p12) o imagen. Se genera QR + PDF institucional y se notifica al jefe."
           defaultName={user.name}
           confirmLabel="Firmar, validar y archivar PDF"
           slot="validador"
           user={user}
+          scheduleId={detail.id}
+          unitName={detail.unitName}
           onCancel={() => setSignOpen(false)}
           onConfirm={(result) => {
             void validateAndArchive(
@@ -346,7 +348,7 @@ export function ValidadorWorkspace({
         )}
 
         <MonthSummary doc={detail} />
-        <InstitutionalPreview doc={detail} onFlash={onFlash} />
+        <InstitutionalPreview doc={detail} onFlash={onFlash} defaultOpen />
         <div className="mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
           <div className="border-b border-line bg-sand/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted">
             Planilla (solo visualización)

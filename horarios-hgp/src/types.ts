@@ -77,10 +77,12 @@ export type ElectronicSignRecord = {
   serialNumber?: string
   issuerCn?: string
   signedAt: string
-  method: 'pkcs12_local' | 'firmaec_protocol' | 'image_stamp'
+  method: 'pkcs12_local' | 'firmaec_protocol' | 'image_stamp' | 'nombre_qr'
   stampText: string
   /** Imagen de firma (data URL) opcional para la casilla. */
   imageDataUrl?: string
+  /** Código QR estilo FirmaEC (data URL PNG). */
+  qrDataUrl?: string
 }
 
 export type AuditEntry = {
