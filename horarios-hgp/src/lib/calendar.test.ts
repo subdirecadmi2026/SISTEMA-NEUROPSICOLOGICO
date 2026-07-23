@@ -886,6 +886,15 @@ describe('workspace por rol', () => {
     ).toBe('editor')
     expect(
       workspaceModeFor({
+        id: 'admin',
+        email: 'admin@hgp.gob.ec',
+        name: 'A',
+        role: 'admin',
+        serviceUnits: [],
+      }),
+    ).toBe('admin')
+    expect(
+      workspaceModeFor({
         id: '2',
         email: 'b',
         name: 'R',

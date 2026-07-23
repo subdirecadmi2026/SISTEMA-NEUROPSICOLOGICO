@@ -398,9 +398,9 @@ export function ReviewCardsModule({
 
 export function workspaceModeFor(
   user: AppUser | null,
-): 'editor' | 'revisor' | 'validador' | 'login' {
+): 'editor' | 'revisor' | 'validador' | 'login' | 'admin' {
   if (!user) return 'login'
-  if (user.role === 'admin') return 'editor'
+  if (user.role === 'admin') return 'admin'
   if (user.role === 'lider_servicio') return 'editor'
   if (isValidadorRole(user.role) && !isRevisorRole(user.role)) return 'validador'
   if (isRevisorRole(user.role)) return 'revisor'

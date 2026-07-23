@@ -132,3 +132,36 @@ export function cloneStaffForSchedule(staff: StaffMember[]): StaffMember[] {
       horasExtras: s.horasExtras ?? 0,
     }))
 }
+
+export function listStaffLibraryBuckets(): Array<{
+  serviceType: ServiceType
+  unitName: string
+  count: number
+}> {
+  const all = readAll()
+  return Object.entries(all)
+    .map(([key, staff]) => {
+      const [serviceType, ...rest] = key.split('::')
+      return {
+        serviceType: serviceType as ServiceType,
+        unitName: rest.join('::'),
+        count: staff.filter((s) => s.active !== false).length,
+      }
+    })
+    .filter((b) => b.unitName)
+    .sort((a, b) =>
+      `${a.serviceType}${a.unitName}`.localeCompare(
+        `${b.serviceType}${b.unitName}`,
+        'es',
+      ),
+    )
+}
+
+export function clearStaffLibraryBucket(
+  serviceType: ServiceType,
+  unitName: string,
+) {
+  const all = readAll()
+  delete all[libraryKey(serviceType, unitName)]
+  writeAll(all)
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AppUser } from '../types'
 import {
-  DEMO_USERS,
+  getDemoUsers,
   loginAs,
   primaryDemoUsers,
   roleLabel,
@@ -166,7 +166,7 @@ export function ProfilePanel({
                       className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs"
                       defaultValue=""
                       onChange={(e) => {
-                        const u = DEMO_USERS.find((x) => x.id === e.target.value)
+                        const u = getDemoUsers().find((x) => x.id === e.target.value)
                         if (u) {
                           onSwitchUser(loginAs(u))
                           onClose()
@@ -176,7 +176,8 @@ export function ProfilePanel({
                       <option value="" disabled>
                         Elegir…
                       </option>
-                      {DEMO_USERS.filter(
+                      {getDemoUsers()
+                        .filter(
                         (u) => !primary.some((p) => p.id === u.id),
                       ).map((u) => (
                         <option key={u.id} value={u.id}>

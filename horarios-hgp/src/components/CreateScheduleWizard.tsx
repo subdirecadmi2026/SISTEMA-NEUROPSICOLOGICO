@@ -2,13 +2,10 @@ import { useMemo, useState } from 'react'
 import type { ScheduleDoc, ServiceType, StaffMember } from '../types'
 import { MONTHS_ES, uid } from '../types'
 import { createBlankSchedule } from '../data/demo'
-import {
-  SERVICE_LABEL,
-  UNITS_ENFERMERIA,
-  UNITS_MEDICO,
-} from '../data/templates'
+import { SERVICE_LABEL } from '../data/templates'
 import { createEmptyStaff, listStaff } from '../lib/staffLibrary'
 import { copyStaffFromPreviousMonth } from '../lib/scheduleOps'
+import { listUnits } from '../lib/unitsStore'
 
 export type CreateScheduleInput = {
   serviceType: ServiceType
@@ -55,7 +52,8 @@ export function CreateScheduleWizard({
   onCreate,
 }: Props) {
   const [serviceType, setServiceType] = useState<ServiceType>('medico')
-  const [unitName, setUnitName] = useState(UNITS_MEDICO[0])
+  const [unitName, setUnitName] = useState(() => listUnits('medico')[0] ?? '')
+  const units = listUnits(serviceType)
   const [customUnit, setCustomUnit] = useState('')
   const [useCustomUnit, setUseCustomUnit] = useState(false)
   const [month, setMonth] = useState(defaultMonth)
@@ -65,8 +63,6 @@ export function CreateScheduleWizard({
   const [useLibrary, setUseLibrary] = useState(true)
   const [copyPrevStaff, setCopyPrevStaff] = useState(false)
   const [creating, setCreating] = useState(false)
-
-  const units = serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
 
   const resolvedUnit = useCustomUnit
     ? customUnit.trim()
@@ -84,7 +80,7 @@ export function CreateScheduleWizard({
     setServiceType(t)
     setUseCustomUnit(false)
     setCustomUnit('')
-    setUnitName(t === 'enfermeria' ? UNITS_ENFERMERIA[0] : UNITS_MEDICO[0])
+    setUnitName(listUnits(t)[0] ?? '')
   }
 
   async function handleCreate() {

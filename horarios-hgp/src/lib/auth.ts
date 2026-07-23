@@ -9,76 +9,23 @@ import type {
 } from '../types'
 import { ROLE_LABEL, uid } from '../types'
 import { canEditSchedule } from './validation'
+import {
+  SEED_USERS,
+  checkUserPassword,
+  findUserByEmail,
+  getManagedUser,
+  listAppUsers,
+} from './usersStore'
 
 const USER_KEY = 'hgp-auth-user-v1'
 
-/** Usuarios demo del flujo HGP: Jefe → Revisor → Validador. */
-export const DEMO_USERS: AppUser[] = [
-  {
-    id: 'u-jefe',
-    email: 'jefe.servicio@hgp.gob.ec',
-    name: 'Dr. Carlos Mendoza',
-    role: 'lider_servicio',
-    serviceUnits: ['Medicina interna', 'Centro Obstétrico', 'Pediatría'],
-  },
-  {
-    id: 'u-revisor',
-    email: 'revisor@hgp.gob.ec',
-    name: 'Dra. María Solís',
-    role: 'revisor',
-    serviceUnits: [],
-  },
-  {
-    id: 'u-validador',
-    email: 'validador@hgp.gob.ec',
-    name: 'Ing. Patricia Vega',
-    role: 'validador',
-    serviceUnits: [],
-  },
-  {
-    id: 'u-admin',
-    email: 'admin@hgp.gob.ec',
-    name: 'Administrador HGP',
-    role: 'admin',
-    serviceUnits: [],
-  },
-  // Legado / institucionales (siguen funcionando)
-  {
-    id: 'u-lider',
-    email: 'lider.obstetrico@hgp.gob.ec',
-    name: 'Lic. Ana Parra',
-    role: 'lider_servicio',
-    serviceUnits: ['Centro Obstétrico', 'Medicina interna'],
-  },
-  {
-    id: 'u-gestion',
-    email: 'gestion.enfermeria@hgp.gob.ec',
-    name: 'Lic. Irma Naveda',
-    role: 'gestion_enfermeria',
-    serviceUnits: [],
-  },
-  {
-    id: 'u-dir',
-    email: 'direccion.asistencial@hgp.gob.ec',
-    name: 'Dr. Santiago Pacheco',
-    role: 'direccion_asistencial',
-    serviceUnits: [],
-  },
-  {
-    id: 'u-sub',
-    email: 'subdireccion@hgp.gob.ec',
-    name: 'Mgs. Alex Naranjo',
-    role: 'subdireccion',
-    serviceUnits: [],
-  },
-  {
-    id: 'u-th',
-    email: 'talento.humano@hgp.gob.ec',
-    name: 'Ing. Lourdes Yánez',
-    role: 'talento_humano',
-    serviceUnits: [],
-  },
-]
+/** Usuarios visibles (demo + creados por admin). */
+export function getDemoUsers(): AppUser[] {
+  return listAppUsers()
+}
+
+/** Semilla estática (compatibilidad tests / imports). Prefer getDemoUsers(). */
+export const DEMO_USERS: AppUser[] = SEED_USERS
 
 /** Jefe de servicio: crea y edita horarios en borrador. */
 export function isJefeRole(role: UserRole): boolean {
@@ -106,26 +53,38 @@ export function loadSession(): AppUser | null {
     const raw = localStorage.getItem(USER_KEY)
     if (!raw) return null
     const user = JSON.parse(raw) as AppUser
-    // Migrar id antiguo si el usuario ya no existe en DEMO_USERS
-    const stillValid = DEMO_USERS.some((u) => u.id === user.id)
-    if (!stillValid && user.role) return user
-    const fresh = DEMO_USERS.find((u) => u.id === user.id)
-    return fresh ?? user
+    const fresh = getManagedUser(user.id)
+    if (fresh && fresh.active !== false) {
+      return {
+        id: fresh.id,
+        email: fresh.email,
+        name: fresh.name,
+        role: fresh.role,
+        serviceUnits: fresh.serviceUnits,
+      }
+    }
+    if (!fresh) return null
+    return user
   } catch {
     return null
   }
 }
 
 export function loginAs(user: AppUser): AppUser {
-  localStorage.setItem(USER_KEY, JSON.stringify(user))
-  return user
+  const slim: AppUser = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    serviceUnits: user.serviceUnits,
+  }
+  localStorage.setItem(USER_KEY, JSON.stringify(slim))
+  return slim
 }
 
 export function loginByEmail(email: string): AppUser | null {
-  const found = DEMO_USERS.find(
-    (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
-  )
-  if (!found) return null
+  const found = findUserByEmail(email)
+  if (!found || found.active === false) return null
   return loginAs(found)
 }
 
@@ -141,35 +100,35 @@ export const PRIMARY_DEMO_IDS = [
 ] as const
 
 export function primaryDemoUsers(): AppUser[] {
-  return PRIMARY_DEMO_IDS.map((id) =>
-    DEMO_USERS.find((u) => u.id === id),
-  ).filter((u): u is AppUser => !!u)
+  const all = listAppUsers()
+  return PRIMARY_DEMO_IDS.map((id) => all.find((u) => u.id === id)).filter(
+    (u): u is AppUser => !!u,
+  )
 }
 
 export function otherDemoUsers(): AppUser[] {
-  return DEMO_USERS.filter(
+  return listAppUsers().filter(
     (u) => !(PRIMARY_DEMO_IDS as readonly string[]).includes(u.id),
   )
 }
 
 /**
- * Login por correo + contraseña demo.
- * Acepta DEMO_PASSWORD o dejar contraseña vacía solo en acceso rápido por tarjeta.
+ * Login por correo + contraseña (demo o personalizada del usuario).
  */
 export function authenticateDemo(
   email: string,
   password: string,
 ): { ok: true; user: AppUser } | { ok: false; error: string } {
-  const found = DEMO_USERS.find(
-    (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
-  )
-  if (!found) {
+  const found = findUserByEmail(email)
+  if (!found || found.active === false) {
     return { ok: false, error: 'No existe un perfil con ese correo' }
   }
-  if (password !== DEMO_PASSWORD) {
+  if (!checkUserPassword(found, password, DEMO_PASSWORD)) {
     return {
       ok: false,
-      error: `Contraseña incorrecta. En demo use: ${DEMO_PASSWORD}`,
+      error: found.password
+        ? 'Contraseña incorrecta'
+        : `Contraseña incorrecta. En demo use: ${DEMO_PASSWORD}`,
     }
   }
   return { ok: true, user: loginAs(found) }
@@ -197,7 +156,7 @@ export function roleMission(role: UserRole): string {
     case 'talento_humano':
       return 'Valida horarios aprobados, firma con QR y archiva el PDF.'
     case 'admin':
-      return 'Acceso completo a elaboración, revisión y validación.'
+      return 'Administra usuarios, servicios, personal y horarios; puede crear, editar y eliminar.'
     default:
       return ROLE_LABEL[role]
   }

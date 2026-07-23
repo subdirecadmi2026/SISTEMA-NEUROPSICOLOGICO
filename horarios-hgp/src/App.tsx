@@ -6,11 +6,8 @@ import type {
 } from './types'
 import { MONTHS_ES, STATUS_LABEL, uid } from './types'
 import { createBlankSchedule } from './data/demo'
-import {
-  UNITS_ENFERMERIA,
-  UNITS_MEDICO,
-  shiftsFor,
-} from './data/templates'
+import { shiftsFor } from './data/templates'
+import { listUnits } from './lib/unitsStore'
 import { exportScheduleExcel } from './lib/exportExcel'
 import {
   deleteSchedule,
@@ -31,7 +28,7 @@ import {
   swapCodesInSchedule,
   duplicateScheduleAsNew,
 } from './lib/scheduleOps'
-import { assertEditable, loadSession, logout, isJefeRole, isRevisorRole, isValidadorRole } from './lib/auth'
+import { assertEditable, loadSession, logout, isJefeRole, isRevisorRole, isValidadorRole, transitionStatus } from './lib/auth'
 import {
   persistSchedule,
   isRemoteEnabled,
@@ -42,6 +39,7 @@ import {
 import { seedServicesIfEmpty } from './lib/seedServices'
 import { AuthBar } from './components/AuthBar'
 import { LoginScreen } from './components/LoginScreen'
+import { AdminWorkspace } from './components/AdminWorkspace'
 import { StaffManager } from './components/StaffManager'
 import { ApprovalPanel } from './components/ApprovalPanel'
 import { DistributionPanel } from './components/DistributionPanel'
@@ -99,6 +97,7 @@ export default function App() {
   const [saved, setSaved] = useState<SavedIndexItem[]>([])
   const [toast, setToast] = useState('')
   const [user, setUser] = useState<AppUser | null>(() => loadSession())
+  const [adminEditorOpen, setAdminEditorOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showCreate, setShowCreate] = useState(() => {
     const u = loadSession()
@@ -131,8 +130,7 @@ export default function App() {
     )
   }
 
-  const units =
-    doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
+  const units = listUnits(doc.serviceType)
   const readOnly = !assertEditable(doc, user)
   const canCreate = !!user && isJefeRole(user.role)
   const canDeleteSaved = !!user && (isJefeRole(user.role) || user.role === 'admin')
@@ -148,7 +146,9 @@ export default function App() {
     return saved.filter((s) => user.serviceUnits.includes(s.unitName))
   })()
   const pendingCount = countPendingForRole(user, visibleSaved)
-  const workspace = workspaceModeFor(user)
+  const workspaceBase = workspaceModeFor(user)
+  const workspace =
+    workspaceBase === 'admin' && adminEditorOpen ? 'editor' : workspaceBase
   const namedStaff = doc.staff.filter((s) => s.name.trim().length > 0).length
   const emptySlots = doc.staff.length - namedStaff
   const staffOk = namedStaff >= 1
@@ -459,13 +459,17 @@ export default function App() {
                 Hospital General Puyo
               </p>
               <p className="text-xs text-white/70">
-                {workspace === 'revisor'
-                  ? 'Módulo de revisión · solo visualización'
-                  : workspace === 'validador'
-                    ? 'Módulo de validación · solo visualización'
-                    : workspace === 'login'
-                      ? 'Acceso por perfil · Jefe · Revisor · Validador'
-                      : `Sistema de horarios · MSP Ecuador${isRemoteEnabled() ? ' · Supabase' : ' · Local'}`}
+                {workspaceBase === 'admin' && !adminEditorOpen
+                  ? 'Consola administrador · crear, editar y eliminar'
+                  : workspace === 'revisor'
+                    ? 'Módulo de revisión · solo visualización'
+                    : workspace === 'validador'
+                      ? 'Módulo de validación · solo visualización'
+                      : workspace === 'login'
+                        ? 'Acceso por perfil · Jefe · Revisor · Validador'
+                        : workspaceBase === 'admin' && adminEditorOpen
+                          ? 'Admin · editando horario'
+                          : `Sistema de horarios · MSP Ecuador${isRemoteEnabled() ? ' · Supabase' : ' · Local'}`}
               </p>
             </div>
           </div>
@@ -477,6 +481,7 @@ export default function App() {
               onFlash={flash}
               onLogin={(u) => {
                 setUser(u)
+                setAdminEditorOpen(false)
                 setShowCreate(isJefeRole(u.role) && saved.length === 0)
                 const n = countPendingForRole(u, saved)
                 flash(
@@ -492,6 +497,15 @@ export default function App() {
                 flash('Sesión cerrada')
               }}
             />
+            {workspaceBase === 'admin' && adminEditorOpen && (
+              <button
+                type="button"
+                onClick={() => setAdminEditorOpen(false)}
+                className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/20"
+              >
+                ← Consola admin
+              </button>
+            )}
             {workspace === 'editor' && canCreate && (
               <button
                 type="button"
@@ -560,6 +574,46 @@ export default function App() {
                 ? `Bienvenido · ${u.name} · ${n} pendiente(s)`
                 : `Bienvenido · ${u.name}`,
             )
+          }}
+        />
+      )}
+
+
+      {workspaceBase === 'admin' && user && !adminEditorOpen && (
+        <AdminWorkspace
+          user={user}
+          items={visibleSaved}
+          loading={listLoading}
+          remote={isRemoteEnabled()}
+          onFlash={flash}
+          onRefresh={() => void refreshList()}
+          onCreateSchedule={() => {
+            setAdminEditorOpen(true)
+            setShowCreate(true)
+          }}
+          onOpenSchedule={(id) => {
+            setAdminEditorOpen(true)
+            void handleLoad(id)
+          }}
+          onDeleteSchedule={(id) => void handleDeleteSaved(id)}
+          onReopenSchedule={async (id) => {
+            try {
+              const loaded = await loadAnySchedule(id)
+              if (!loaded) {
+                flash('No se encontró el horario')
+                return
+              }
+              const result = transitionStatus(loaded, 'BORRADOR', user)
+              if (!result.ok) {
+                flash(result.error)
+                return
+              }
+              await persistSchedule(result.doc, user)
+              flash('Horario reabierto a borrador')
+              await refreshList()
+            } catch (e) {
+              flash(e instanceof Error ? e.message : 'No se pudo reabrir')
+            }
           }}
         />
       )}
