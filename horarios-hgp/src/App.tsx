@@ -28,6 +28,8 @@ import {
   copyFirstWeekPattern,
   applyPostGuardLibre,
   createNextMonthDraft,
+  applyHabitualCodesToEmpty,
+  swapCodesInSchedule,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
 import {
@@ -56,8 +58,10 @@ import { NotesPanel } from './components/NotesPanel'
 import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
 import { AuditTrail } from './components/AuditTrail'
+import { EmptyCellsPanel } from './components/EmptyCellsPanel'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
+import { shiftMeta } from './data/templates'
 
 type TabId =
   | 'horario'
@@ -93,8 +97,18 @@ export default function App() {
   const [undoCount, setUndoCount] = useState(0)
   const [dirty, setDirty] = useState(false)
   const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null)
+  const [highlightEmpty, setHighlightEmpty] = useState(false)
+  const [recentCodes, setRecentCodes] = useState<string[]>([])
   const docRefApp = useRef(doc)
   docRefApp.current = doc
+
+  function pickCode(code: string) {
+    setActiveCode(code)
+    setPaintMode(true)
+    setRecentCodes((prev) =>
+      [code, ...prev.filter((c) => c !== code)].slice(0, 6),
+    )
+  }
 
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
@@ -279,6 +293,37 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         void handleSaveRef.current()
+      }
+
+      // Atajos de claves (sin modificadores)
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const raw = e.key.toUpperCase()
+      const service = docRefApp.current.serviceType
+      const candidates =
+        service === 'enfermeria'
+          ? ['D1', 'N1', 'A1', 'A2', 'L', 'F', 'V', 'M', 'T']
+          : ['CE', 'X', 'PT1', 'PT2', 'L', 'F', 'V', 'HA', 'HD']
+      // Preferir coincidencia exacta de 2 chars si el usuario pulsa rápido no aplica;
+      // mapear teclas simples frecuentes:
+      const map: Record<string, string> = {
+        L: 'L',
+        F: 'F',
+        V: 'V',
+        X: 'X',
+        C: 'CE',
+        D: 'D1',
+        N: 'N1',
+        M: service === 'enfermeria' ? 'M' : 'CE',
+        T: service === 'enfermeria' ? 'T' : 'PT1',
+        P: 'PT2',
+        H: 'HA',
+      }
+      const code = map[raw]
+      if (code && shiftMeta(service, code) && candidates.includes(code)) {
+        e.preventDefault()
+        pickCode(code)
+        setToast(`Clave ${code}`)
+        window.setTimeout(() => setToast(''), 1200)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -834,6 +879,56 @@ export default function App() {
           >
             Crear mes siguiente
           </button>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => {
+              const next = applyHabitualCodesToEmpty(doc)
+              if (next === doc) {
+                flash(
+                  'Nada que completar (revise códigos habituales o ya está lleno)',
+                )
+                return
+              }
+              patchDoc(next)
+              flash('Vacíos completados con código habitual de cada persona')
+            }}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
+          >
+            Código habitual en vacíos
+          </button>
+          {doc.serviceType === 'enfermeria' && (
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    '¿Intercambiar todas las claves D1 ↔ N1 del mes?',
+                  )
+                )
+                  return
+                const next = swapCodesInSchedule(doc, 'D1', 'N1')
+                if (next === doc) {
+                  flash('No hay D1/N1 para intercambiar')
+                  return
+                }
+                patchDoc(next)
+                flash('D1 ↔ N1 intercambiados')
+              }}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
+            >
+              Intercambiar D1 ↔ N1
+            </button>
+          )}
+          <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={highlightEmpty}
+              onChange={(e) => setHighlightEmpty(e.target.checked)}
+            />
+            Resaltar vacíos
+          </label>
           <span className="ml-auto self-center text-xs text-muted">
             {dirty
               ? 'Cambios sin guardar… (auto en 12s)'
@@ -857,10 +952,19 @@ export default function App() {
           <CodeUsageBar
             doc={doc}
             onPickCode={(code) => {
-              setActiveCode(code)
-              setPaintMode(true)
+              pickCode(code)
               setTab('horario')
             }}
+          />
+        )}
+
+        {tab === 'horario' && (
+          <EmptyCellsPanel
+            doc={doc}
+            readOnly={readOnly}
+            activeCode={activeCode}
+            onChange={patchDoc}
+            onFlash={flash}
           />
         )}
 
@@ -962,7 +1066,8 @@ export default function App() {
             claveTab={claveTab}
             paintMode={paintMode}
             showTable={tab === 'claves'}
-            onActiveCode={setActiveCode}
+            recentCodes={recentCodes}
+            onActiveCode={pickCode}
             onClaveTab={setClaveTab}
             onPaintMode={setPaintMode}
             onGoHorario={
@@ -1009,6 +1114,7 @@ export default function App() {
               readOnly={readOnly}
               paintMode={paintMode}
               activeCode={activeCode}
+              highlightEmpty={highlightEmpty}
               onChange={patchDoc}
               onAddStaff={addStaff}
               onNewDemo={() =>

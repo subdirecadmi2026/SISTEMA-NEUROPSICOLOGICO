@@ -1,5 +1,5 @@
 import type { ServiceType, ShiftCode } from '../types'
-import { SERVICE_LABEL, shiftsFor } from '../data/templates'
+import { SERVICE_LABEL, shiftsFor, shiftMeta } from '../data/templates'
 
 type Props = {
   serviceType: ServiceType
@@ -7,6 +7,7 @@ type Props = {
   claveTab: 'turno' | 'area' | 'ausencia' | 'todas'
   paintMode: boolean
   showTable: boolean
+  recentCodes?: string[]
   onActiveCode: (code: string) => void
   onClaveTab: (t: 'turno' | 'area' | 'ausencia' | 'todas') => void
   onPaintMode: (v: boolean) => void
@@ -19,6 +20,7 @@ export function ShiftPalette({
   claveTab,
   paintMode,
   showTable,
+  recentCodes = [],
   onActiveCode,
   onClaveTab,
   onPaintMode,
@@ -28,6 +30,9 @@ export function ShiftPalette({
   const visible: ShiftCode[] =
     claveTab === 'todas' ? shifts : shifts.filter((s) => s.group === claveTab)
   const isEnf = serviceType === 'enfermeria'
+  const recent = recentCodes
+    .map((c) => shiftMeta(serviceType, c))
+    .filter((s): s is ShiftCode => !!s)
 
   return (
     <section className="no-print mb-4 rounded-2xl rounded-tl-none border border-line bg-white/85 p-4 shadow-sm">
@@ -37,7 +42,8 @@ export function ShiftPalette({
             Claves — {SERVICE_LABEL[serviceType]}
           </h2>
           <p className="text-sm text-muted">
-            Seleccione una clave y pinte las celdas. Clic derecho borra.
+            Seleccione una clave y pinte. Atajos: L F V · CE X · D1 N1 (si no
+            está escribiendo).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -74,6 +80,31 @@ export function ShiftPalette({
           )}
         </div>
       </div>
+
+      {recent.length > 0 && !showTable && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+            Recientes
+          </span>
+          {recent.map((s) => (
+            <button
+              key={`r-${s.code}`}
+              type="button"
+              onClick={() => {
+                onActiveCode(s.code)
+                onGoHorario?.()
+              }}
+              className={`rounded border px-2 py-1 text-xs font-bold ${
+                activeCode === s.code ? 'ring-2 ring-navy' : ''
+              }`}
+              style={{ background: s.color, color: s.text }}
+            >
+              {s.code}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {visible.map((s) => {
           const active = activeCode === s.code

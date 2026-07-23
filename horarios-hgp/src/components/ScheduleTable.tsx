@@ -20,6 +20,7 @@ type Props = {
   readOnly: boolean
   paintMode: boolean
   activeCode: string
+  highlightEmpty?: boolean
   onChange: (doc: ScheduleDoc) => void
   onAddStaff: () => void
   onNewDemo: () => void
@@ -30,6 +31,7 @@ export function ScheduleTable({
   readOnly,
   paintMode,
   activeCode,
+  highlightEmpty = false,
   onChange,
   onAddStaff,
   onNewDemo,
@@ -424,11 +426,13 @@ export function ScheduleTable({
                           className={`border border-line px-0 py-0 text-center select-none ${
                             readOnly ? '' : 'cursor-pointer'
                           } ${
-                            !code && holiday
-                              ? 'bg-amber-50'
-                              : !code && weekend
-                                ? 'bg-teal/5'
-                                : ''
+                            !code && highlightEmpty
+                              ? 'bg-rose-100/80 ring-1 ring-inset ring-rose-300'
+                              : !code && holiday
+                                ? 'bg-amber-50'
+                                : !code && weekend
+                                  ? 'bg-teal/5'
+                                  : ''
                           }`}
                           style={
                             meta

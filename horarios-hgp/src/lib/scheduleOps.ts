@@ -4,6 +4,7 @@ import { daysInMonth, isWeekend } from './calendar'
 import { holidayDatesInMonth } from './holidays'
 import { loadSchedule, listSavedSchedules } from './storage'
 import { isRemoteEnabled, listRemoteSchedules, fetchRemoteSchedule } from './api'
+import { shiftMeta } from '../data/templates'
 
 /** Borra todas las celdas del mes (mantiene personal y metadatos). */
 export function clearMonthCells(doc: ScheduleDoc): ScheduleDoc {
@@ -713,6 +714,115 @@ export function addStaffFromNameList(
         userName: 'Usuario',
         action: 'pegar_nombres',
         detail: `${extras.length} nombres agregados`,
+      },
+    ],
+  }
+}
+
+/**
+ * Rellena celdas vacías de cada persona con su código habitual
+ * (si la clave existe en la plantilla).
+ */
+export function applyHabitualCodesToEmpty(doc: ScheduleDoc): ScheduleDoc {
+  const days = daysInMonth(doc.year, doc.month)
+  const cells = { ...doc.cells }
+  let painted = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    const code = (s.codigoPersonal || '').trim().toUpperCase()
+    if (!code || !shiftMeta(doc.serviceType, code)) continue
+    for (let d = 1; d <= days; d++) {
+      const key = `${s.id}:${d}`
+      if (cells[key]) continue
+      cells[key] = code
+      painted += 1
+    }
+  }
+  if (painted === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'codigo_habitual',
+        detail: `${painted} celdas con código habitual`,
+      },
+    ],
+  }
+}
+
+export type EmptyStaffReport = {
+  staffId: string
+  name: string
+  fun: string
+  emptyDays: number
+  filledDays: number
+  totalDays: number
+}
+
+/** Personal con celdas vacías (días sin clave). */
+export function emptyCellsReport(doc: ScheduleDoc): EmptyStaffReport[] {
+  const days = daysInMonth(doc.year, doc.month)
+  const out: EmptyStaffReport[] = []
+  for (const s of [...doc.staff].sort((a, b) => a.order - b.order)) {
+    if (!s.name.trim()) continue
+    let empty = 0
+    let filled = 0
+    for (let d = 1; d <= days; d++) {
+      if (doc.cells[`${s.id}:${d}`]) filled += 1
+      else empty += 1
+    }
+    if (empty === 0) continue
+    out.push({
+      staffId: s.id,
+      name: s.name,
+      fun: s.fun,
+      emptyDays: empty,
+      filledDays: filled,
+      totalDays: days,
+    })
+  }
+  return out.sort((a, b) => b.emptyDays - a.emptyDays)
+}
+
+/** Intercambia dos claves en todo el horario (p. ej. D1 ↔ N1). */
+export function swapCodesInSchedule(
+  doc: ScheduleDoc,
+  codeA: string,
+  codeB: string,
+): ScheduleDoc {
+  if (!codeA || !codeB || codeA === codeB) return doc
+  const cells = { ...doc.cells }
+  let swapped = 0
+  for (const [k, v] of Object.entries(cells)) {
+    if (v === codeA) {
+      cells[k] = codeB
+      swapped += 1
+    } else if (v === codeB) {
+      cells[k] = codeA
+      swapped += 1
+    }
+  }
+  if (swapped === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'intercambiar_claves',
+        detail: `${codeA} ↔ ${codeB} (${swapped})`,
       },
     ],
   }

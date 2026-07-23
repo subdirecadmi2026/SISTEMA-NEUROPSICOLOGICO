@@ -360,6 +360,29 @@ describe('operaciones de mes', () => {
     const sorted = sortStaffByName(copied)
     expect(sorted.staff[0].name.startsWith('Dr')).toBe(true)
   })
+
+  it('aplica código habitual y reporta vacíos', async () => {
+    const { applyHabitualCodesToEmpty, emptyCellsReport, swapCodesInSchedule } =
+      await import('./scheduleOps')
+    const doc = createBlankSchedule('enfermeria', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Lic. Ana',
+        fun: 'ENF',
+        role: 'Enf',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'D1',
+        order: 1,
+      },
+    ]
+    expect(emptyCellsReport(doc)[0]?.emptyDays).toBe(31)
+    const filled = applyHabitualCodesToEmpty(doc)
+    expect(emptyCellsReport(filled)).toHaveLength(0)
+    expect(filled.cells[cellKey('a', 1)]).toBe('D1')
+    const swapped = swapCodesInSchedule(filled, 'D1', 'N1')
+    expect(swapped.cells[cellKey('a', 1)]).toBe('N1')
+  })
 })
 
 describe('export CSV', () => {
