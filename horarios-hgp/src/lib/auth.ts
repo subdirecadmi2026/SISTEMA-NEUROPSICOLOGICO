@@ -114,14 +114,31 @@ export function otherDemoUsers(): AppUser[] {
 
 /**
  * Login por correo + contraseña (demo o personalizada del usuario).
+ * Si se indica `expectedUserId`, el correo debe corresponder a ese perfil.
  */
 export function authenticateDemo(
   email: string,
   password: string,
+  opts?: { expectedUserId?: string; expectedRole?: UserRole },
 ): { ok: true; user: AppUser } | { ok: false; error: string } {
   const found = findUserByEmail(email)
   if (!found || found.active === false) {
-    return { ok: false, error: 'No existe un perfil con ese correo' }
+    return { ok: false, error: 'Usuario o correo no registrado' }
+  }
+  if (opts?.expectedUserId && found.id !== opts.expectedUserId) {
+    return {
+      ok: false,
+      error: 'El usuario no corresponde al perfil que seleccionó',
+    }
+  }
+  if (opts?.expectedRole && found.role !== opts.expectedRole) {
+    return {
+      ok: false,
+      error: 'El usuario no corresponde al rol seleccionado',
+    }
+  }
+  if (!password.trim()) {
+    return { ok: false, error: 'Ingrese la contraseña' }
   }
   if (!checkUserPassword(found, password, DEMO_PASSWORD)) {
     return {

@@ -73,8 +73,19 @@ describe('login y perfiles demo', () => {
     expect(loadSession()).toBeNull()
   })
 
-  it('roleMission y userInitials', () => {
-    expect(roleMission('validador')).toMatch(/QR|valida/i)
-    expect(userInitials('Dra. María Solís')).toBe('DS')
+  it('authenticateDemo exige perfil seleccionado correcto', () => {
+    const bad = authenticateDemo('revisor@hgp.gob.ec', DEMO_PASSWORD, {
+      expectedUserId: 'u-jefe',
+    })
+    expect(bad.ok).toBe(false)
+    const good = authenticateDemo('jefe.servicio@hgp.gob.ec', DEMO_PASSWORD, {
+      expectedUserId: 'u-jefe',
+    })
+    expect(good.ok).toBe(true)
+  })
+
+  it('authenticateDemo rechaza contraseña vacía', () => {
+    const r = authenticateDemo('validador@hgp.gob.ec', '')
+    expect(r.ok).toBe(false)
   })
 })

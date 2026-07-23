@@ -1,49 +1,171 @@
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { AppUser } from '../types'
 import {
   DEMO_PASSWORD,
   authenticateDemo,
-  loginAs,
-  otherDemoUsers,
   primaryDemoUsers,
   roleLabel,
   roleMission,
-  userInitials,
 } from '../lib/auth'
 
 type Props = {
   onLogin: (user: AppUser) => void
 }
 
-const ACCENT: Record<string, string> = {
-  'u-jefe': 'border-teal/40 bg-teal/10 hover:border-teal hover:bg-teal/15',
-  'u-revisor':
-    'border-navy/25 bg-navy/5 hover:border-navy/50 hover:bg-navy/10',
-  'u-validador':
-    'border-teal-soft/50 bg-teal-soft/10 hover:border-teal-soft hover:bg-teal-soft/20',
-  'u-admin':
-    'border-line bg-sand/60 hover:border-navy/40 hover:bg-sand',
+type RoleVisual = {
+  id: string
+  title: string
+  action: string
+  accent: string
+  selected: string
+  Illustration: () => ReactNode
 }
 
+function IlluJefe() {
+  return (
+    <svg viewBox="0 0 160 110" className="h-full w-full" aria-hidden>
+      <rect x="8" y="12" width="144" height="86" rx="10" fill="#1c3a5c" />
+      <rect x="18" y="24" width="70" height="8" rx="2" fill="#5bb8b0" />
+      <rect x="18" y="40" width="124" height="6" rx="2" fill="#d9ebe9" opacity=".85" />
+      <rect x="18" y="52" width="124" height="6" rx="2" fill="#d9ebe9" opacity=".55" />
+      <rect x="18" y="64" width="90" height="6" rx="2" fill="#d9ebe9" opacity=".4" />
+      <rect x="18" y="78" width="48" height="12" rx="4" fill="#2e7d84" />
+      <circle cx="128" cy="36" r="14" fill="#f3efe6" />
+      <path d="M120 36h16M128 28v16" stroke="#1c3a5c" strokeWidth="3" />
+    </svg>
+  )
+}
+
+function IlluRevisor() {
+  return (
+    <svg viewBox="0 0 160 110" className="h-full w-full" aria-hidden>
+      <rect x="20" y="14" width="90" height="82" rx="8" fill="#fff" stroke="#1c3a5c" strokeWidth="3" />
+      <rect x="32" y="28" width="66" height="6" rx="2" fill="#d5dee6" />
+      <rect x="32" y="42" width="66" height="6" rx="2" fill="#d5dee6" />
+      <rect x="32" y="56" width="44" height="6" rx="2" fill="#d5dee6" />
+      <circle cx="118" cy="70" r="26" fill="#2e7d84" />
+      <path
+        d="M106 70l8 8 16-18"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function IlluValidador() {
+  return (
+    <svg viewBox="0 0 160 110" className="h-full w-full" aria-hidden>
+      <rect x="14" y="18" width="78" height="74" rx="8" fill="#1c3a5c" />
+      <rect x="24" y="30" width="58" height="8" rx="2" fill="#5bb8b0" />
+      <rect x="24" y="46" width="58" height="5" rx="2" fill="#d9ebe9" opacity=".7" />
+      <rect x="24" y="56" width="40" height="5" rx="2" fill="#d9ebe9" opacity=".45" />
+      <rect x="100" y="28" width="46" height="46" rx="6" fill="#fff" stroke="#2e7d84" strokeWidth="3" />
+      <rect x="108" y="36" width="12" height="12" fill="#1c3a5c" />
+      <rect x="126" y="36" width="12" height="12" fill="#1c3a5c" />
+      <rect x="108" y="54" width="12" height="12" fill="#1c3a5c" />
+      <rect x="126" y="54" width="12" height="12" fill="#2e7d84" />
+      <text x="123" y="98" textAnchor="middle" fontSize="9" fill="#1c3a5c" fontWeight="700">
+        QR
+      </text>
+    </svg>
+  )
+}
+
+function IlluAdmin() {
+  return (
+    <svg viewBox="0 0 160 110" className="h-full w-full" aria-hidden>
+      <rect x="18" y="20" width="52" height="36" rx="8" fill="#1c3a5c" />
+      <rect x="78" y="20" width="52" height="36" rx="8" fill="#2e7d84" />
+      <rect x="18" y="64" width="52" height="26" rx="8" fill="#5bb8b0" />
+      <rect x="78" y="64" width="52" height="26" rx="8" fill="#d9ebe9" stroke="#1c3a5c" strokeWidth="2" />
+      <circle cx="132" cy="30" r="10" fill="#f3efe6" />
+      <path d="M128 30h8M132 26v8" stroke="#1c3a5c" strokeWidth="2.5" />
+    </svg>
+  )
+}
+
+const ROLE_VISUALS: RoleVisual[] = [
+  {
+    id: 'u-jefe',
+    title: 'Jefe de servicio',
+    action: 'Elaborar horarios',
+    accent: 'border-teal/30 bg-teal/5',
+    selected: 'border-teal ring-2 ring-teal/40 bg-teal/10',
+    Illustration: IlluJefe,
+  },
+  {
+    id: 'u-revisor',
+    title: 'Revisor',
+    action: 'Revisar y aprobar',
+    accent: 'border-navy/20 bg-navy/5',
+    selected: 'border-navy ring-2 ring-navy/30 bg-navy/10',
+    Illustration: IlluRevisor,
+  },
+  {
+    id: 'u-validador',
+    title: 'Validador',
+    action: 'Firmar y validar',
+    accent: 'border-teal-soft/40 bg-teal-soft/10',
+    selected: 'border-teal-soft ring-2 ring-teal-soft/50 bg-teal-soft/15',
+    Illustration: IlluValidador,
+  },
+  {
+    id: 'u-admin',
+    title: 'Administrador',
+    action: 'Administrar el sistema',
+    accent: 'border-line bg-sand/50',
+    selected: 'border-navy ring-2 ring-navy/25 bg-sand',
+    Illustration: IlluAdmin,
+  },
+]
+
 /**
- * Pantalla de acceso: perfiles del flujo HGP + correo/contraseña demo.
+ * Login en 2 pasos: 1) elegir imagen del rol  2) validar usuario + contraseña.
  */
 export function LoginScreen({ onLogin }: Props) {
-  const [email, setEmail] = useState('')
+  const primary = primaryDemoUsers()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [showMore, setShowMore] = useState(false)
-  const primary = primaryDemoUsers()
-  const others = otherDemoUsers()
+  const [step, setStep] = useState<'elige' | 'credenciales'>('elige')
 
-  function enterAs(u: AppUser) {
+  const selectedUser = useMemo(
+    () => primary.find((u) => u.id === selectedId) ?? null,
+    [primary, selectedId],
+  )
+
+  const visual = ROLE_VISUALS.find((r) => r.id === selectedId)
+
+  function pickRole(id: string) {
+    const u = primary.find((x) => x.id === id)
+    setSelectedId(id)
     setError('')
-    onLogin(loginAs(u))
+    setPassword('')
+    setUsuario(u?.email ?? '')
+    setStep('credenciales')
+  }
+
+  function backToRoles() {
+    setStep('elige')
+    setError('')
+    setPassword('')
   }
 
   function submitForm(e: React.FormEvent) {
     e.preventDefault()
-    const result = authenticateDemo(email, password)
+    if (!selectedUser) {
+      setError('Seleccione primero qué va a hacer (su perfil)')
+      setStep('elige')
+      return
+    }
+    const result = authenticateDemo(usuario, password, {
+      expectedUserId: selectedUser.id,
+    })
     if (!result.ok) {
       setError(result.error)
       return
@@ -63,155 +185,158 @@ export function LoginScreen({ onLogin }: Props) {
         }}
       />
 
-      <div className="relative mx-auto grid max-w-5xl gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:py-16">
-        <div>
-          <div className="mb-6 flex items-center gap-3">
-            <img
-              src="/logo_msp.png"
-              alt="Ministerio de Salud Pública"
-              className="h-16 w-auto rounded-lg bg-white p-1.5 shadow-sm"
-            />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
-                MSP Ecuador
-              </p>
-              <h1 className="font-display text-3xl leading-tight text-navy sm:text-4xl">
-                Hospital General Puyo
-              </h1>
-            </div>
-          </div>
-          <p className="max-w-md text-base text-muted sm:text-lg">
-            Sistema de horarios. Elija su perfil para elaborar, revisar o
-            validar el cuadro de trabajo.
-          </p>
-          <ol className="mt-6 space-y-2 text-sm text-ink">
-            <li className="flex gap-2">
-              <span className="font-display text-teal">1.</span>
-              <span>
-                <strong>Jefe</strong> elabora y envía a revisión
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-display text-teal">2.</span>
-              <span>
-                <strong>Revisor</strong> aprueba o devuelve con comentario
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="font-display text-teal">3.</span>
-              <span>
-                <strong>Validador</strong> firma con QR y archiva el PDF
-              </span>
-            </li>
-          </ol>
-        </div>
-
-        <div className="rounded-3xl border border-line/80 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
-          <h2 className="font-display text-xl text-navy">Entrar con perfil</h2>
-          <p className="mt-1 text-xs text-muted">
-            Acceso demo institucional · contraseña:{' '}
-            <code className="rounded bg-sand px-1.5 py-0.5 font-semibold text-navy">
-              {DEMO_PASSWORD}
-            </code>
-          </p>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {primary.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => enterAs(u)}
-                className={`rounded-2xl border px-3 py-3 text-left transition ${
-                  ACCENT[u.id] ?? 'border-line bg-white hover:bg-sand'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy font-display text-sm text-white">
-                    {userInitials(u.name)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold text-navy">
-                      {roleLabel(u.role).replace(' (visualización)', '')}
-                    </span>
-                    <span className="block truncate text-xs text-muted">
-                      {u.name}
-                    </span>
-                  </span>
-                </div>
-                <p className="mt-2 text-[11px] leading-snug text-muted">
-                  {roleMission(u.role)}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={submitForm} className="mt-5 space-y-3 border-t border-line pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              O con correo
+      <div className="relative mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-14">
+        <div className="mb-8 flex flex-wrap items-center gap-3">
+          <img
+            src="/logo_msp.png"
+            alt="Ministerio de Salud Pública"
+            className="h-14 w-auto rounded-lg bg-white p-1.5 shadow-sm"
+          />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
+              MSP Ecuador
             </p>
-            <label className="block text-xs font-semibold text-muted">
-              Correo institucional
-              <input
-                type="email"
-                autoComplete="username"
-                className="mt-1 w-full rounded-xl border border-line bg-sand/30 px-3 py-2.5 text-sm text-ink"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="ej. jefe.servicio@hgp.gob.ec"
-              />
-            </label>
-            <label className="block text-xs font-semibold text-muted">
-              Contraseña
-              <input
-                type="password"
-                autoComplete="current-password"
-                className="mt-1 w-full rounded-xl border border-line bg-sand/30 px-3 py-2.5 text-sm text-ink"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={DEMO_PASSWORD}
-              />
-            </label>
-            {error ? (
-              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
-                {error}
-              </p>
-            ) : null}
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-deep"
-            >
-              Iniciar sesión
-            </button>
-          </form>
-
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => setShowMore((v) => !v)}
-              className="text-xs font-semibold text-teal underline"
-            >
-              {showMore
-                ? 'Ocultar otros perfiles'
-                : 'Más perfiles institucionales…'}
-            </button>
-            {showMore ? (
-              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-line bg-sand/20 p-2">
-                {others.map((u) => (
-                  <li key={u.id}>
-                    <button
-                      type="button"
-                      onClick={() => enterAs(u)}
-                      className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white"
-                    >
-                      <span className="font-semibold text-navy">{u.name}</span>
-                      <span className="text-muted">{roleLabel(u.role)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            <h1 className="font-display text-3xl leading-tight text-navy sm:text-4xl">
+              Hospital General Puyo
+            </h1>
+            <p className="text-sm text-muted">
+              Acceso al sistema de horarios · seleccione su función e inicie sesión
+            </p>
           </div>
         </div>
+
+        {step === 'elige' ? (
+          <section className="rounded-3xl border border-line/80 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
+            <h2 className="font-display text-2xl text-navy">
+              ¿Qué va a hacer?
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Elija la imagen de su perfil. Después deberá validar con usuario y
+              contraseña.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {ROLE_VISUALS.map((role) => {
+                const u = primary.find((x) => x.id === role.id)
+                if (!u) return null
+                const Illu = role.Illustration
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => pickRole(role.id)}
+                    className={`group overflow-hidden rounded-2xl border text-left transition hover:-translate-y-0.5 hover:shadow-md ${role.accent}`}
+                  >
+                    <div className="h-28 bg-gradient-to-br from-white/80 to-transparent px-3 pt-3 sm:h-32">
+                      <Illu />
+                    </div>
+                    <div className="border-t border-line/60 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-teal">
+                        {role.action}
+                      </p>
+                      <p className="font-display text-lg text-navy">
+                        {role.title}
+                      </p>
+                      <p className="mt-1 text-xs text-muted">
+                        {roleMission(u.role)}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ) : (
+          <section className="mx-auto grid max-w-3xl gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+            <div
+              className={`overflow-hidden rounded-3xl border ${visual?.selected ?? 'border-line'} bg-white shadow-sm`}
+            >
+              <div className="h-36 px-4 pt-4">
+                {visual ? <visual.Illustration /> : null}
+              </div>
+              <div className="border-t border-line px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-teal">
+                  {visual?.action}
+                </p>
+                <p className="font-display text-xl text-navy">
+                  {visual?.title}
+                </p>
+                {selectedUser ? (
+                  <p className="mt-1 text-sm text-muted">
+                    Perfil: {selectedUser.name}
+                    <br />
+                    <span className="text-xs">
+                      {roleLabel(selectedUser.role)}
+                    </span>
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={backToRoles}
+                  className="mt-3 text-xs font-semibold text-teal underline"
+                >
+                  ← Cambiar imagen / perfil
+                </button>
+              </div>
+            </div>
+
+            <form
+              onSubmit={submitForm}
+              className="rounded-3xl border border-line bg-white/95 p-5 shadow-sm sm:p-6"
+            >
+              <h2 className="font-display text-xl text-navy">
+                Validar acceso
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                Ingrese usuario y contraseña del perfil seleccionado.
+                Demo: <code className="rounded bg-sand px-1 font-semibold">{DEMO_PASSWORD}</code>
+              </p>
+
+              <label className="mt-4 block text-xs font-semibold uppercase tracking-wider text-muted">
+                Usuario (correo)
+                <input
+                  type="email"
+                  autoComplete="username"
+                  autoFocus
+                  required
+                  className="mt-1 w-full rounded-xl border border-line bg-sand/30 px-3 py-2.5 text-sm text-ink"
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
+                  placeholder="correo@hgp.gob.ec"
+                />
+              </label>
+              <label className="mt-3 block text-xs font-semibold uppercase tracking-wider text-muted">
+                Contraseña
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  className="mt-1 w-full rounded-xl border border-line bg-sand/30 px-3 py-2.5 text-sm text-ink"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </label>
+
+              {error ? (
+                <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                  {error}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                className="mt-5 w-full rounded-xl bg-navy px-4 py-3 text-sm font-semibold text-white hover:bg-navy-deep"
+              >
+                Iniciar sesión
+              </button>
+              {selectedUser ? (
+                <p className="mt-3 text-center text-[11px] text-muted">
+                  Usuario sugerido: {selectedUser.email}
+                </p>
+              ) : null}
+            </form>
+          </section>
+        )}
       </div>
     </main>
   )
