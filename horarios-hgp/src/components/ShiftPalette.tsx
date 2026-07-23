@@ -56,7 +56,9 @@ export function ShiftPalette({
             Claves — {SERVICE_LABEL[serviceType]}
           </h2>
           <p className="text-xs text-muted">
-            Elija clave y pinte en la grilla · Atajos L F V · CE X · D1 N1
+            {isEnf
+              ? 'Elija clave y pinte · Atajos L F V · D1 N1 · M T'
+              : 'Elija clave y pinte · Atajos L F V · CE X · PT1 PT2'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
