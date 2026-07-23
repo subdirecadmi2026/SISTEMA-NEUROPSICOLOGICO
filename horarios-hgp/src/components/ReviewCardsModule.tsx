@@ -16,6 +16,11 @@ import { runAllValidations } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
 import { SignatureGate } from './SignatureGate'
 import { slotForStatus } from '../lib/firmaEc'
+import {
+  blobToPdfBase64,
+  buildSchedulePdfBlob,
+  pdfFileName,
+} from '../lib/exportPdf'
 
 type Mode = 'revisor' | 'validador'
 
@@ -175,7 +180,7 @@ export function ReviewCardsModule({
               ? 'Firmar y aprobar (Revisor)'
               : 'Firmar y validar'
           }
-          subtitle="Puede firmar con nombre o electrónicamente con FirmaEC (.p12). Se genera código QR."
+          subtitle="Firme con .p12, app FirmaEC (si hay API) o nombre+QR. El sello solo aparece al confirmar."
           defaultName={user.name}
           confirmLabel={
             signNext === 'APROBADO' ? 'Firmar y aprobar' : 'Firmar y validar'
@@ -188,6 +193,13 @@ export function ReviewCardsModule({
           user={user}
           scheduleId={detail.id}
           unitName={detail.unitName}
+          getDocumentPdfBase64={async () => {
+            const blob = await buildSchedulePdfBlob(detail)
+            return {
+              base64: await blobToPdfBase64(blob),
+              fileName: pdfFileName(detail),
+            }
+          }}
           onCancel={() => setSignNext(null)}
           onConfirm={(result) => {
             if (!signNext) return

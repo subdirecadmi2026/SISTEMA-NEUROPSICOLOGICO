@@ -4,10 +4,12 @@ import {
   clearFirmaEcVault,
   clearSignatureImage,
   certificateDaysLeft,
+  firmaEcApiStatusLabel,
   getSignatureImage,
   getStoredCertMeta,
   hasStoredCertificate,
   isCertificateExpired,
+  isFirmaEcApiConfigured,
   loadFirmaEcConfig,
   saveCertificateForUser,
   saveFirmaEcConfig,
@@ -344,14 +346,23 @@ export function FirmaEcSettings({ user, onFlash, tone = 'header' }: Props) {
               </p>
             )}
 
-            <details className="rounded-xl border border-line">
+            <details className="rounded-xl border border-line" open={isFirmaEcApiConfigured(cfg)}>
               <summary className="cursor-pointer bg-sand/40 px-3 py-2 text-sm font-semibold text-navy">
-                API FirmaEC institucional (opcional)
+                API FirmaEC institucional (MINTEL)
               </summary>
               <div className="space-y-3 p-3 text-sm">
+                <p
+                  className={`rounded-lg px-2 py-1.5 text-xs font-semibold ${
+                    isFirmaEcApiConfigured(cfg)
+                      ? 'bg-teal/10 text-navy'
+                      : 'bg-amber-50 text-amber-950'
+                  }`}
+                >
+                  {firmaEcApiStatusLabel(cfg)}
+                </p>
                 <p className="text-xs text-muted">
-                  Solo si el hospital tiene X-API-KEY de MINTEL. No es
-                  necesario para cargar el .p12 aquí.
+                  Con X-API-KEY y cédula, al firmar puede abrir la app FirmaEC
+                  (protocolo <code>firmaec://</code>) con el PDF del horario.
                 </p>
                 <label className="block text-xs font-semibold text-muted">
                   Sistema
@@ -362,6 +373,22 @@ export function FirmaEcSettings({ user, onFlash, tone = 'header' }: Props) {
                       setCfg({ ...cfg, sistema: e.target.value })
                     }
                   />
+                </label>
+                <label className="block text-xs font-semibold text-muted">
+                  Ambiente
+                  <select
+                    className="mt-1 w-full rounded-lg border border-line px-2 py-1.5"
+                    value={cfg.ambiente}
+                    onChange={(e) =>
+                      setCfg({
+                        ...cfg,
+                        ambiente: e.target.value as FirmaEcConfig['ambiente'],
+                      })
+                    }
+                  >
+                    <option value="pruebas">Pruebas</option>
+                    <option value="produccion">Producción</option>
+                  </select>
                 </label>
                 <label className="block text-xs font-semibold text-muted">
                   X-API-KEY
@@ -382,6 +409,16 @@ export function FirmaEcSettings({ user, onFlash, tone = 'header' }: Props) {
                       setCfg({ ...cfg, cedula: e.target.value })
                     }
                   />
+                </label>
+                <label className="flex items-center gap-2 text-xs font-semibold text-muted">
+                  <input
+                    type="checkbox"
+                    checked={cfg.preferProtocol}
+                    onChange={(e) =>
+                      setCfg({ ...cfg, preferProtocol: e.target.checked })
+                    }
+                  />
+                  Preferir app FirmaEC al firmar (si API está lista)
                 </label>
                 <button
                   type="button"

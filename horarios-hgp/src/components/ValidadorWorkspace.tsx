@@ -9,6 +9,7 @@ import { MonthSummary } from './MonthSummary'
 import { SERVICE_LABEL } from '../data/templates'
 import {
   buildSchedulePdfBlob,
+  blobToPdfBase64,
   pdfFileName,
   specialtyFolderName,
 } from '../lib/exportPdf'
@@ -243,6 +244,13 @@ export function ValidadorWorkspace({
           user={user}
           scheduleId={detail.id}
           unitName={detail.unitName}
+          getDocumentPdfBase64={async () => {
+            const blob = await buildSchedulePdfBlob(detail)
+            return {
+              base64: await blobToPdfBase64(blob),
+              fileName: pdfFileName(detail),
+            }
+          }}
           onCancel={() => setSignOpen(false)}
           onConfirm={(result) => {
             void validateAndArchive(

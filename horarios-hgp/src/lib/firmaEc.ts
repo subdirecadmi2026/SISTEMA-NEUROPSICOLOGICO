@@ -49,9 +49,10 @@ export type ElectronicSignResult = {
   serialNumber?: string
   issuerCn?: string
   signedAt: string
-  method: 'pkcs12_local' | 'image_stamp'
+  method: 'pkcs12_local' | 'image_stamp' | 'firmaec_protocol'
   fileName?: string
   imageDataUrl?: string
+  protocolUrl?: string
 }
 
 const DEFAULT_CFG: FirmaEcConfig = {
@@ -531,6 +532,9 @@ export function formatElectronicStamp(e: ElectronicSignResult): string {
   if (e.method === 'image_stamp') {
     return `${e.subjectCn}\nFirma electrónica (imagen)\n${when}`
   }
+  if (e.method === 'firmaec_protocol') {
+    return `${e.subjectCn}\nFirmado con app FirmaEC\n${when}`
+  }
   return `${e.subjectCn}\nFirmado electrónicamente · FirmaEC\n${when}`
 }
 
@@ -572,6 +576,18 @@ export function buildFirmaEcProtocolUrl(
   return `firmaec://${encodeURIComponent(cfg.sistema)}/firmar?${q.toString()}`
 }
 
+export function isFirmaEcApiConfigured(cfg?: FirmaEcConfig): boolean {
+  const c = cfg ?? loadFirmaEcConfig()
+  return !!c.apiKey.trim() && !!c.cedula.trim() && !!c.sistema.trim()
+}
+
+export function firmaEcApiStatusLabel(cfg?: FirmaEcConfig): string {
+  const c = cfg ?? loadFirmaEcConfig()
+  if (!c.apiKey.trim()) return 'API no configurada (falta X-API-KEY)'
+  if (!c.cedula.trim()) return 'API incompleta (falta cédula)'
+  return `API lista · ${c.ambiente} · ${c.sistema}`
+}
+
 export async function requestFirmaEcToken(
   pdfBase64: string,
   fileName: string,
@@ -609,4 +625,24 @@ export async function requestFirmaEcToken(
   const jwt = data.jwt ?? data.token
   if (!jwt) throw new Error('FirmaEC no devolvió token JWT')
   return jwt
+}
+
+/**
+ * Solicita token a FirmaEC y arma el enlace firmaec:// para la app de escritorio.
+ */
+export async function openFirmaEcProtocolSign(
+  pdfBase64: string,
+  fileName: string,
+  slot: FirmaEcSlot,
+  cfg?: FirmaEcConfig,
+): Promise<{ token: string; protocolUrl: string }> {
+  const config = cfg ?? loadFirmaEcConfig()
+  const token = await requestFirmaEcToken(pdfBase64, fileName, config)
+  const protocolUrl = buildFirmaEcProtocolUrl(token, slot, config)
+  try {
+    window.location.href = protocolUrl
+  } catch {
+    /* algunos navegadores bloquean el esquema; el caller puede mostrar la URL */
+  }
+  return { token, protocolUrl }
 }

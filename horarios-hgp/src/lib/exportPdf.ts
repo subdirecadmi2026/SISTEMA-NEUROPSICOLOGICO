@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import type { ElectronicSignRecord, ScheduleDoc } from '../types'
+import type { ScheduleDoc } from '../types'
 import { InstitutionalPrintBody } from '../components/PrintSheet'
 import { ensureElectronicQr } from './signatureQr'
 
@@ -39,35 +39,8 @@ function waitFrames(ms = 120): Promise<void> {
 
 async function enrichSigns(doc: ScheduleDoc): Promise<ScheduleDoc> {
   const signs = doc.electronicSigns ?? []
-  if (!signs.length) {
-    // Generar QR sintético desde textos de casilla para PDF/impresión
-    const synthetic: ElectronicSignRecord[] = []
-    const pushIf = (
-      slot: ElectronicSignRecord['slot'],
-      text: string | undefined,
-    ) => {
-      const name = text?.split('\n')[0]?.split('—')[0]?.trim()
-      if (!name) return
-      synthetic.push({
-        slot,
-        subjectCn: name,
-        signedAt: doc.updatedAt || new Date().toISOString(),
-        method: 'nombre_qr',
-        stampText: text || name,
-      })
-    }
-    pushIf('jefe', doc.elaboradoPor)
-    pushIf('revisor', doc.revisadoPor || doc.aprobadoPor)
-    pushIf('validador', doc.talentoHumano)
-    if (!synthetic.length) return doc
-    const withQr = await Promise.all(
-      synthetic.map((s) =>
-        ensureElectronicQr(s, { scheduleId: doc.id, unitName: doc.unitName }),
-      ),
-    )
-    return { ...doc, electronicSigns: withQr }
-  }
-
+  // Solo QR de firmas reales del encargado (no inventar desde texto).
+  if (!signs.length) return doc
   const withQr = await Promise.all(
     signs.map((s) =>
       ensureElectronicQr(s, { scheduleId: doc.id, unitName: doc.unitName }),
@@ -144,4 +117,16 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+/** Convierte Blob PDF a base64 (sin prefijo data:) para la API FirmaEC. */
+export async function blobToPdfBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
 }

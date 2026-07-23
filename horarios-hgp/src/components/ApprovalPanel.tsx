@@ -13,6 +13,11 @@ import { runAllValidations } from '../lib/validation'
 import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/notifications'
 import { SignatureGate } from './SignatureGate'
 import { slotForStatus } from '../lib/firmaEc'
+import {
+  blobToPdfBase64,
+  buildSchedulePdfBlob,
+  pdfFileName,
+} from '../lib/exportPdf'
 
 type Props = {
   doc: ScheduleDoc
@@ -149,13 +154,20 @@ export function ApprovalPanel({
       <SignatureGate
         open={!!signIntent}
         title={signTitle}
-        subtitle="Puede firmar con nombre o electrónicamente con su certificado FirmaEC (.p12). Se genera código QR."
+        subtitle="Firme con .p12, app FirmaEC (si hay API) o nombre+QR. El sello solo aparece al confirmar."
         defaultName={user?.name ?? ''}
         confirmLabel={signConfirm}
         slot={signSlot}
         user={user}
         scheduleId={doc.id}
         unitName={doc.unitName}
+        getDocumentPdfBase64={async () => {
+          const blob = await buildSchedulePdfBlob(doc)
+          return {
+            base64: await blobToPdfBase64(blob),
+            fileName: pdfFileName(doc),
+          }
+        }}
         onCancel={() => setSignIntent(null)}
         onConfirm={(result) => {
           if (!signIntent) return
