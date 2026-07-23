@@ -378,7 +378,11 @@ export function ValidadorWorkspace({
 
   // ——— Tarjetas: dos módulos ———
   return (
-    <div className="mx-auto max-w-5xl px-3 py-6 sm:px-6">
+    <div
+      className={`mx-auto px-3 py-6 sm:px-6 ${
+        module === 'archivo' ? 'max-w-[1400px]' : 'max-w-5xl'
+      }`}
+    >
       <header className="mb-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
           Módulo validador
@@ -485,43 +489,55 @@ export function ValidadorWorkspace({
             Aún no hay horarios validados. Valide desde Pendientes.
           </p>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {archivedBySpecialty.map(([specialty, list]) => (
               <section key={specialty}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h2 className="font-display text-xl text-navy">
-                    {specialty}
-                  </h2>
-                  <span className="text-xs font-semibold text-muted">
-                    Carpeta: {specialty} · {list.length} horario(s)
-                  </span>
+                <div className="mb-2 flex items-end justify-between gap-2 border-b border-line/80 pb-1.5">
+                  <div>
+                    <h2 className="font-display text-lg leading-tight text-navy">
+                      {specialty}
+                    </h2>
+                    <p className="text-[11px] text-muted">
+                      Carpeta · {list.length} validado
+                      {list.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
                   {list.map((s) => (
                     <article
                       key={s.id}
-                      className="rounded-2xl border border-line bg-white p-4 shadow-sm"
+                      className="group relative flex min-h-[7.25rem] flex-col overflow-hidden rounded-xl border border-line bg-gradient-to-b from-white to-sand/30 p-2.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-teal/45 hover:shadow-md"
                     >
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                        {s.serviceType === 'enfermeria'
-                          ? 'Enfermería'
-                          : 'Médico'}
-                      </p>
-                      <h3 className="font-display text-lg text-navy">
-                        {MONTHS_ES[s.month - 1]} {s.year}
+                      <div
+                        className="absolute inset-x-0 top-0 h-0.5 bg-teal/70"
+                        aria-hidden
+                      />
+                      <div className="flex items-center justify-between gap-1 pt-0.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-teal">
+                          {s.serviceType === 'enfermeria' ? 'Enf' : 'Med'}
+                        </span>
+                        <span className="text-[9px] font-semibold text-emerald-800">
+                          ✓
+                        </span>
+                      </div>
+                      <h3 className="mt-1 truncate font-display text-[0.95rem] leading-snug text-navy">
+                        {MONTHS_ES[s.month - 1]}
+                        <span className="ml-1 font-sans text-[11px] font-semibold text-muted">
+                          {s.year}
+                        </span>
                       </h3>
-                      <p className="mt-1 text-xs text-muted">
-                        {STATUS_LABEL.ARCHIVADO} ·{' '}
-                        {new Date(s.updatedAt).toLocaleString('es-EC', {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
+                      <p className="mt-0.5 text-[10px] tabular-nums text-muted">
+                        {new Date(s.updatedAt).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: 'short',
                         })}
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-auto flex gap-1 pt-2">
                         <button
                           type="button"
                           onClick={() => void openCard(s.id)}
-                          className="rounded-xl border border-line px-3 py-1.5 text-xs font-semibold hover:bg-sand"
+                          className="flex-1 rounded-md border border-line/90 bg-white px-1.5 py-1 text-[10px] font-semibold text-navy hover:bg-sand"
                         >
                           Ver
                         </button>
@@ -529,9 +545,9 @@ export function ValidadorWorkspace({
                           type="button"
                           disabled={busy}
                           onClick={() => void redownloadPdf(s.id)}
-                          className="rounded-xl bg-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                          className="flex-1 rounded-md bg-teal px-1.5 py-1 text-[10px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
                         >
-                          PDF → carpeta
+                          PDF
                         </button>
                       </div>
                     </article>
