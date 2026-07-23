@@ -56,10 +56,10 @@ Opciones:
 También: resaltar vacíos, modo compacto, ir a un día, reemplazar clave.
 
 ## 6. Revisar calidad
-- **Listo para enviar**: checklist de requisitos
-- **DISTRIBUCIÓN**: cobertura por día + quién trabaja + horas por persona
+- **Listo para enviar**: nombre + jefe + al menos una celda pintada (no exige mes lleno)
+- **DISTRIBUCIÓN**: cobertura por día (avisos informativos; turnos rotativos/24 h pueden dejar días vacíos)
 - **Comparar con mes anterior**: Δ de horas
-- **CONTINGENCIA**: obligatorio en médico si hay V/P/INC/CD (botón sugerir)
+- **CONTINGENCIA**: recomendada en médico si hay V/P/INC/CD
 
 ## 7. Guardar y enviar (flujo de roles)
 1. **Jefe** elabora → **Guardar** → **Enviar a revisión**
