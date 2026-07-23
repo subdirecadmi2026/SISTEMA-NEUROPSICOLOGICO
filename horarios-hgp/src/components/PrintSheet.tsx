@@ -11,28 +11,25 @@ import {
   weekdayLetter,
 } from '../lib/calendar'
 import { shiftMeta } from '../data/templates'
+import { formatHolidaysLabel } from '../lib/holidays'
 
 type Props = {
   doc: ScheduleDoc
 }
 
-/** mm → px (96 dpi, estándar CSS). */
 function mmToPx(mm: number) {
   return (mm * 96) / 25.4
 }
 
-/** Área útil de A4 landscape con márgenes de impresión. */
+/** Área útil A4 landscape (márgenes 5 mm). */
 function paperSize() {
-  const marginMm = 4
-  return {
-    w: mmToPx(297 - marginMm * 2),
-    h: mmToPx(210 - marginMm * 2),
-  }
+  const m = 5
+  return { w: mmToPx(297 - m * 2), h: mmToPx(210 - m * 2) }
 }
 
 /**
- * Planilla que escala (transform + colapso de layout) para caber
- * en una sola hoja A4 horizontal al imprimir / PDF.
+ * Formato institucional anterior (encabezado navy, firmas, feriados),
+ * con escala solo si hace falta para caber en 1 hoja A4 horizontal.
  */
 export function PrintSheet({ doc }: Props) {
   const days = daysInMonth(doc.year, doc.month)
@@ -48,71 +45,83 @@ export function PrintSheet({ doc }: Props) {
     const fit = fitRef.current
     if (!root || !fit) return
 
-    const scaleToFit = (forPrint: boolean) => {
-      // Reset para medir tamaño natural
+    const applyScale = (forPrint: boolean) => {
       fit.style.transform = 'none'
       fit.style.width = '100%'
-      fit.style.height = 'auto'
       fit.style.marginBottom = '0'
-      fit.style.zoom = '1'
+      root.style.height = ''
 
       const paper = paperSize()
+      // En pantalla: no achicar por la altura del monitor; solo ancho del contenedor
       const availW = forPrint
         ? paper.w
         : Math.max(root.clientWidth || paper.w, 1)
-      const availH = forPrint
-        ? paper.h
-        : Math.max(Math.min(root.clientHeight || paper.h, paper.h), 1)
+      const availH = forPrint ? paper.h : Number.POSITIVE_INFINITY
 
       const needW = Math.max(fit.scrollWidth, fit.offsetWidth, 1)
       const needH = Math.max(fit.scrollHeight, fit.offsetHeight, 1)
       const scale = Math.min(availW / needW, availH / needH, 1)
 
+      if (scale >= 0.995) {
+        fit.style.transform = 'none'
+        fit.style.width = '100%'
+        fit.style.marginBottom = '0'
+        return
+      }
+
       fit.style.transformOrigin = 'top left'
       fit.style.transform = `scale(${scale})`
-      // Ancho lógico para que el contenido use todo el ancho disponible
       fit.style.width = `${100 / scale}%`
-      // Crítico: transform no reduce el box; colapsar espacio sobrante
-      // evita que el navegador genere una 2ª página en blanco/recorte.
       fit.style.marginBottom = `${needH * scale - needH}px`
-      root.style.height = forPrint ? `${needH * scale}px` : ''
-      root.style.overflow = 'hidden'
+      if (forPrint) root.style.height = `${needH * scale}px`
     }
 
-    const runScreen = () => requestAnimationFrame(() => scaleToFit(false))
-    const runPrint = () => scaleToFit(true)
+    const onScreen = () => requestAnimationFrame(() => applyScale(false))
+    const onPrint = () => applyScale(true)
 
-    runScreen()
-    const ro = new ResizeObserver(runScreen)
+    onScreen()
+    const ro = new ResizeObserver(onScreen)
     ro.observe(root)
 
-    const onBeforePrint = () => {
+    const before = () => {
       document.body.dataset.printing = '1'
-      runPrint()
+      onPrint()
     }
-    const onAfterPrint = () => {
+    const after = () => {
       delete document.body.dataset.printing
-      runScreen()
+      onScreen()
     }
-
-    window.addEventListener('beforeprint', onBeforePrint)
-    window.addEventListener('afterprint', onAfterPrint)
-
-    // Chrome a veces aplica media print antes del evento
-    const mql = window.matchMedia('print')
-    const onMql = () => {
-      if (mql.matches) runPrint()
-      else runScreen()
-    }
-    mql.addEventListener?.('change', onMql)
+    window.addEventListener('beforeprint', before)
+    window.addEventListener('afterprint', after)
 
     return () => {
       ro.disconnect()
-      window.removeEventListener('beforeprint', onBeforePrint)
-      window.removeEventListener('afterprint', onAfterPrint)
-      mql.removeEventListener?.('change', onMql)
+      window.removeEventListener('beforeprint', before)
+      window.removeEventListener('afterprint', after)
     }
   }, [doc, days, staff.length])
+
+  const handlePrint = () => {
+    const fit = fitRef.current
+    const root = rootRef.current
+    if (fit && root) {
+      fit.style.transform = 'none'
+      fit.style.width = '100%'
+      fit.style.marginBottom = '0'
+      const paper = paperSize()
+      const needW = Math.max(fit.scrollWidth, 1)
+      const needH = Math.max(fit.scrollHeight, 1)
+      const scale = Math.min(paper.w / needW, paper.h / needH, 1)
+      if (scale < 0.995) {
+        fit.style.transformOrigin = 'top left'
+        fit.style.transform = `scale(${scale})`
+        fit.style.width = `${100 / scale}%`
+        fit.style.marginBottom = `${needH * scale - needH}px`
+        root.style.height = `${needH * scale}px`
+      }
+    }
+    window.print()
+  }
 
   return (
     <section
@@ -123,32 +132,13 @@ export function PrintSheet({ doc }: Props) {
         <div>
           <h2 className="font-display text-xl text-navy">IMPRIMIR</h2>
           <p className="text-sm text-muted">
-            Todo el horario en una sola hoja A4 horizontal ·{' '}
+            Formato institucional · 1 hoja A4 horizontal ·{' '}
             {STATUS_LABEL[doc.status]}
           </p>
         </div>
         <button
           type="button"
-          onClick={() => {
-            // Ajustar a papel justo antes del diálogo
-            const fit = fitRef.current
-            const root = rootRef.current
-            if (fit && root) {
-              fit.style.transform = 'none'
-              fit.style.width = '100%'
-              fit.style.marginBottom = '0'
-              const paper = paperSize()
-              const needW = Math.max(fit.scrollWidth, 1)
-              const needH = Math.max(fit.scrollHeight, 1)
-              const scale = Math.min(paper.w / needW, paper.h / needH, 1)
-              fit.style.transformOrigin = 'top left'
-              fit.style.transform = `scale(${scale})`
-              fit.style.width = `${100 / scale}%`
-              fit.style.marginBottom = `${needH * scale - needH}px`
-              root.style.height = `${needH * scale}px`
-            }
-            window.print()
-          }}
+          onClick={handlePrint}
           className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white"
         >
           Imprimir / Guardar PDF
@@ -156,25 +146,25 @@ export function PrintSheet({ doc }: Props) {
       </div>
 
       <div ref={fitRef} className="print-fit-one-page">
-        <div className="print-header border-b border-line px-2 py-1">
-          <div className="flex flex-wrap items-start gap-2">
+        <div className="print-header border-b border-line px-4 py-3">
+          <div className="flex flex-wrap items-start gap-3">
             <img
               src="/logo_msp.png"
               alt="MSP"
-              className="h-10 w-auto rounded bg-white p-0.5"
+              className="h-12 w-auto rounded bg-white p-1"
             />
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted">
+            <div className="text-sm">
+              <p className="text-[11px] uppercase tracking-wider text-muted">
                 {doc.provincial}
               </p>
-              <h1 className="print-title font-display text-lg leading-tight text-navy">
+              <p className="print-title font-display text-xl text-navy">
                 {doc.hospital}
-              </h1>
-              <p className="text-xs text-muted">{doc.department}</p>
-              <p className="text-xs font-semibold">
+              </p>
+              <p>{doc.department}</p>
+              <p className="mt-1 font-semibold">
                 CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO
               </p>
-              <p className="text-xs">
+              <p className="mt-1">
                 Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
                 <strong>{doc.jefeServicio || '—'}</strong> ·{' '}
                 {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
@@ -185,131 +175,136 @@ export function PrintSheet({ doc }: Props) {
           </div>
         </div>
 
-        <table className="print-schedule-table w-full border-collapse text-[10px]">
-          <thead>
-            <tr className="bg-sand/90">
-              <th className="border border-line px-1 py-1">N°</th>
-              <th className="border border-line px-1 py-1">FUN</th>
-              <th className="border border-line px-1 py-1 text-left">
-                Nombres y apellidos
-              </th>
-              <th className="border border-line px-1 py-1 text-left">
-                Rel. laboral
-              </th>
-              <th className="border border-line px-1 py-1">Cód.</th>
-              {Array.from({ length: days }, (_, i) => {
-                const d = i + 1
-                return (
-                  <th
-                    key={d}
-                    className="border border-line px-0 py-0.5 text-center"
-                  >
-                    <div className="text-[8px] font-normal text-muted">
-                      {weekdayLetter(doc.year, doc.month, d)}
-                    </div>
-                    <div className="font-semibold">{d}</div>
-                  </th>
-                )
-              })}
-              {isEnf ? (
-                <>
-                  <th className="border border-line px-0.5 py-0.5 text-[8px]">
-                    Turnos
-                  </th>
-                  <th className="border border-line px-0.5 py-0.5 text-[8px]">
-                    H. plan.
-                  </th>
-                  <th className="border border-line px-0.5 py-0.5 text-[8px]">
-                    Vac.
-                  </th>
-                  <th className="border border-line px-0.5 py-0.5 text-[8px]">
-                    Total
-                  </th>
-                </>
-              ) : (
-                <th className="border border-line px-0.5 py-0.5 text-[8px]">
-                  Horas
+        <div className="print-table-wrap p-2">
+          <table className="print-schedule-table w-full border-collapse text-[10px]">
+            <thead>
+              <tr className="bg-navy text-white">
+                <th className="border border-navy px-1 py-1">N°</th>
+                <th className="border border-navy px-1 py-1">FUN</th>
+                <th className="border border-navy px-1 py-1 text-left">
+                  Nombres y apellidos
                 </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {staff.length === 0 && (
-              <tr>
-                <td
-                  colSpan={5 + days + (isEnf ? 4 : 1)}
-                  className="border border-line px-3 py-4 text-center text-muted"
-                >
-                  Sin personal con nombre. Complete la lista antes de imprimir.
-                </td>
-              </tr>
-            )}
-            {staff.map((s, idx) => (
-              <tr key={s.id}>
-                <td className="border border-line px-1 text-center">{idx + 1}</td>
-                <td className="border border-line px-1 text-center font-semibold">
-                  {s.fun}
-                </td>
-                <td className="border border-line px-1 font-medium">{s.name}</td>
-                <td className="border border-line px-1 text-muted">
-                  {s.relacionLaboral}
-                </td>
-                <td className="border border-line px-1 text-center font-bold text-navy">
-                  {s.codigoPersonal}
-                </td>
-                {Array.from({ length: days }, (_, i) => {
-                  const d = i + 1
-                  const code = doc.cells[cellKey(s.id, d)] ?? ''
-                  const meta = code
-                    ? shiftMeta(doc.serviceType, code)
-                    : undefined
-                  return (
-                    <td
-                      key={d}
-                      className="border border-line px-0 text-center font-bold"
-                      style={
-                        meta
-                          ? { background: meta.color, color: meta.text }
-                          : undefined
-                      }
-                    >
-                      {code}
-                    </td>
-                  )
-                })}
+                <th className="border border-navy px-1 py-1">Rel. lab.</th>
+                <th className="border border-navy px-1 py-1">Cód.</th>
+                {Array.from({ length: days }, (_, i) => (
+                  <th key={i + 1} className="border border-navy px-0 py-1">
+                    <div className="text-[8px] font-normal opacity-80">
+                      {weekdayLetter(doc.year, doc.month, i + 1)}
+                    </div>
+                    {i + 1}
+                  </th>
+                ))}
                 {isEnf ? (
                   <>
-                    <td className="border border-line px-0.5 text-center">
-                      {plannedShifts(doc, s.id)}
-                    </td>
-                    <td className="border border-line px-0.5 text-center">
-                      {plannedHours(doc, s.id)}
-                    </td>
-                    <td className="border border-line px-0.5 text-center">
-                      {countCodeForStaff(doc, s.id, 'V')}
-                    </td>
-                    <td className="border border-line px-0.5 text-center font-bold">
-                      {totalPaidHours(doc, s)}
-                    </td>
+                    <th className="border border-navy px-0.5 py-1">Turnos</th>
+                    <th className="border border-navy px-0.5 py-1">H.plan</th>
+                    <th className="border border-navy px-0.5 py-1">Vac</th>
+                    <th className="border border-navy px-0.5 py-1">Total</th>
                   </>
                 ) : (
-                  <td className="border border-line px-0.5 text-center font-bold">
-                    {plannedHours(doc, s.id)}
-                  </td>
+                  <th className="border border-navy px-0.5 py-1">Horas</th>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {staff.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={5 + days + (isEnf ? 4 : 1)}
+                    className="border border-line px-3 py-4 text-center text-muted"
+                  >
+                    Sin personal con nombre. Complete la lista antes de
+                    imprimir.
+                  </td>
+                </tr>
+              )}
+              {staff.map((s, idx) => (
+                <tr key={s.id}>
+                  <td className="border border-line px-1 text-center">
+                    {idx + 1}
+                  </td>
+                  <td className="border border-line px-1 text-center font-semibold">
+                    {s.fun}
+                  </td>
+                  <td className="border border-line px-1 font-medium">
+                    {s.name}
+                  </td>
+                  <td className="border border-line px-1">
+                    {s.relacionLaboral}
+                  </td>
+                  <td className="border border-line px-1 text-center font-bold">
+                    {s.codigoPersonal}
+                  </td>
+                  {Array.from({ length: days }, (_, i) => {
+                    const d = i + 1
+                    const code = doc.cells[cellKey(s.id, d)] ?? ''
+                    const meta = code
+                      ? shiftMeta(doc.serviceType, code)
+                      : undefined
+                    return (
+                      <td
+                        key={d}
+                        className="border border-line px-0 text-center font-bold"
+                        style={
+                          meta
+                            ? { background: meta.color, color: meta.text }
+                            : undefined
+                        }
+                      >
+                        {code}
+                      </td>
+                    )
+                  })}
+                  {isEnf ? (
+                    <>
+                      <td className="border border-line px-0.5 text-center">
+                        {plannedShifts(doc, s.id)}
+                      </td>
+                      <td className="border border-line px-0.5 text-center">
+                        {plannedHours(doc, s.id)}
+                      </td>
+                      <td className="border border-line px-0.5 text-center">
+                        {countCodeForStaff(doc, s.id, 'V')}
+                      </td>
+                      <td className="border border-line px-0.5 text-center font-bold">
+                        {totalPaidHours(doc, s)}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="border border-line px-0.5 text-center font-bold">
+                      {plannedHours(doc, s.id)}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        <div className="print-footer grid gap-2 border-t border-line p-2 text-[10px] sm:grid-cols-2">
-          <div className="print-notes min-w-0">
-            <p className="font-semibold text-navy">Observaciones</p>
-            <p className="print-notes-text">{doc.notes || '—'}</p>
-            <p className="mt-1 font-semibold text-navy">Contingencia</p>
-            <p className="print-notes-text">{doc.contingencyPlan || '—'}</p>
+        <div className="print-footer grid gap-3 border-t border-line p-4 text-xs sm:grid-cols-2">
+          <div>
+            <p className="mb-1 font-semibold text-navy">
+              Feriados {doc.year}
+            </p>
+            <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
+            {doc.notes ? (
+              <>
+                <p className="mb-1 mt-3 font-semibold text-navy">
+                  Observaciones
+                </p>
+                <p className="print-notes-text">{doc.notes}</p>
+              </>
+            ) : null}
+            {doc.contingencyPlan ? (
+              <>
+                <p className="mb-1 mt-3 font-semibold text-navy">
+                  Plan de contingencia
+                </p>
+                <p className="print-notes-text">{doc.contingencyPlan}</p>
+              </>
+            ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {(
               [
                 ['Elaborado', doc.elaboradoPor],
@@ -318,9 +313,14 @@ export function PrintSheet({ doc }: Props) {
                 ['Talento Humano', doc.talentoHumano],
               ] as const
             ).map(([label, value]) => (
-              <div key={label} className="print-sign border border-line px-1 py-1">
-                <p className="font-semibold text-navy">{label}</p>
-                <p>{value || '________________'}</p>
+              <div
+                key={label}
+                className="print-sign rounded border border-line px-2 py-3"
+              >
+                <p className="text-[10px] uppercase text-muted">{label}</p>
+                <p className="mt-6 border-t border-line pt-1 font-medium">
+                  {value || '________________'}
+                </p>
               </div>
             ))}
           </div>

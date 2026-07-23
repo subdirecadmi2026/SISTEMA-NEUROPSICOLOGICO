@@ -55,11 +55,11 @@ textarea {
   }
 }
 
-/* ——— Impresión: todo el horario en UNA sola hoja A4 landscape ——— */
+/* Impresión: formato institucional, 1 hoja. Sin forzar tipografía minúscula. */
 @media print {
   @page {
     size: A4 landscape;
-    margin: 4mm;
+    margin: 5mm;
   }
 
   .print-sheet-offscreen {
@@ -129,63 +129,60 @@ textarea {
     page-break-inside: avoid !important;
   }
 
-  .print-area table,
-  .print-schedule-table {
-    width: 100% !important;
-    table-layout: fixed !important;
-    border-collapse: collapse !important;
-    font-size: 6px !important;
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
+  .print-header {
+    padding: 6px 10px !important;
   }
 
-  .print-area th,
-  .print-area td {
-    padding: 0 1px !important;
-    line-height: 1.05 !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    font-size: inherit !important;
+  .print-header .print-title {
+    font-size: 16px !important;
+    line-height: 1.15 !important;
   }
 
-  .print-area img {
-    height: 22px !important;
+  .print-header img {
+    height: 40px !important;
     width: auto !important;
   }
 
-  .print-header {
-    padding: 1px 2px !important;
+  .print-table-wrap {
+    padding: 4px !important;
   }
 
-  .print-header h1,
-  .print-header .print-title {
-    font-size: 11px !important;
-    line-height: 1.1 !important;
-    margin: 0 !important;
+  .print-schedule-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 9px !important;
   }
 
-  .print-header p {
-    font-size: 7px !important;
-    line-height: 1.1 !important;
-    margin: 0 !important;
+  .print-schedule-table th,
+  .print-schedule-table td {
+    padding: 2px 3px !important;
+    line-height: 1.15 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
 
   .print-footer {
-    padding: 1px 2px !important;
-    font-size: 6.5px !important;
-    gap: 4px !important;
+    padding: 6px 10px !important;
+    gap: 8px !important;
+    font-size: 9px !important;
   }
 
   .print-footer .print-sign {
-    padding: 1px 2px !important;
+    padding: 4px 6px !important;
+  }
+
+  .print-footer .print-sign .mt-6 {
+    margin-top: 12px !important;
   }
 
   .print-notes-text {
-    max-height: 2.4em !important;
+    max-height: 3.2em !important;
     overflow: hidden !important;
     display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
+    -webkit-line-clamp: 3 !important;
     -webkit-box-orient: vertical !important;
     white-space: normal !important;
   }
