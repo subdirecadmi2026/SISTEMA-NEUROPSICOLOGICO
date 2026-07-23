@@ -10,7 +10,7 @@ import {
   resolveReviewComments,
 } from '../lib/auth'
 import { runAllValidations } from '../lib/validation'
-import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/notifications'
+import { notifyJefeScheduleValidated, notifyJefeScheduleReturned, notifyJefeLeaveScheduleAlert } from '../lib/notifications'
 import { SignatureGate } from './SignatureGate'
 import { slotForStatus } from '../lib/firmaEc'
 import {
@@ -79,6 +79,34 @@ export function ApprovalPanel({
     if (!doc.jefeServicio.trim()) {
       onFlash('Indique el jefe / líder de servicio antes de enviar')
       return
+    }
+    const leaveErrors = errors.filter(
+      (a) =>
+        a.code === 'permiso_conflicto_turno' ||
+        a.code === 'permiso_exceso_horas',
+    )
+    if (leaveErrors.length > 0) {
+      const summary = leaveErrors
+        .slice(0, 2)
+        .map((a) => a.message)
+        .join(' · ')
+      notifyJefeLeaveScheduleAlert({ doc, summary })
+      onNotify?.()
+      onFlash(
+        `No se puede enviar: ${leaveErrors.length} conflicto(s) de permisos/vacaciones. Revise la pestaña Permisos.`,
+      )
+      return
+    }
+    const leaveWarns = alerts.filter(
+      (a) =>
+        a.code === 'permiso_sin_marcar' || a.code === 'permiso_casi_agotado',
+    )
+    if (leaveWarns.length > 0) {
+      notifyJefeLeaveScheduleAlert({
+        doc,
+        summary: leaveWarns[0].message,
+      })
+      onNotify?.()
     }
     setSignIntent({ next: 'EN_REVISION' })
   }

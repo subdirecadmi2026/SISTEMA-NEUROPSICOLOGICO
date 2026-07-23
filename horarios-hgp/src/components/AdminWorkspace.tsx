@@ -36,6 +36,7 @@ import { SchedulesHome } from './SchedulesHome'
 import { StaffManager } from './StaffManager'
 import { AdminClavesPanel } from './AdminClavesPanel'
 import { AdminFeriadosPanel } from './AdminFeriadosPanel'
+import { PermisosVacacionesPanel } from './PermisosVacacionesPanel'
 import { shiftsFor } from '../lib/shiftsStore'
 
 type TabId =
@@ -45,6 +46,7 @@ type TabId =
   | 'especialidades'
   | 'claves'
   | 'personal'
+  | 'permisos'
   | 'feriados'
 
 type Props = {
@@ -67,6 +69,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'claves', label: 'Claves' },
   { id: 'horarios', label: 'Horarios' },
   { id: 'personal', label: 'Personal' },
+  { id: 'permisos', label: 'Permisos' },
   { id: 'feriados', label: 'Feriados' },
 ]
 
@@ -778,6 +781,10 @@ export function AdminWorkspace({
             </ul>
           </div>
         </section>
+      )}
+
+      {tab === 'permisos' && (
+        <PermisosVacacionesPanel user={user} onFlash={onFlash} />
       )}
 
       {tab === 'feriados' && (

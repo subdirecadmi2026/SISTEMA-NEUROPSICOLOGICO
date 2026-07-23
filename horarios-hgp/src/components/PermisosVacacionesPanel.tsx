@@ -1,0 +1,584 @@
+import { useEffect, useMemo, useState } from 'react'
+import type { AppUser, ServiceType, StaffMember } from '../types'
+import { SERVICE_LABEL } from '../data/templates'
+import { listUnits } from '../lib/unitsStore'
+import { listStaff } from '../lib/staffLibrary'
+import {
+  LEAVE_KINDS,
+  LEAVE_KIND_LABEL,
+  type LeaveKind,
+  type StaffLeave,
+  cancelLeave,
+  defaultAbsenceCode,
+  deleteLeave,
+  estimateAuthorizedHours,
+  inclusiveDayCount,
+  listLeaves,
+  upsertLeave,
+} from '../lib/leavesStore'
+import { notifyJefeLeaveRegistered } from '../lib/notifications'
+
+type Props = {
+  user: AppUser
+  onFlash: (msg: string) => void
+  onNotify?: () => void
+  /** Prefill de unidad/servicio (editor del jefe). */
+  defaultServiceType?: ServiceType
+  defaultUnitName?: string
+  /** Personal del horario abierto (además de biblioteca). */
+  scheduleStaff?: StaffMember[]
+  compact?: boolean
+}
+
+type FormState = {
+  id?: string
+  serviceType: ServiceType
+  unitName: string
+  staffId: string
+  staffName: string
+  kind: LeaveKind
+  absenceCode: string
+  startDate: string
+  endDate: string
+  hoursPerDay: number
+  authorizedHours: number
+  autoHours: boolean
+  notes: string
+}
+
+function emptyForm(
+  serviceType: ServiceType,
+  unitName: string,
+): FormState {
+  const start = new Date()
+  const y = start.getFullYear()
+  const m = String(start.getMonth() + 1).padStart(2, '0')
+  const d = String(start.getDate()).padStart(2, '0')
+  const ymd = `${y}-${m}-${d}`
+  return {
+    serviceType,
+    unitName,
+    staffId: '',
+    staffName: '',
+    kind: 'vacaciones',
+    absenceCode: defaultAbsenceCode('vacaciones', serviceType),
+    startDate: ymd,
+    endDate: ymd,
+    hoursPerDay: 8,
+    authorizedHours: 8,
+    autoHours: true,
+    notes: '',
+  }
+}
+
+/**
+ * Módulo de registro de vacaciones y permisos temporales.
+ * Al llenar el horario se comparan horas usadas vs autorizadas.
+ */
+export function PermisosVacacionesPanel({
+  user,
+  onFlash,
+  onNotify,
+  defaultServiceType = 'medico',
+  defaultUnitName = '',
+  scheduleStaff = [],
+  compact = false,
+}: Props) {
+  const [tick, setTick] = useState(0)
+  const [filter, setFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'activo' | 'all'>('activo')
+  const [form, setForm] = useState<FormState>(() =>
+    emptyForm(defaultServiceType, defaultUnitName || listUnits(defaultServiceType)[0] || ''),
+  )
+
+  useEffect(() => {
+    if (defaultUnitName) {
+      setForm((f) => ({
+        ...f,
+        serviceType: defaultServiceType,
+        unitName: defaultUnitName,
+      }))
+    }
+  }, [defaultServiceType, defaultUnitName])
+
+  const units = listUnits(form.serviceType)
+  const libraryStaff = useMemo(() => {
+    void tick
+    return form.unitName ? listStaff(form.serviceType, form.unitName) : []
+  }, [form.serviceType, form.unitName, tick])
+
+  const staffOptions = useMemo(() => {
+    const map = new Map<string, StaffMember>()
+    for (const s of libraryStaff) {
+      if (s.name.trim()) map.set(s.id, s)
+    }
+    for (const s of scheduleStaff) {
+      if (s.name.trim() && !map.has(s.id)) map.set(s.id, s)
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  }, [libraryStaff, scheduleStaff])
+
+  const leaves = useMemo(() => {
+    void tick
+    return listLeaves({
+      serviceType: form.serviceType,
+      unitName: form.unitName || undefined,
+      status: statusFilter,
+    })
+  }, [form.serviceType, form.unitName, statusFilter, tick])
+
+  const visible = leaves.filter((l) => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return true
+    return `${l.staffName} ${l.kind} ${l.absenceCode} ${l.notes}`
+      .toLowerCase()
+      .includes(q)
+  })
+
+  function refresh() {
+    setTick((n) => n + 1)
+  }
+
+  function setKind(kind: LeaveKind) {
+    setForm((f) => ({
+      ...f,
+      kind,
+      absenceCode: defaultAbsenceCode(kind, f.serviceType),
+    }))
+  }
+
+  function syncAutoHours(next: Partial<FormState>, base = form) {
+    const merged = { ...base, ...next }
+    if (!merged.autoHours) return merged
+    return {
+      ...merged,
+      authorizedHours: estimateAuthorizedHours(
+        merged.startDate,
+        merged.endDate,
+        merged.hoursPerDay,
+      ),
+    }
+  }
+
+  function pickStaff(id: string) {
+    const s = staffOptions.find((x) => x.id === id)
+    setForm((f) => ({
+      ...f,
+      staffId: id,
+      staffName: s?.name ?? '',
+    }))
+  }
+
+  function startCreate() {
+    setForm(
+      emptyForm(
+        form.serviceType,
+        form.unitName || units[0] || '',
+      ),
+    )
+  }
+
+  function startEdit(l: StaffLeave) {
+    setForm({
+      id: l.id,
+      serviceType: l.serviceType,
+      unitName: l.unitName,
+      staffId: l.staffId,
+      staffName: l.staffName,
+      kind: l.kind,
+      absenceCode: l.absenceCode,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      hoursPerDay: l.hoursPerDay,
+      authorizedHours: l.authorizedHours,
+      autoHours: false,
+      notes: l.notes,
+    })
+  }
+
+  function save() {
+    try {
+      const saved = upsertLeave(
+        {
+          id: form.id,
+          staffId: form.staffId,
+          staffName: form.staffName,
+          serviceType: form.serviceType,
+          unitName: form.unitName,
+          kind: form.kind,
+          absenceCode: form.absenceCode,
+          startDate: form.startDate,
+          endDate: form.endDate,
+          authorizedHours: form.authorizedHours,
+          hoursPerDay: form.hoursPerDay,
+          notes: form.notes,
+          status: 'activo',
+        },
+        user,
+      )
+      if (!form.id) {
+        notifyJefeLeaveRegistered({
+          unitName: saved.unitName,
+          staffName: saved.staffName,
+          kindLabel: LEAVE_KIND_LABEL[saved.kind],
+          startDate: saved.startDate,
+          endDate: saved.endDate,
+          authorizedHours: saved.authorizedHours,
+          absenceCode: saved.absenceCode,
+          registeredBy: user.name,
+        })
+        onNotify?.()
+      }
+      onFlash(
+        form.id
+          ? 'Permiso actualizado'
+          : `${LEAVE_KIND_LABEL[saved.kind]} registradas · aviso al jefe`,
+      )
+      startCreate()
+      refresh()
+    } catch (e) {
+      onFlash(e instanceof Error ? e.message : 'No se pudo guardar')
+    }
+  }
+
+  function remove(l: StaffLeave) {
+    if (!window.confirm(`¿Eliminar ${LEAVE_KIND_LABEL[l.kind]} de ${l.staffName}?`))
+      return
+    deleteLeave(l.id)
+    if (form.id === l.id) startCreate()
+    refresh()
+    onFlash('Registro eliminado')
+  }
+
+  function softCancel(l: StaffLeave) {
+    cancelLeave(l.id)
+    refresh()
+    onFlash('Permiso cancelado')
+  }
+
+  const days = inclusiveDayCount(form.startDate, form.endDate)
+
+  return (
+    <section
+      className={`grid gap-4 ${compact ? '' : 'lg:grid-cols-[1fr_1.15fr]'}`}
+    >
+      <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              Registro institucional
+            </p>
+            <h2 className="font-display text-xl text-navy">
+              {form.id ? 'Editar permiso / vacaciones' : 'Nuevo permiso / vacaciones'}
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              Al llenar el horario se comparan las horas marcadas con las
+              autorizadas y se avisa al jefe si hay conflicto o exceso.
+            </p>
+          </div>
+          {form.id ? (
+            <button
+              type="button"
+              onClick={startCreate}
+              className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold"
+            >
+              Nuevo
+            </button>
+          ) : null}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="block text-xs font-semibold text-muted">
+            Servicio
+            <select
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm text-ink"
+              value={form.serviceType}
+              onChange={(e) => {
+                const serviceType = e.target.value as ServiceType
+                const unitName = listUnits(serviceType)[0] ?? ''
+                setForm((f) =>
+                  syncAutoHours({
+                    serviceType,
+                    unitName,
+                    staffId: '',
+                    staffName: '',
+                    absenceCode: defaultAbsenceCode(f.kind, serviceType),
+                  }),
+                )
+              }}
+            >
+              <option value="medico">{SERVICE_LABEL.medico}</option>
+              <option value="enfermeria">{SERVICE_LABEL.enfermeria}</option>
+            </select>
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Especialidad / unidad
+            <select
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm text-ink"
+              value={form.unitName}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  unitName: e.target.value,
+                  staffId: '',
+                  staffName: '',
+                }))
+              }
+            >
+              {units.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold text-muted sm:col-span-2">
+            Personal
+            <select
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm text-ink"
+              value={form.staffId}
+              onChange={(e) => pickStaff(e.target.value)}
+            >
+              <option value="">Seleccione…</option>
+              {staffOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} · {s.fun}
+                </option>
+              ))}
+            </select>
+            {staffOptions.length === 0 ? (
+              <span className="mt-1 block text-[11px] font-normal text-amber-800">
+                No hay personal en biblioteca ni en el horario. Cargue personal
+                primero o escriba el nombre abajo.
+              </span>
+            ) : null}
+          </label>
+          <label className="block text-xs font-semibold text-muted sm:col-span-2">
+            Nombre (si no está en lista)
+            <input
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+              value={form.staffName}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  staffName: e.target.value,
+                  staffId: f.staffId || `manual-${Date.now().toString(36)}`,
+                }))
+              }
+              placeholder="Apellidos Nombres"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Tipo
+            <select
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm text-ink"
+              value={form.kind}
+              onChange={(e) => setKind(e.target.value as LeaveKind)}
+            >
+              {LEAVE_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {LEAVE_KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Clave en planilla
+            <input
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm uppercase"
+              value={form.absenceCode}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  absenceCode: e.target.value.toUpperCase(),
+                }))
+              }
+            />
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Desde
+            <input
+              type="date"
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+              value={form.startDate}
+              onChange={(e) =>
+                setForm((f) => syncAutoHours({ startDate: e.target.value }, f))
+              }
+            />
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Hasta
+            <input
+              type="date"
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+              value={form.endDate}
+              onChange={(e) =>
+                setForm((f) => syncAutoHours({ endDate: e.target.value }, f))
+              }
+            />
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Horas / día (jornada)
+            <input
+              type="number"
+              min={1}
+              max={24}
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+              value={form.hoursPerDay}
+              onChange={(e) =>
+                setForm((f) =>
+                  syncAutoHours(
+                    { hoursPerDay: Number(e.target.value) || 8 },
+                    f,
+                  ),
+                )
+              }
+            />
+          </label>
+          <label className="block text-xs font-semibold text-muted">
+            Horas autorizadas
+            <input
+              type="number"
+              min={0}
+              step={1}
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+              value={form.authorizedHours}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  autoHours: false,
+                  authorizedHours: Number(e.target.value) || 0,
+                }))
+              }
+            />
+            <span className="mt-1 flex items-center gap-2 text-[11px] font-normal text-muted">
+              <label className="inline-flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={form.autoHours}
+                  onChange={(e) =>
+                    setForm((f) =>
+                      syncAutoHours({ autoHours: e.target.checked }, f),
+                    )
+                  }
+                />
+                Calcular = {days} día(s) × {form.hoursPerDay} h
+              </label>
+            </span>
+          </label>
+          <label className="block text-xs font-semibold text-muted sm:col-span-2">
+            Observación
+            <textarea
+              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              placeholder="Resolución, memo, detalle…"
+            />
+          </label>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={save}
+            className="rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110"
+          >
+            {form.id ? 'Guardar cambios' : 'Registrar permiso'}
+          </button>
+          <button
+            type="button"
+            onClick={startCreate}
+            className="rounded-xl border border-line px-3 py-2 text-sm font-semibold"
+          >
+            Limpiar
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-lg text-navy">
+            Registros ({visible.length})
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            <select
+              className="rounded-lg border border-line px-2 py-1.5 text-xs"
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'activo' | 'all')
+              }
+            >
+              <option value="activo">Activos</option>
+              <option value="all">Todos</option>
+            </select>
+            <input
+              className="w-40 rounded-lg border border-line px-2 py-1.5 text-xs sm:w-52"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Buscar…"
+            />
+          </div>
+        </div>
+
+        <ul className="max-h-[36rem] space-y-2 overflow-y-auto">
+          {visible.map((l) => (
+            <li
+              key={l.id}
+              className="rounded-xl border border-line bg-gradient-to-b from-white to-sand/20 px-3 py-2.5"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-navy">{l.staffName}</p>
+                  <p className="text-[11px] text-muted">
+                    {LEAVE_KIND_LABEL[l.kind]} · clave{' '}
+                    <strong className="text-teal">{l.absenceCode}</strong> ·{' '}
+                    {l.startDate} → {l.endDate}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink">
+                    <strong>{l.authorizedHours} h</strong> autorizadas (
+                    {l.hoursPerDay} h/día) · {l.unitName}
+                    {l.status === 'cancelado' ? ' · cancelado' : ''}
+                  </p>
+                  {l.notes ? (
+                    <p className="mt-1 text-[11px] text-muted">{l.notes}</p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(l)}
+                    className="rounded-md border border-line px-2 py-1 text-[10px] font-semibold"
+                  >
+                    Editar
+                  </button>
+                  {l.status === 'activo' ? (
+                    <button
+                      type="button"
+                      onClick={() => softCancel(l)}
+                      className="rounded-md border border-amber-200 px-2 py-1 text-[10px] font-semibold text-amber-900"
+                    >
+                      Cancelar
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => remove(l)}
+                    className="rounded-md border border-rose-200 px-2 py-1 text-[10px] font-semibold text-rose-900"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+          {visible.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-line px-3 py-8 text-center text-sm text-muted">
+              Aún no hay permisos registrados para esta unidad.
+            </p>
+          ) : null}
+        </ul>
+      </div>
+    </section>
+  )
+}

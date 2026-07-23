@@ -17,8 +17,8 @@ export function AlertsBanner({
   if (alerts.length === 0) {
     return (
       <section className="no-print mb-4 rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3 text-sm text-navy">
-        Validaciones OK · cobertura, descansos y contingencia sin alertas
-        críticas.
+        Validaciones OK · cobertura, descansos, permisos y contingencia sin
+        alertas críticas.
       </section>
     )
   }

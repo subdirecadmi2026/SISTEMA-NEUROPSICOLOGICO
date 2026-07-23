@@ -4,6 +4,7 @@ export type EditorTabId =
   | 'distribucion'
   | 'contingencia'
   | 'personal'
+  | 'permisos'
   | 'imprimir'
 
 const TABS: { id: EditorTabId; label: string; short: string }[] = [
@@ -12,6 +13,7 @@ const TABS: { id: EditorTabId; label: string; short: string }[] = [
   { id: 'distribucion', label: 'Distribución', short: 'Dist.' },
   { id: 'contingencia', label: 'Contingencia', short: 'Cont.' },
   { id: 'personal', label: 'Personal', short: 'Pers.' },
+  { id: 'permisos', label: 'Permisos', short: 'Perm.' },
   { id: 'imprimir', label: 'Imprimir', short: 'Print' },
 ]
 

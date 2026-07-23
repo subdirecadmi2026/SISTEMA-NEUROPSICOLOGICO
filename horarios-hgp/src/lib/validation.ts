@@ -1,6 +1,7 @@
 import type { ScheduleDoc, UserRole } from '../types'
 import { cellKey, coverageByDay, daysInMonth } from './calendar'
 import { hoursForCode, shiftMeta } from '../data/templates'
+import { validateLeaves } from './leaveValidation'
 
 export type ValidationAlert = {
   level: 'error' | 'warning' | 'info'
@@ -141,6 +142,7 @@ export function runAllValidations(doc: ScheduleDoc): ValidationAlert[] {
     ...validateRestDays(doc),
     ...validatePostGuard(doc),
     ...validateContingency(doc),
+    ...validateLeaves(doc),
   ]
 }
 

@@ -14,6 +14,7 @@ export type HgpNotification = {
   scheduleId: string
   title: string
   body: string
+  kind?: 'horario' | 'permiso' | 'permiso_alerta'
 }
 
 function loadAll(): HgpNotification[] {
@@ -58,6 +59,7 @@ export function notifyJefeScheduleValidated(
     scheduleId: doc.id,
     title: 'Horario validado',
     body: `Su horario de ${doc.unitName} (${period}) fue firmado y validado por ${validatorName}. Ya puede consultarlo en archivo.`,
+    kind: 'horario',
   })
 }
 
@@ -75,6 +77,44 @@ export function notifyJefeScheduleReturned(
     scheduleId: doc.id,
     title: 'Corrección solicitada',
     body: `El revisor ${reviewerName} devolvió el horario de ${doc.unitName} (${period}): «${short}»`,
+    kind: 'horario',
+  })
+}
+
+/** Aviso al jefe: se registró un permiso / vacaciones del personal. */
+export function notifyJefeLeaveRegistered(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  startDate: string
+  endDate: string
+  authorizedHours: number
+  absenceCode: string
+  registeredBy: string
+}): HgpNotification {
+  return addNotification({
+    toRole: 'lider_servicio',
+    unitName: opts.unitName,
+    scheduleId: `leave:${opts.unitName}`,
+    title: `${opts.kindLabel} registradas`,
+    body: `${opts.staffName} · ${opts.startDate} → ${opts.endDate} · ${opts.authorizedHours} h autorizadas (clave ${opts.absenceCode}). Registró: ${opts.registeredBy}. Al llenar el horario se validará el uso de horas.`,
+    kind: 'permiso',
+  })
+}
+
+/** Aviso al jefe: el horario choca o excede permisos/vacaciones. */
+export function notifyJefeLeaveScheduleAlert(opts: {
+  doc: ScheduleDoc
+  summary: string
+}): HgpNotification {
+  const period = `${MONTHS_ES[opts.doc.month - 1]} ${opts.doc.year}`
+  return addNotification({
+    toRole: 'lider_servicio',
+    unitName: opts.doc.unitName,
+    scheduleId: opts.doc.id,
+    title: 'Alerta de permisos / vacaciones',
+    body: `${opts.doc.unitName} (${period}): ${opts.summary}`,
+    kind: 'permiso_alerta',
   })
 }
 
