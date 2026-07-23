@@ -88,4 +88,9 @@ describe('login y perfiles demo', () => {
     const r = authenticateDemo('validador@hgp.gob.ec', '')
     expect(r.ok).toBe(false)
   })
+
+  it('roleMission y userInitials', () => {
+    expect(roleMission('validador')).toMatch(/QR|valida/i)
+    expect(userInitials('Dra. María Solís')).toBe('DS')
+  })
 })
