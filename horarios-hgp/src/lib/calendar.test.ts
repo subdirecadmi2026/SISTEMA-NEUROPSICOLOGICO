@@ -377,11 +377,40 @@ describe('operaciones de mes', () => {
       },
     ]
     expect(emptyCellsReport(doc)[0]?.emptyDays).toBe(31)
-    const filled = applyHabitualCodesToEmpty(doc)
-    expect(emptyCellsReport(filled)).toHaveLength(0)
-    expect(filled.cells[cellKey('a', 1)]).toBe('D1')
-    const swapped = swapCodesInSchedule(filled, 'D1', 'N1')
+    const filledWeekdays = applyHabitualCodesToEmpty(doc)
+    expect(filledWeekdays.cells[cellKey('a', 1)]).toBe('D1')
+    // 4 y 5 jul 2026 = sáb/dom → siguen vacíos con weekdaysOnly
+    expect(filledWeekdays.cells[cellKey('a', 4)]).toBeUndefined()
+    const filledAll = applyHabitualCodesToEmpty(doc, { weekdaysOnly: false })
+    expect(emptyCellsReport(filledAll)).toHaveLength(0)
+    const swapped = swapCodesInSchedule(filledAll, 'D1', 'N1')
     expect(swapped.cells[cellKey('a', 1)]).toBe('N1')
+  })
+
+  it('checklist de envío exige nombre, jefe y celdas', async () => {
+    const { getSubmissionChecklist, isReadyToSubmit } = await import(
+      './validation'
+    )
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    expect(isReadyToSubmit(doc)).toBe(false)
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Ana',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.jefeServicio = 'Dr. Jefe'
+    doc.cells = { [cellKey('a', 1)]: 'CE' }
+    doc.coverageRule = { minStaffPerDay: 0, minHoursPerDay: 0 }
+    const items = getSubmissionChecklist(doc)
+    expect(items.find((i) => i.id === 'nombres')?.ok).toBe(true)
+    expect(items.find((i) => i.id === 'jefe')?.ok).toBe(true)
+    expect(isReadyToSubmit(doc)).toBe(true)
   })
 
   it('reemplaza clave y duplica horario como nuevo', async () => {

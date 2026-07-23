@@ -63,7 +63,7 @@ import { EmptyCellsPanel } from './components/EmptyCellsPanel'
 import { ReplaceCodePanel } from './components/ReplaceCodePanel'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { ToolsToolbar } from './components/ToolsToolbar'
-import { MonthComparePanel } from './components/MonthComparePanel'
+import { SubmissionChecklist } from './components/SubmissionChecklist'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -845,7 +845,7 @@ export default function App() {
                 },
                 {
                   id: 'habitual',
-                  label: 'Código habitual en vacíos',
+                  label: 'Código habitual (lun–vie)',
                   disabled: readOnly,
                   onClick: () => {
                     const next = applyHabitualCodesToEmpty(doc)
@@ -857,7 +857,7 @@ export default function App() {
                     }
                     patchDoc(next)
                     flash(
-                      'Vacíos completados con código habitual de cada persona',
+                      'Vacíos de lun–vie completados con código habitual',
                     )
                   },
                 },
@@ -1058,6 +1058,16 @@ export default function App() {
               })
           }}
           onFlash={flash}
+        />
+
+        <SubmissionChecklist
+          doc={doc}
+          onGoFix={(hint) => {
+            if (hint === 'personal') setTab('personal')
+            else if (hint === 'contingencia') setTab('contingencia')
+            else if (hint === 'distribucion') setTab('distribucion')
+            else setTab('horario')
+          }}
         />
 
         <AuditTrail doc={doc} />

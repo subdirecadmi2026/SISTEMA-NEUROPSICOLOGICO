@@ -722,16 +722,22 @@ export function addStaffFromNameList(
 /**
  * Rellena celdas vacías de cada persona con su código habitual
  * (si la clave existe en la plantilla).
+ * @param weekdaysOnly si true, no pinta sábados/domingos (use Llenar sáb/dom).
  */
-export function applyHabitualCodesToEmpty(doc: ScheduleDoc): ScheduleDoc {
+export function applyHabitualCodesToEmpty(
+  doc: ScheduleDoc,
+  opts?: { weekdaysOnly?: boolean },
+): ScheduleDoc {
   const days = daysInMonth(doc.year, doc.month)
   const cells = { ...doc.cells }
   let painted = 0
+  const weekdaysOnly = opts?.weekdaysOnly ?? true
   for (const s of doc.staff) {
     if (!s.name.trim()) continue
     const code = (s.codigoPersonal || '').trim().toUpperCase()
     if (!code || !shiftMeta(doc.serviceType, code)) continue
     for (let d = 1; d <= days; d++) {
+      if (weekdaysOnly && isWeekend(doc.year, doc.month, d)) continue
       const key = `${s.id}:${d}`
       if (cells[key]) continue
       cells[key] = code
@@ -751,7 +757,7 @@ export function applyHabitualCodesToEmpty(doc: ScheduleDoc): ScheduleDoc {
         at: new Date().toISOString(),
         userName: 'Usuario',
         action: 'codigo_habitual',
-        detail: `${painted} celdas con código habitual`,
+        detail: `${painted} celdas${weekdaysOnly ? ' (lun–vie)' : ''}`,
       },
     ],
   }

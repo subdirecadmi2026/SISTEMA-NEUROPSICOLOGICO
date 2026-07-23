@@ -139,6 +139,91 @@ export function runAllValidations(doc: ScheduleDoc): ValidationAlert[] {
   ]
 }
 
+export type ChecklistItem = {
+  id: string
+  ok: boolean
+  level: 'required' | 'recommended'
+  message: string
+}
+
+/** Checklist previo a enviar a revisión. */
+export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
+  const named = doc.staff.filter((s) => s.name.trim())
+  const days = daysInMonth(doc.year, doc.month)
+  let empty = 0
+  for (const s of named) {
+    for (let d = 1; d <= days; d++) {
+      if (!doc.cells[cellKey(s.id, d)]) empty += 1
+    }
+  }
+  const alerts = runAllValidations(doc)
+  const errors = alerts.filter((a) => a.level === 'error')
+  const warnings = alerts.filter((a) => a.level === 'warning')
+  const painted = Object.keys(doc.cells).length
+
+  return [
+    {
+      id: 'nombres',
+      ok: named.length >= 1,
+      level: 'required',
+      message:
+        named.length >= 1
+          ? `${named.length} persona(s) con nombre`
+          : 'Falta al menos 1 nombre de personal',
+    },
+    {
+      id: 'jefe',
+      ok: doc.jefeServicio.trim().length > 0,
+      level: 'required',
+      message: doc.jefeServicio.trim()
+        ? `Jefe/líder: ${doc.jefeServicio}`
+        : 'Indique el jefe / líder de servicio',
+    },
+    {
+      id: 'pintado',
+      ok: painted > 0,
+      level: 'required',
+      message:
+        painted > 0
+          ? `${painted} celdas con clave`
+          : 'Aún no hay turnos pintados',
+    },
+    {
+      id: 'vacios',
+      ok: empty === 0 && named.length > 0,
+      level: 'recommended',
+      message:
+        empty === 0 && named.length > 0
+          ? 'Mes completo (sin celdas vacías)'
+          : `${empty} celdas vacías en personal con nombre`,
+    },
+    {
+      id: 'errores',
+      ok: errors.length === 0,
+      level: 'required',
+      message:
+        errors.length === 0
+          ? 'Sin errores de validación'
+          : `${errors.length} error(es) por corregir antes de enviar`,
+    },
+    {
+      id: 'avisos',
+      ok: warnings.length === 0,
+      level: 'recommended',
+      message:
+        warnings.length === 0
+          ? 'Sin avisos de cobertura/descansos'
+          : `${warnings.length} aviso(s) (puede enviar, pero revise)`,
+    },
+  ]
+}
+
+export function isReadyToSubmit(doc: ScheduleDoc): boolean {
+  return getSubmissionChecklist(doc)
+    .filter((i) => i.level === 'required')
+    .every((i) => i.ok)
+}
+
 export function isProductiveCode(
   serviceType: ScheduleDoc['serviceType'],
   code: string,
