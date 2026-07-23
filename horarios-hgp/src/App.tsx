@@ -53,7 +53,6 @@ import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
 import { NamesEditor } from './components/NamesEditor'
 import { SchedulesHome } from './components/SchedulesHome'
 import { PrintSheet } from './components/PrintSheet'
-import { AlertsBanner } from './components/AlertsBanner'
 import { MonthSummary } from './components/MonthSummary'
 import { NotesPanel } from './components/NotesPanel'
 import { CodeUsageBar } from './components/CodeUsageBar'
@@ -116,7 +115,6 @@ export default function App() {
   const [recentCodes, setRecentCodes] = useState<string[]>([])
   const [compactTable, setCompactTable] = useState(false)
   const [focusDay, setFocusDay] = useState<number | null>(null)
-  const [helpOpen, setHelpOpen] = useState(false)
   const [jumpDay, setJumpDay] = useState(1)
   const docRefApp = useRef(doc)
   docRefApp.current = doc
@@ -1089,14 +1087,6 @@ export default function App() {
         )}
 
         <MonthSummary doc={doc} />
-
-        <ShortcutsHelp open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} />
-
-        <AlertsBanner
-          doc={doc}
-          onGoDistribution={() => setTab('distribucion')}
-          onGoContingency={() => setTab('contingencia')}
-        />
 
         <NotesPanel doc={doc} readOnly={readOnly} onChange={patchDoc} />
 
