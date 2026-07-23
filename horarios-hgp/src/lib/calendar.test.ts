@@ -435,6 +435,69 @@ describe('export CSV', () => {
   })
 })
 
+describe('comparar mes anterior', () => {
+  it('detecta diferencia de horas cuando hay mes previo en storage', async () => {
+    const store: Record<string, string> = {}
+    const ls = {
+      getItem: (k: string) => (k in store ? store[k] : null),
+      setItem: (k: string, v: string) => {
+        store[k] = v
+      },
+      removeItem: (k: string) => {
+        delete store[k]
+      },
+    }
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: ls,
+      configurable: true,
+    })
+
+    const { saveSchedule, deleteSchedule } = await import('./storage')
+    const { compareWithPreviousMonth } = await import('./monthCompare')
+
+    const prev = createBlankSchedule('medico', 2026, 6, { withDemo: false })
+    prev.unitName = 'Medicina interna'
+    prev.staff = [
+      {
+        id: 'p1',
+        name: 'Dra. Test',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    prev.cells = { [cellKey('p1', 1)]: 'CE', [cellKey('p1', 2)]: 'CE' }
+    const savedPrev = saveSchedule(prev)
+
+    const curr = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    curr.unitName = 'Medicina interna'
+    curr.staff = [
+      {
+        id: 'c1',
+        name: 'Dra. Test',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    curr.cells = { [cellKey('c1', 1)]: 'CE' }
+
+    const cmp = await compareWithPreviousMonth(curr)
+    expect(cmp).not.toBeNull()
+    expect(cmp!.prevLabel).toBe('6/2026')
+    const row = cmp!.rows.find((r) => r.name === 'Dra. Test')
+    expect(row?.hoursPrev).toBe(16)
+    expect(row?.hoursNow).toBe(8)
+    expect(row?.delta).toBe(-8)
+
+    deleteSchedule(savedPrev.id)
+  })
+})
+
 describe('asignaciones y ranking', () => {
   it('lista quién trabaja un día y ranking de horas', () => {
     const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })

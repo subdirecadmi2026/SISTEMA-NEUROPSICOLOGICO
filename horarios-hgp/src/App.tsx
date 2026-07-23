@@ -62,6 +62,8 @@ import { AuditTrail } from './components/AuditTrail'
 import { EmptyCellsPanel } from './components/EmptyCellsPanel'
 import { ReplaceCodePanel } from './components/ReplaceCodePanel'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
+import { ToolsToolbar } from './components/ToolsToolbar'
+import { MonthComparePanel } from './components/MonthComparePanel'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -738,259 +740,260 @@ export default function App() {
           </div>
         </section>
 
-        {/* Acciones de mes */}
-        <section className="no-print mb-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              if (
-                window.confirm(
-                  '¿Limpiar todas las celdas del mes? Se mantiene el personal.',
-                )
-              ) {
-                patchDoc(clearMonthCells(doc))
-                flash('Mes limpiado')
-              }
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-          >
-            Limpiar mes
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              void (async () => {
-                const next = await duplicatePreviousMonth(doc)
-                patchDoc(next)
-                const failed =
-                  next.audit.at(-1)?.action === 'duplicar_mes_fallido'
-                flash(
-                  failed
-                    ? 'No hay mes anterior guardado para este servicio'
-                    : 'Mes anterior duplicado (personal y turnos)',
-                )
-              })()
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-          >
-            Duplicar mes anterior
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              void (async () => {
-                const res = await copyStaffFromPreviousMonth(doc)
-                if (!res.ok) {
-                  flash(res.error)
-                  return
-                }
-                patchDoc({ ...doc, staff: res.staff, cells: {} })
-                setHighlightNames(true)
-                flash(
-                  `Copiados ${res.staff.length} nombres del mes anterior. Ajuste turnos.`,
-                )
-              })()
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-          >
-            Copiar nombres del mes anterior
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              patchDoc(applyHolidaysToEmptyCells(doc))
-              flash('Feriados aplicados en celdas vacías')
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-          >
-            Autocompletar feriados
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              const next = fillEmptyWeekendsWithLibre(doc)
-              if (next === doc) {
-                flash('No hay sáb/dom vacíos para marcar L')
-                return
-              }
-              patchDoc(next)
-              flash('Fines de semana vacíos marcados con L')
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-          >
-            Llenar sáb/dom con L
-          </button>
-          <button
-            type="button"
-            disabled={undoCount === 0}
-            onClick={undoLast}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-            title="Ctrl+Z"
-          >
-            Deshacer ({undoCount})
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              const next = copyFirstWeekPattern(doc)
-              if (next === doc) {
-                flash(
-                  'Pinte primero la semana 1 (días 1–7); no hay vacíos que completar',
-                )
-                return
-              }
-              patchDoc(next)
-              flash('Patrón de la 1ª semana copiado al resto del mes')
-            }}
-            className="rounded-lg border border-teal/40 bg-teal/5 px-3 py-2 text-sm font-semibold text-navy hover:bg-teal/10 disabled:opacity-50"
-          >
-            Copiar 1ª semana al mes
-          </button>
-          {doc.serviceType === 'medico' && (
-            <button
-              type="button"
-              disabled={readOnly}
-              onClick={() => {
-                const next = applyPostGuardLibre(doc)
-                if (next === doc) {
-                  flash('No hay días vacíos tras guardia X/PT2/GD')
-                  return
-                }
-                patchDoc(next)
-                flash('L aplicado tras guardias (celdas vacías)')
-              }}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-            >
-              L tras guardia
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              const next = createNextMonthDraft(doc)
-              undoStack.current = []
-              setUndoCount(0)
-              setDoc(next)
-              setDirty(true)
-              setTab('horario')
-              flash(
-                `Borrador ${next.month}/${next.year} creado con el mismo personal`,
-              )
-            }}
-            className="rounded-lg border border-navy/30 bg-navy/5 px-3 py-2 text-sm font-semibold text-navy hover:bg-navy/10"
-          >
-            Crear mes siguiente
-          </button>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => {
-              const next = applyHabitualCodesToEmpty(doc)
-              if (next === doc) {
-                flash(
-                  'Nada que completar (revise códigos habituales o ya está lleno)',
-                )
-                return
-              }
-              patchDoc(next)
-              flash('Vacíos completados con código habitual de cada persona')
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-          >
-            Código habitual en vacíos
-          </button>
-          {doc.serviceType === 'enfermeria' && (
-            <button
-              type="button"
-              disabled={readOnly}
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    '¿Intercambiar todas las claves D1 ↔ N1 del mes?',
+        <ToolsToolbar
+          primary={[
+            {
+              id: 'undo',
+              label: `Deshacer (${undoCount})`,
+              disabled: undoCount === 0,
+              title: 'Ctrl+Z',
+              onClick: undoLast,
+            },
+            {
+              id: 'dup-prev',
+              label: 'Duplicar mes anterior',
+              disabled: readOnly,
+              onClick: () => {
+                void (async () => {
+                  const next = await duplicatePreviousMonth(doc)
+                  patchDoc(next)
+                  const failed =
+                    next.audit.at(-1)?.action === 'duplicar_mes_fallido'
+                  flash(
+                    failed
+                      ? 'No hay mes anterior guardado para este servicio'
+                      : 'Mes anterior duplicado (personal y turnos)',
                   )
-                )
-                  return
-                const next = swapCodesInSchedule(doc, 'D1', 'N1')
+                })()
+              },
+            },
+            {
+              id: 'copy-week',
+              label: 'Copiar 1ª semana al mes',
+              disabled: readOnly,
+              emphasis: 'teal',
+              onClick: () => {
+                const next = copyFirstWeekPattern(doc)
                 if (next === doc) {
-                  flash('No hay D1/N1 para intercambiar')
+                  flash(
+                    'Pinte primero la semana 1 (días 1–7); no hay vacíos que completar',
+                  )
                   return
                 }
                 patchDoc(next)
-                flash('D1 ↔ N1 intercambiados')
-              }}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
-            >
-              Intercambiar D1 ↔ N1
-            </button>
-          )}
-          <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={highlightEmpty}
-              onChange={(e) => setHighlightEmpty(e.target.checked)}
-            />
-            Resaltar vacíos
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={compactTable}
-              onChange={(e) => setCompactTable(e.target.checked)}
-            />
-            Compacto
-          </label>
-          <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-            Ir al día
-            <input
-              type="number"
-              min={1}
-              max={daysInMonth(doc.year, doc.month)}
-              value={jumpDay}
-              onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
-              className="w-14 rounded border border-line px-1 py-1 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const max = daysInMonth(doc.year, doc.month)
-                const d = Math.min(Math.max(1, jumpDay), max)
-                setFocusDay(d)
+                flash('Patrón de la 1ª semana copiado al resto del mes')
+              },
+            },
+            {
+              id: 'next-month',
+              label: 'Crear mes siguiente',
+              emphasis: 'navy',
+              onClick: () => {
+                const next = createNextMonthDraft(doc)
+                undoStack.current = []
+                setUndoCount(0)
+                setDoc(next)
+                setDirty(true)
                 setTab('horario')
-                flash(`Enfocado día ${d}`)
-              }}
-              className="rounded bg-navy px-2 py-1 text-xs font-semibold text-white"
-            >
-              Ir
-            </button>
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              const next = duplicateScheduleAsNew(doc)
-              undoStack.current = []
-              setUndoCount(0)
-              setDoc(next)
-              setDirty(true)
-              flash('Copia del horario creada como borrador nuevo')
-            }}
-            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
-          >
-            Duplicar como nuevo
-          </button>
-          <span className="ml-auto self-center text-xs text-muted">
-            {dirty
-              ? 'Cambios sin guardar… (auto en 12s)'
-              : autoSavedAt
-                ? `Autoguardado ${autoSavedAt}`
-                : 'Ctrl+S guarda'}
-          </span>
-        </section>
+                flash(
+                  `Borrador ${next.month}/${next.year} creado con el mismo personal`,
+                )
+              },
+            },
+          ]}
+          groups={[
+            {
+              title: 'Completar celdas',
+              items: [
+                {
+                  id: 'clear',
+                  label: 'Limpiar mes',
+                  disabled: readOnly,
+                  onClick: () => {
+                    if (
+                      window.confirm(
+                        '¿Limpiar todas las celdas del mes? Se mantiene el personal.',
+                      )
+                    ) {
+                      patchDoc(clearMonthCells(doc))
+                      flash('Mes limpiado')
+                    }
+                  },
+                },
+                {
+                  id: 'holidays',
+                  label: 'Autocompletar feriados',
+                  disabled: readOnly,
+                  onClick: () => {
+                    patchDoc(applyHolidaysToEmptyCells(doc))
+                    flash('Feriados aplicados en celdas vacías')
+                  },
+                },
+                {
+                  id: 'weekends',
+                  label: 'Llenar sáb/dom con L',
+                  disabled: readOnly,
+                  onClick: () => {
+                    const next = fillEmptyWeekendsWithLibre(doc)
+                    if (next === doc) {
+                      flash('No hay sáb/dom vacíos para marcar L')
+                      return
+                    }
+                    patchDoc(next)
+                    flash('Fines de semana vacíos marcados con L')
+                  },
+                },
+                {
+                  id: 'habitual',
+                  label: 'Código habitual en vacíos',
+                  disabled: readOnly,
+                  onClick: () => {
+                    const next = applyHabitualCodesToEmpty(doc)
+                    if (next === doc) {
+                      flash(
+                        'Nada que completar (revise códigos habituales o ya está lleno)',
+                      )
+                      return
+                    }
+                    patchDoc(next)
+                    flash(
+                      'Vacíos completados con código habitual de cada persona',
+                    )
+                  },
+                },
+                ...(doc.serviceType === 'medico'
+                  ? [
+                      {
+                        id: 'post-guard',
+                        label: 'L tras guardia',
+                        disabled: readOnly,
+                        onClick: () => {
+                          const next = applyPostGuardLibre(doc)
+                          if (next === doc) {
+                            flash('No hay días vacíos tras guardia X/PT2/GD')
+                            return
+                          }
+                          patchDoc(next)
+                          flash('L aplicado tras guardias (celdas vacías)')
+                        },
+                      },
+                    ]
+                  : []),
+                ...(doc.serviceType === 'enfermeria'
+                  ? [
+                      {
+                        id: 'swap-dn',
+                        label: 'Intercambiar D1 ↔ N1',
+                        disabled: readOnly,
+                        onClick: () => {
+                          if (
+                            !window.confirm(
+                              '¿Intercambiar todas las claves D1 ↔ N1 del mes?',
+                            )
+                          )
+                            return
+                          const next = swapCodesInSchedule(doc, 'D1', 'N1')
+                          if (next === doc) {
+                            flash('No hay D1/N1 para intercambiar')
+                            return
+                          }
+                          patchDoc(next)
+                          flash('D1 ↔ N1 intercambiados')
+                        },
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            {
+              title: 'Personal y copias',
+              items: [
+                {
+                  id: 'copy-names',
+                  label: 'Copiar nombres del mes anterior',
+                  disabled: readOnly,
+                  onClick: () => {
+                    void (async () => {
+                      const res = await copyStaffFromPreviousMonth(doc)
+                      if (!res.ok) {
+                        flash(res.error)
+                        return
+                      }
+                      patchDoc({ ...doc, staff: res.staff, cells: {} })
+                      setHighlightNames(true)
+                      flash(
+                        `Copiados ${res.staff.length} nombres del mes anterior. Ajuste turnos.`,
+                      )
+                    })()
+                  },
+                },
+                {
+                  id: 'dup-new',
+                  label: 'Duplicar como nuevo',
+                  onClick: () => {
+                    const next = duplicateScheduleAsNew(doc)
+                    undoStack.current = []
+                    setUndoCount(0)
+                    setDoc(next)
+                    setDirty(true)
+                    flash('Copia del horario creada como borrador nuevo')
+                  },
+                },
+              ],
+            },
+          ]}
+          extras={
+            <>
+              <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={highlightEmpty}
+                  onChange={(e) => setHighlightEmpty(e.target.checked)}
+                />
+                Resaltar vacíos
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={compactTable}
+                  onChange={(e) => setCompactTable(e.target.checked)}
+                />
+                Compacto
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                Ir al día
+                <input
+                  type="number"
+                  min={1}
+                  max={daysInMonth(doc.year, doc.month)}
+                  value={jumpDay}
+                  onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
+                  className="w-14 rounded border border-line px-1 py-1 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const max = daysInMonth(doc.year, doc.month)
+                    const d = Math.min(Math.max(1, jumpDay), max)
+                    setFocusDay(d)
+                    setTab('horario')
+                    flash(`Enfocado día ${d}`)
+                  }}
+                  className="rounded bg-navy px-2 py-1 text-xs font-semibold text-white"
+                >
+                  Ir
+                </button>
+              </label>
+              <span className="self-center text-xs text-muted">
+                {dirty
+                  ? 'Cambios sin guardar… (auto en 12s)'
+                  : autoSavedAt
+                    ? `Autoguardado ${autoSavedAt}`
+                    : 'Ctrl+S guarda'}
+              </span>
+            </>
+          }
+        />
 
         <MonthSummary doc={doc} />
 
@@ -1153,6 +1156,7 @@ export default function App() {
               }}
             />
             <StaffHoursPanel doc={doc} />
+            <MonthComparePanel doc={doc} />
           </>
         )}
 
