@@ -196,6 +196,60 @@ describe('operaciones de mes', () => {
     expect(next.cells[cellKey('m1', 4)]).toBe('X')
     expect(next.cells[cellKey('m1', 5)]).toBe('L')
   })
+
+  it('copia patrón de la primera semana a celdas vacías', async () => {
+    const { copyFirstWeekPattern } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'm1',
+        name: 'Dra. Test',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = {
+      [cellKey('m1', 1)]: 'CE',
+      [cellKey('m1', 2)]: 'L',
+      [cellKey('m1', 3)]: 'X',
+    }
+    const next = copyFirstWeekPattern(doc)
+    // día 8 = patrón día 1, día 9 = día 2, día 10 = día 3
+    expect(next.cells[cellKey('m1', 8)]).toBe('CE')
+    expect(next.cells[cellKey('m1', 9)]).toBe('L')
+    expect(next.cells[cellKey('m1', 10)]).toBe('X')
+  })
+
+  it('pinta columna de un día', async () => {
+    const { paintDayColumn } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'A',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+      {
+        id: 'b',
+        name: 'B',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 2,
+      },
+    ]
+    const next = paintDayColumn(doc, 3, 'CE')
+    expect(next.cells[cellKey('a', 3)]).toBe('CE')
+    expect(next.cells[cellKey('b', 3)]).toBe('CE')
+  })
 })
 
 describe('feriados Ecuador', () => {

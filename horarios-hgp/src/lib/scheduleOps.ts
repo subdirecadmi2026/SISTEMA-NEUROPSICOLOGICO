@@ -271,3 +271,85 @@ export function fillStaffEmptyDays(
     ],
   }
 }
+
+/** Pinta o borra toda una columna (día) para el personal con nombre. */
+export function paintDayColumn(
+  doc: ScheduleDoc,
+  day: number,
+  code: string | null,
+): ScheduleDoc {
+  const days = daysInMonth(doc.year, doc.month)
+  if (day < 1 || day > days) return doc
+  const cells = { ...doc.cells }
+  let changed = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    const key = `${s.id}:${day}`
+    if (code === null) {
+      if (cells[key]) {
+        delete cells[key]
+        changed += 1
+      }
+    } else if (cells[key] !== code) {
+      cells[key] = code
+      changed += 1
+    }
+  }
+  if (changed === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: code === null ? 'borrar_columna' : 'pintar_columna',
+        detail: `día=${day} code=${code ?? '—'} cambios=${changed}`,
+      },
+    ],
+  }
+}
+
+/**
+ * Copia el patrón de la primera semana (días 1–7) hacia el resto del mes,
+ * solo en celdas vacías. Útil para rotativos.
+ */
+export function copyFirstWeekPattern(doc: ScheduleDoc): ScheduleDoc {
+  const days = daysInMonth(doc.year, doc.month)
+  if (days <= 7) return doc
+  const cells = { ...doc.cells }
+  let painted = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    for (let d = 8; d <= days; d++) {
+      const key = `${s.id}:${d}`
+      if (cells[key]) continue
+      const srcDay = ((d - 1) % 7) + 1
+      const src = cells[`${s.id}:${srcDay}`]
+      if (!src) continue
+      cells[key] = src
+      painted += 1
+    }
+  }
+  if (painted === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'copiar_semana',
+        detail: `${painted} celdas desde patrón días 1–7`,
+      },
+    ],
+  }
+}

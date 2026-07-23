@@ -25,6 +25,7 @@ import {
   duplicatePreviousMonth,
   copyStaffFromPreviousMonth,
   fillEmptyWeekendsWithLibre,
+  copyFirstWeekPattern,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
 import {
@@ -49,6 +50,7 @@ import { SchedulesHome } from './components/SchedulesHome'
 import { PrintSheet } from './components/PrintSheet'
 import { AlertsBanner } from './components/AlertsBanner'
 import { MonthSummary } from './components/MonthSummary'
+import { NotesPanel } from './components/NotesPanel'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId =
@@ -83,6 +85,10 @@ export default function App() {
   const [listLoading, setListLoading] = useState(false)
   const undoStack = useRef<ScheduleDoc[]>([])
   const [undoCount, setUndoCount] = useState(0)
+  const [dirty, setDirty] = useState(false)
+  const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null)
+  const docRefApp = useRef(doc)
+  docRefApp.current = doc
 
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
@@ -125,6 +131,7 @@ export default function App() {
     undoStack.current = [...undoStack.current.slice(-29), doc]
     setUndoCount(undoStack.current.length)
     setDoc(next)
+    setDirty(true)
   }
 
   function undoLast() {
@@ -135,27 +142,30 @@ export default function App() {
       return
     }
     setDoc(prev)
+    setDirty(true)
     flash('Cambio deshecho')
   }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      const tag = target?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        const prev = undoStack.current.pop()
-        setUndoCount(undoStack.current.length)
-        if (!prev) return
-        setDoc(prev)
-        setToast('Cambio deshecho')
-        window.setTimeout(() => setToast(''), 2400)
+    if (!dirty || readOnly) return
+    const t = window.setTimeout(() => {
+      try {
+        const savedDoc = saveSchedule(docRefApp.current)
+        setDoc(savedDoc)
+        setDirty(false)
+        setAutoSavedAt(
+          new Date().toLocaleTimeString('es-EC', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+        )
+      } catch {
+        /* silencioso */
       }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+    }, 12000)
+    return () => window.clearTimeout(t)
+  }, [dirty, doc, readOnly])
 
   function switchService(serviceType: ServiceType) {
     const next = createBlankSchedule(serviceType, doc.year, doc.month)
@@ -191,7 +201,9 @@ export default function App() {
   }
 
   async function handleSave() {
-    if (!staffOk) {
+    const current = docRefApp.current
+    const named = current.staff.filter((s) => s.name.trim().length > 0).length
+    if (named < 1) {
       flash('Escriba al menos 1 nombre de médico/personal antes de guardar')
       setHighlightNames(true)
       setTab('horario')
@@ -199,8 +211,16 @@ export default function App() {
     }
     setSaving(true)
     try {
-      const savedDoc = await persistSchedule(doc, user)
+      const savedDoc = await persistSchedule(current, user)
       setDoc(savedDoc)
+      setDirty(false)
+      setAutoSavedAt(
+        new Date().toLocaleTimeString('es-EC', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+      )
       await refreshList()
       flash(
         isRemoteEnabled()
@@ -208,8 +228,9 @@ export default function App() {
           : 'Horario guardado en este navegador',
       )
     } catch (e) {
-      const local = saveSchedule(doc)
+      const local = saveSchedule(current)
       setDoc(local)
+      setDirty(false)
       await refreshList()
       flash(
         e instanceof Error
@@ -221,6 +242,33 @@ export default function App() {
     }
   }
 
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        const prev = undoStack.current.pop()
+        setUndoCount(undoStack.current.length)
+        if (!prev) return
+        setDoc(prev)
+        setDirty(true)
+        setToast('Cambio deshecho')
+        window.setTimeout(() => setToast(''), 2400)
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void handleSaveRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   async function handleLoad(id: string) {
     try {
       const loaded = await loadAnySchedule(id)
@@ -229,6 +277,9 @@ export default function App() {
         return
       }
       setDoc(loaded)
+      undoStack.current = []
+      setUndoCount(0)
+      setDirty(false)
       setActiveCode(
         shiftsFor(loaded.serviceType).find((s) => s.group === 'turno')?.code ??
           '',
@@ -698,6 +749,31 @@ export default function App() {
           >
             Deshacer ({undoCount})
           </button>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => {
+              const next = copyFirstWeekPattern(doc)
+              if (next === doc) {
+                flash(
+                  'Pinte primero la semana 1 (días 1–7); no hay vacíos que completar',
+                )
+                return
+              }
+              patchDoc(next)
+              flash('Patrón de la 1ª semana copiado al resto del mes')
+            }}
+            className="rounded-lg border border-teal/40 bg-teal/5 px-3 py-2 text-sm font-semibold text-navy hover:bg-teal/10 disabled:opacity-50"
+          >
+            Copiar 1ª semana al mes
+          </button>
+          <span className="ml-auto self-center text-xs text-muted">
+            {dirty
+              ? 'Cambios sin guardar… (auto en 12s)'
+              : autoSavedAt
+                ? `Autoguardado ${autoSavedAt}`
+                : 'Ctrl+S guarda'}
+          </span>
         </section>
 
         <MonthSummary doc={doc} />
@@ -707,6 +783,8 @@ export default function App() {
           onGoDistribution={() => setTab('distribucion')}
           onGoContingency={() => setTab('contingencia')}
         />
+
+        <NotesPanel doc={doc} readOnly={readOnly} onChange={patchDoc} />
 
         <SchedulesHome
           items={saved}

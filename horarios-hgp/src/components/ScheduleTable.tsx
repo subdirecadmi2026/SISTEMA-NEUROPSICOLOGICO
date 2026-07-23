@@ -13,7 +13,7 @@ import {
   weekdayLetter,
 } from '../lib/calendar'
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
-import { fillStaffEmptyDays } from '../lib/scheduleOps'
+import { fillStaffEmptyDays, paintDayColumn } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -50,6 +50,7 @@ export function ScheduleTable({
     string,
     string
   > | null>(null)
+  const [staffFilter, setStaffFilter] = useState('')
 
   useEffect(() => {
     const stop = () => {
@@ -73,10 +74,19 @@ export function ScheduleTable({
   }, [])
 
   const liveCells = previewCells ?? doc.cells
+  const filterNorm = staffFilter.trim().toLowerCase()
 
   const sections = (() => {
     const map = new Map<string, StaffMember[]>()
     for (const s of staffSorted) {
+      if (
+        filterNorm &&
+        !s.name.toLowerCase().includes(filterNorm) &&
+        !s.fun.toLowerCase().includes(filterNorm) &&
+        !s.codigoPersonal.toLowerCase().includes(filterNorm)
+      ) {
+        continue
+      }
       const key = s.section || 'Personal'
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(s)
@@ -184,6 +194,31 @@ export function ScheduleTable({
         </div>
       </div>
 
+      <div className="no-print flex flex-wrap items-center gap-2 border-b border-line bg-sand/30 px-4 py-2">
+        <label className="text-xs text-muted">
+          Buscar personal
+          <input
+            value={staffFilter}
+            onChange={(e) => setStaffFilter(e.target.value)}
+            placeholder="Nombre, FUN o código…"
+            className="ml-2 rounded-lg border border-line bg-white px-2 py-1.5 text-sm"
+          />
+        </label>
+        {staffFilter && (
+          <button
+            type="button"
+            onClick={() => setStaffFilter('')}
+            className="rounded border border-line px-2 py-1 text-xs hover:bg-white"
+          >
+            Limpiar filtro
+          </button>
+        )}
+        <p className="text-[11px] text-muted">
+          Clic en el número del día = pintar columna con clave activa · Clic
+          derecho en día = borrar columna
+        </p>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1500px] border-collapse text-[11px]">
           <thead>
@@ -208,8 +243,25 @@ export function ScheduleTable({
                 return (
                   <th
                     key={d}
-                    title={holiday ? 'Feriado' : weekend ? 'Fin de semana' : ''}
+                    title={
+                      holiday
+                        ? 'Feriado · clic pinta columna'
+                        : weekend
+                          ? 'Fin de semana · clic pinta columna'
+                          : 'Clic: pintar columna · clic derecho: borrar'
+                    }
+                    onClick={() => {
+                      if (readOnly || !paintMode || !activeCode) return
+                      onChange(paintDayColumn(docRef.current, d, activeCode))
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      if (readOnly) return
+                      onChange(paintDayColumn(docRef.current, d, null))
+                    }}
                     className={`min-w-[30px] border border-line px-0 py-1 text-center ${
+                      readOnly ? '' : 'cursor-pointer hover:ring-2 hover:ring-navy/40'
+                    } ${
                       holiday
                         ? 'bg-amber-200/80'
                         : weekend
