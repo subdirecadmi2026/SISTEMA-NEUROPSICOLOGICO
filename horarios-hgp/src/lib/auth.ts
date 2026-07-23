@@ -204,7 +204,7 @@ export function transitionStatus(
   doc: ScheduleDoc,
   next: ScheduleStatus,
   user: AppUser,
-  opts?: { cargo?: string; comment?: string },
+  opts?: { cargo?: string; comment?: string; signedName?: string },
 ): { ok: true; doc: ScheduleDoc } | { ok: false; error: string } {
   const allowed: Record<ScheduleStatus, ScheduleStatus[]> = {
     BORRADOR: ['EN_REVISION'],
@@ -266,9 +266,10 @@ export function transitionStatus(
           ? 'validado'
           : 'revisado'
 
+  const signedName = (opts?.signedName?.trim() || user.name).trim()
   const signature: ApprovalSignature = {
     role: sigRole,
-    name: user.name,
+    name: signedName,
     cargo: opts?.cargo ?? roleLabel(user.role),
     at: new Date().toISOString(),
     userId: user.id,
@@ -284,7 +285,7 @@ export function transitionStatus(
   if (next === 'EN_REVISION') {
     updated = {
       ...updated,
-      elaboradoPor: `${user.name} — ${signature.cargo}`,
+      elaboradoPor: `${signedName} — ${signature.cargo}`,
     }
     // Al reenviar, marcar correcciones previas como atendidas
     if ((updated.reviewComments ?? []).some((c) => !c.resolved)) {
@@ -301,15 +302,15 @@ export function transitionStatus(
   if (next === 'APROBADO') {
     updated = {
       ...updated,
-      aprobadoPor: `${user.name} — ${signature.cargo}`,
-      revisadoPor: `${user.name} — ${signature.cargo}`,
+      aprobadoPor: `${signedName} — ${signature.cargo}`,
+      revisadoPor: `${signedName} — ${signature.cargo}`,
     }
   }
 
   if (next === 'ARCHIVADO') {
     updated = {
       ...updated,
-      talentoHumano: `${user.name} — ${signature.cargo}`,
+      talentoHumano: `${signedName} — ${signature.cargo}`,
     }
   }
 

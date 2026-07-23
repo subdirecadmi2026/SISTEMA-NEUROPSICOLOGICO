@@ -28,15 +28,213 @@ function paperSize() {
 }
 
 /**
- * Formato institucional anterior (encabezado navy, firmas, feriados),
- * con escala solo si hace falta para caber en 1 hoja A4 horizontal.
+ * Cuerpo institucional del horario (encabezado MSP + grilla + firmas).
+ * Usado por impresión del médico y por el PDF del validador.
  */
-export function PrintSheet({ doc }: Props) {
+export function InstitutionalPrintBody({ doc }: Props) {
   const days = daysInMonth(doc.year, doc.month)
   const isEnf = doc.serviceType === 'enfermeria'
   const staff = [...doc.staff]
     .filter((s) => s.name.trim())
     .sort((a, b) => a.order - b.order)
+
+  const signatures = [
+    {
+      label: 'Jefe de servicio (Elaborado)',
+      value: doc.elaboradoPor,
+    },
+    {
+      label: 'Revisor (Aprobado)',
+      value: doc.revisadoPor || doc.aprobadoPor,
+    },
+    {
+      label: 'Validador (Validado)',
+      value: doc.talentoHumano,
+    },
+  ] as const
+
+  return (
+    <div className="print-capture-root bg-white text-ink">
+      <div className="print-header border-b border-line px-4 py-3">
+        <div className="flex flex-wrap items-start gap-3">
+          <img
+            src="/logo_msp.png"
+            alt="MSP"
+            className="h-12 w-auto rounded bg-white p-1"
+            crossOrigin="anonymous"
+          />
+          <div className="text-sm">
+            <p className="text-[11px] uppercase tracking-wider text-muted">
+              {doc.provincial}
+            </p>
+            <p className="print-title font-display text-xl text-navy">
+              {doc.hospital}
+            </p>
+            <p>{doc.department}</p>
+            <p className="mt-1 font-semibold">
+              CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO
+            </p>
+            <p className="mt-1">
+              Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
+              <strong>{doc.jefeServicio || '—'}</strong> ·{' '}
+              {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
+              {doc.llamado ? ' · LLAMADO' : ''}
+              {doc.vacacionesFlag ? ' · VACACIONES' : ''}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="print-table-wrap p-2">
+        <table className="print-schedule-table w-full border-collapse text-[10px]">
+          <thead>
+            <tr className="bg-navy text-white">
+              <th className="border border-navy px-1 py-1">N°</th>
+              <th className="border border-navy px-1 py-1">FUN</th>
+              <th className="border border-navy px-1 py-1 text-left">
+                Nombres y apellidos
+              </th>
+              <th className="border border-navy px-1 py-1">Rel. lab.</th>
+              <th className="border border-navy px-1 py-1">Cód.</th>
+              {Array.from({ length: days }, (_, i) => (
+                <th key={i + 1} className="border border-navy px-0 py-1">
+                  <div className="text-[8px] font-normal opacity-80">
+                    {weekdayLetter(doc.year, doc.month, i + 1)}
+                  </div>
+                  {i + 1}
+                </th>
+              ))}
+              {isEnf ? (
+                <>
+                  <th className="border border-navy px-0.5 py-1">Turnos</th>
+                  <th className="border border-navy px-0.5 py-1">H.plan</th>
+                  <th className="border border-navy px-0.5 py-1">Vac</th>
+                  <th className="border border-navy px-0.5 py-1">Total</th>
+                </>
+              ) : (
+                <th className="border border-navy px-0.5 py-1">Horas</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {staff.length === 0 && (
+              <tr>
+                <td
+                  colSpan={5 + days + (isEnf ? 4 : 1)}
+                  className="border border-line px-3 py-4 text-center text-muted"
+                >
+                  Sin personal con nombre. Complete la lista antes de imprimir.
+                </td>
+              </tr>
+            )}
+            {staff.map((s, idx) => (
+              <tr key={s.id}>
+                <td className="border border-line px-1 text-center">
+                  {idx + 1}
+                </td>
+                <td className="border border-line px-1 text-center font-semibold">
+                  {s.fun}
+                </td>
+                <td className="border border-line px-1 font-medium">{s.name}</td>
+                <td className="border border-line px-1">{s.relacionLaboral}</td>
+                <td className="border border-line px-1 text-center font-bold">
+                  {s.codigoPersonal}
+                </td>
+                {Array.from({ length: days }, (_, i) => {
+                  const d = i + 1
+                  const code = doc.cells[cellKey(s.id, d)] ?? ''
+                  const meta = code
+                    ? shiftMeta(doc.serviceType, code)
+                    : undefined
+                  return (
+                    <td
+                      key={d}
+                      className="border border-line px-0 text-center font-bold"
+                      style={
+                        meta
+                          ? { background: meta.color, color: meta.text }
+                          : undefined
+                      }
+                    >
+                      {code}
+                    </td>
+                  )
+                })}
+                {isEnf ? (
+                  <>
+                    <td className="border border-line px-0.5 text-center">
+                      {plannedShifts(doc, s.id)}
+                    </td>
+                    <td className="border border-line px-0.5 text-center">
+                      {plannedHours(doc, s.id)}
+                    </td>
+                    <td className="border border-line px-0.5 text-center">
+                      {countCodeForStaff(doc, s.id, 'V')}
+                    </td>
+                    <td className="border border-line px-0.5 text-center font-bold">
+                      {totalPaidHours(doc, s)}
+                    </td>
+                  </>
+                ) : (
+                  <td className="border border-line px-0.5 text-center font-bold">
+                    {plannedHours(doc, s.id)}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="print-footer grid gap-3 border-t border-line p-4 text-xs sm:grid-cols-2">
+        <div>
+          <p className="mb-1 font-semibold text-navy">Feriados {doc.year}</p>
+          <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
+          {doc.notes ? (
+            <>
+              <p className="mb-1 mt-3 font-semibold text-navy">Observaciones</p>
+              <p className="print-notes-text">{doc.notes}</p>
+            </>
+          ) : null}
+          {doc.contingencyPlan ? (
+            <>
+              <p className="mb-1 mt-3 font-semibold text-navy">
+                Plan de contingencia
+              </p>
+              <p className="print-notes-text">{doc.contingencyPlan}</p>
+            </>
+          ) : null}
+          <p className="mt-3 text-[10px] text-muted">
+            Estado: {STATUS_LABEL[doc.status]} · v{doc.version}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {signatures.map((s) => (
+            <div
+              key={s.label}
+              className="print-sign rounded border border-line px-2 py-3"
+            >
+              <p className="text-[9px] uppercase leading-tight text-muted">
+                {s.label}
+              </p>
+              <p className="mt-6 border-t border-line pt-1 text-[11px] font-medium leading-snug">
+                {s.value || '________________'}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Formato institucional (encabezado navy, firmas, feriados),
+ * con escala solo si hace falta para caber en 1 hoja A4 horizontal.
+ */
+export function PrintSheet({ doc }: Props) {
+  const days = daysInMonth(doc.year, doc.month)
+  const staffCount = doc.staff.filter((s) => s.name.trim()).length
   const rootRef = useRef<HTMLElement>(null)
   const fitRef = useRef<HTMLDivElement>(null)
 
@@ -52,7 +250,6 @@ export function PrintSheet({ doc }: Props) {
       root.style.height = ''
 
       const paper = paperSize()
-      // En pantalla: no achicar por la altura del monitor; solo ancho del contenedor
       const availW = forPrint
         ? paper.w
         : Math.max(root.clientWidth || paper.w, 1)
@@ -99,7 +296,7 @@ export function PrintSheet({ doc }: Props) {
       window.removeEventListener('beforeprint', before)
       window.removeEventListener('afterprint', after)
     }
-  }, [doc, days, staff.length])
+  }, [doc, days, staffCount])
 
   const handlePrint = () => {
     const fit = fitRef.current
@@ -146,185 +343,7 @@ export function PrintSheet({ doc }: Props) {
       </div>
 
       <div ref={fitRef} className="print-fit-one-page">
-        <div className="print-header border-b border-line px-4 py-3">
-          <div className="flex flex-wrap items-start gap-3">
-            <img
-              src="/logo_msp.png"
-              alt="MSP"
-              className="h-12 w-auto rounded bg-white p-1"
-            />
-            <div className="text-sm">
-              <p className="text-[11px] uppercase tracking-wider text-muted">
-                {doc.provincial}
-              </p>
-              <p className="print-title font-display text-xl text-navy">
-                {doc.hospital}
-              </p>
-              <p>{doc.department}</p>
-              <p className="mt-1 font-semibold">
-                CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO
-              </p>
-              <p className="mt-1">
-                Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
-                <strong>{doc.jefeServicio || '—'}</strong> ·{' '}
-                {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
-                {doc.llamado ? ' · LLAMADO' : ''}
-                {doc.vacacionesFlag ? ' · VACACIONES' : ''}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="print-table-wrap p-2">
-          <table className="print-schedule-table w-full border-collapse text-[10px]">
-            <thead>
-              <tr className="bg-navy text-white">
-                <th className="border border-navy px-1 py-1">N°</th>
-                <th className="border border-navy px-1 py-1">FUN</th>
-                <th className="border border-navy px-1 py-1 text-left">
-                  Nombres y apellidos
-                </th>
-                <th className="border border-navy px-1 py-1">Rel. lab.</th>
-                <th className="border border-navy px-1 py-1">Cód.</th>
-                {Array.from({ length: days }, (_, i) => (
-                  <th key={i + 1} className="border border-navy px-0 py-1">
-                    <div className="text-[8px] font-normal opacity-80">
-                      {weekdayLetter(doc.year, doc.month, i + 1)}
-                    </div>
-                    {i + 1}
-                  </th>
-                ))}
-                {isEnf ? (
-                  <>
-                    <th className="border border-navy px-0.5 py-1">Turnos</th>
-                    <th className="border border-navy px-0.5 py-1">H.plan</th>
-                    <th className="border border-navy px-0.5 py-1">Vac</th>
-                    <th className="border border-navy px-0.5 py-1">Total</th>
-                  </>
-                ) : (
-                  <th className="border border-navy px-0.5 py-1">Horas</th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {staff.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5 + days + (isEnf ? 4 : 1)}
-                    className="border border-line px-3 py-4 text-center text-muted"
-                  >
-                    Sin personal con nombre. Complete la lista antes de
-                    imprimir.
-                  </td>
-                </tr>
-              )}
-              {staff.map((s, idx) => (
-                <tr key={s.id}>
-                  <td className="border border-line px-1 text-center">
-                    {idx + 1}
-                  </td>
-                  <td className="border border-line px-1 text-center font-semibold">
-                    {s.fun}
-                  </td>
-                  <td className="border border-line px-1 font-medium">
-                    {s.name}
-                  </td>
-                  <td className="border border-line px-1">
-                    {s.relacionLaboral}
-                  </td>
-                  <td className="border border-line px-1 text-center font-bold">
-                    {s.codigoPersonal}
-                  </td>
-                  {Array.from({ length: days }, (_, i) => {
-                    const d = i + 1
-                    const code = doc.cells[cellKey(s.id, d)] ?? ''
-                    const meta = code
-                      ? shiftMeta(doc.serviceType, code)
-                      : undefined
-                    return (
-                      <td
-                        key={d}
-                        className="border border-line px-0 text-center font-bold"
-                        style={
-                          meta
-                            ? { background: meta.color, color: meta.text }
-                            : undefined
-                        }
-                      >
-                        {code}
-                      </td>
-                    )
-                  })}
-                  {isEnf ? (
-                    <>
-                      <td className="border border-line px-0.5 text-center">
-                        {plannedShifts(doc, s.id)}
-                      </td>
-                      <td className="border border-line px-0.5 text-center">
-                        {plannedHours(doc, s.id)}
-                      </td>
-                      <td className="border border-line px-0.5 text-center">
-                        {countCodeForStaff(doc, s.id, 'V')}
-                      </td>
-                      <td className="border border-line px-0.5 text-center font-bold">
-                        {totalPaidHours(doc, s)}
-                      </td>
-                    </>
-                  ) : (
-                    <td className="border border-line px-0.5 text-center font-bold">
-                      {plannedHours(doc, s.id)}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="print-footer grid gap-3 border-t border-line p-4 text-xs sm:grid-cols-2">
-          <div>
-            <p className="mb-1 font-semibold text-navy">
-              Feriados {doc.year}
-            </p>
-            <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
-            {doc.notes ? (
-              <>
-                <p className="mb-1 mt-3 font-semibold text-navy">
-                  Observaciones
-                </p>
-                <p className="print-notes-text">{doc.notes}</p>
-              </>
-            ) : null}
-            {doc.contingencyPlan ? (
-              <>
-                <p className="mb-1 mt-3 font-semibold text-navy">
-                  Plan de contingencia
-                </p>
-                <p className="print-notes-text">{doc.contingencyPlan}</p>
-              </>
-            ) : null}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {(
-              [
-                ['Elaborado', doc.elaboradoPor],
-                ['Revisado', doc.revisadoPor],
-                ['Aprobado', doc.aprobadoPor],
-                ['Talento Humano', doc.talentoHumano],
-              ] as const
-            ).map(([label, value]) => (
-              <div
-                key={label}
-                className="print-sign rounded border border-line px-2 py-3"
-              >
-                <p className="text-[10px] uppercase text-muted">{label}</p>
-                <p className="mt-6 border-t border-line pt-1 font-medium">
-                  {value || '________________'}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <InstitutionalPrintBody doc={doc} />
       </div>
     </section>
   )

@@ -10,12 +10,15 @@ import {
   resolveReviewComments,
 } from '../lib/auth'
 import { runAllValidations } from '../lib/validation'
+import { notifyJefeScheduleValidated } from '../lib/notifications'
+import { SignatureGate } from './SignatureGate'
 
 type Props = {
   doc: ScheduleDoc
   user: AppUser | null
   onChange: (doc: ScheduleDoc) => void
   onFlash: (msg: string) => void
+  onNotify?: () => void
 }
 
 const STEPS: Array<{ key: ScheduleDoc['status']; label: string }> = [
@@ -25,8 +28,21 @@ const STEPS: Array<{ key: ScheduleDoc['status']; label: string }> = [
   { key: 'ARCHIVADO', label: '4. Validar' },
 ]
 
-export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
+type SignIntent =
+  | { next: 'EN_REVISION' }
+  | { next: 'APROBADO' }
+  | { next: 'ARCHIVADO' }
+  | null
+
+export function ApprovalPanel({
+  doc,
+  user,
+  onChange,
+  onFlash,
+  onNotify,
+}: Props) {
   const [correction, setCorrection] = useState('')
+  const [signIntent, setSignIntent] = useState<SignIntent>(null)
   const alerts = runAllValidations(doc)
   const errors = alerts.filter((a) => a.level === 'error')
   const named = doc.staff.filter((s) => s.name.trim()).length
@@ -41,37 +57,94 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
   const canReview = !!user && isRevisorRole(user.role)
   const canValidate = !!user && isValidadorRole(user.role)
 
-  function go(next: ScheduleDoc['status'], comment?: string) {
+  function requestSend() {
     if (!user) {
       onFlash('Seleccione un usuario arriba (Entrar como) para el flujo')
       return
     }
-    if (next === 'EN_REVISION') {
-      if (named < 1) {
-        onFlash('Debe registrar al menos 1 nombre de personal/médico')
-        return
-      }
-      if (Object.keys(doc.cells).length === 0) {
-        onFlash('Pinte al menos una clave antes de enviar a revisión')
-        return
-      }
-      if (!doc.jefeServicio.trim()) {
-        onFlash('Indique el jefe / líder de servicio antes de enviar')
-        return
-      }
+    if (named < 1) {
+      onFlash('Debe registrar al menos 1 nombre de personal/médico')
+      return
     }
-    const res = transitionStatus(doc, next, user, { comment })
+    if (Object.keys(doc.cells).length === 0) {
+      onFlash('Pinte al menos una clave antes de enviar a revisión')
+      return
+    }
+    if (!doc.jefeServicio.trim()) {
+      onFlash('Indique el jefe / líder de servicio antes de enviar')
+      return
+    }
+    setSignIntent({ next: 'EN_REVISION' })
+  }
+
+  function go(
+    next: ScheduleDoc['status'],
+    opts?: { comment?: string; signedName?: string },
+  ) {
+    if (!user) {
+      onFlash('Seleccione un usuario arriba (Entrar como) para el flujo')
+      return
+    }
+    const res = transitionStatus(doc, next, user, opts)
     if (!res.ok) {
       onFlash(res.error)
       return
     }
     onChange(res.doc)
     setCorrection('')
-    onFlash(`Estado: ${STATUS_LABEL[next]} · ${user.name}`)
+    setSignIntent(null)
+    if (next === 'ARCHIVADO') {
+      notifyJefeScheduleValidated(
+        res.doc,
+        opts?.signedName?.trim() || user.name,
+      )
+      onNotify?.()
+    }
+    onFlash(
+      next === 'EN_REVISION'
+        ? `Firmado y enviado a revisión · ${opts?.signedName || user.name}`
+        : next === 'APROBADO'
+          ? `Firmado y aprobado · ${opts?.signedName || user.name}`
+          : next === 'ARCHIVADO'
+            ? `Firmado y validado · aviso enviado al jefe`
+            : `Estado: ${STATUS_LABEL[next]} · ${user.name}`,
+    )
   }
 
+  const signTitle =
+    signIntent?.next === 'EN_REVISION'
+      ? 'Firmar y enviar a revisión'
+      : signIntent?.next === 'APROBADO'
+        ? 'Firmar y aprobar (Revisor)'
+        : signIntent?.next === 'ARCHIVADO'
+          ? 'Firmar y validar'
+          : ''
+
+  const signConfirm =
+    signIntent?.next === 'EN_REVISION'
+      ? 'Firmar y enviar'
+      : signIntent?.next === 'APROBADO'
+        ? 'Firmar y aprobar'
+        : 'Firmar y validar'
+
   return (
-    <section className="no-print mb-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm" id="flujo-aprobacion">
+    <section
+      className="no-print mb-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm"
+      id="flujo-aprobacion"
+    >
+      <SignatureGate
+        open={!!signIntent}
+        title={signTitle}
+        subtitle="Su firma quedará impresa en el horario institucional (Jefe / Revisor / Validador)."
+        defaultName={user?.name ?? ''}
+        confirmLabel={signConfirm}
+        onCancel={() => setSignIntent(null)}
+        onConfirm={(signedName) => {
+          if (!signIntent) return
+          go(signIntent.next, { signedName })
+        }}
+      />
+
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-xl text-navy">Flujo de aprobación</h2>
@@ -97,28 +170,28 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
           {doc.status === 'BORRADOR' && canSend && (
             <button
               type="button"
-              onClick={() => go('EN_REVISION')}
+              onClick={requestSend}
               className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
             >
-              Enviar a revisión
+              Firmar y enviar a revisión
             </button>
           )}
           {doc.status === 'EN_REVISION' && canReview && (
             <button
               type="button"
-              onClick={() => go('APROBADO')}
+              onClick={() => setSignIntent({ next: 'APROBADO' })}
               className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white"
             >
-              Aprobar
+              Firmar y aprobar
             </button>
           )}
           {doc.status === 'APROBADO' && canValidate && (
             <button
               type="button"
-              onClick={() => go('ARCHIVADO')}
+              onClick={() => setSignIntent({ next: 'ARCHIVADO' })}
               className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
             >
-              Validar horario
+              Firmar y validar
             </button>
           )}
           {(doc.status === 'ARCHIVADO' || doc.status === 'APROBADO') &&
@@ -156,13 +229,11 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
       </ol>
 
       <p className="mb-3 text-xs text-muted">
-        <strong>Jefe de servicio</strong> crea y envía →{' '}
-        <strong>Revisor</strong> visualiza, aprueba o pide corrección →{' '}
-        <strong>Validador</strong> valida. Tras aprobar/validar, el horario queda
-        bloqueado.
+        <strong>Jefe</strong> firma y envía → <strong>Revisor</strong> firma y
+        aprueba (o pide corrección) → <strong>Validador</strong> firma y
+        aprueba; el jefe recibe aviso de horario aprobado.
       </p>
 
-      {/* Revisor: devolver con comentario */}
       {doc.status === 'EN_REVISION' && canReview && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3">
           <p className="mb-1 text-sm font-semibold text-navy">
@@ -181,7 +252,7 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
           />
           <button
             type="button"
-            onClick={() => go('BORRADOR', correction)}
+            onClick={() => go('BORRADOR', { comment: correction })}
             className="rounded-lg border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
           >
             Devolver con comentario
@@ -189,7 +260,6 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
         </div>
       )}
 
-      {/* Correcciones abiertas para el jefe */}
       {openComments.length > 0 && (
         <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50/80 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -265,7 +335,8 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
       {alerts.length > 0 && (
         <details className="mt-3 rounded-lg border border-line">
           <summary className="cursor-pointer bg-sand/50 px-3 py-2 text-xs font-semibold text-navy">
-            Alertas informativas ({alerts.length}) — {errors.length} crítico(s) · no bloquean el envío
+            Alertas informativas ({alerts.length}) — {errors.length} crítico(s)
+            · no bloquean el envío
           </summary>
           <div className="max-h-40 overflow-y-auto">
             {alerts.slice(0, 40).map((a, i) => (

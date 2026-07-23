@@ -3,6 +3,7 @@ import type { AppUser, SavedIndexItem, ScheduleDoc } from '../types'
 import { MONTHS_ES, STATUS_LABEL } from '../types'
 import { roleLabel, transitionStatus } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
+import { notifyJefeScheduleValidated } from '../lib/notifications'
 import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
 import { SERVICE_LABEL } from '../data/templates'
@@ -19,6 +20,7 @@ import {
   supportsDirectoryPicker,
   downloadPdfDirect,
 } from '../lib/archiveFolder'
+import { SignatureGate } from './SignatureGate'
 
 type Props = {
   user: AppUser
@@ -27,6 +29,7 @@ type Props = {
   onRefresh: () => void
   onChanged: (doc: ScheduleDoc) => void
   onFlash: (msg: string) => void
+  onNotify?: () => void
 }
 
 type ModuleTab = 'pendientes' | 'archivo'
@@ -42,6 +45,7 @@ export function ValidadorWorkspace({
   onRefresh,
   onChanged,
   onFlash,
+  onNotify,
 }: Props) {
   const [module, setModule] = useState<ModuleTab>('pendientes')
   const [filter, setFilter] = useState('')
@@ -50,6 +54,7 @@ export function ValidadorWorkspace({
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [busy, setBusy] = useState(false)
   const [rootHint, setRootHint] = useState(getArchiveRootHint())
+  const [signOpen, setSignOpen] = useState(false)
 
   const pending = useMemo(() => {
     const needle = filter.trim().toLowerCase()
@@ -130,15 +135,18 @@ export function ValidadorWorkspace({
     }
   }
 
-  async function validateAndArchive(doc: ScheduleDoc) {
+  async function validateAndArchive(doc: ScheduleDoc, signedName: string) {
     setBusy(true)
+    setSignOpen(false)
     try {
-      const res = transitionStatus(doc, 'ARCHIVADO', user)
+      const res = transitionStatus(doc, 'ARCHIVADO', user, { signedName })
       if (!res.ok) {
         onFlash(res.error)
         return
       }
       const validated = res.doc
+      notifyJefeScheduleValidated(validated, signedName)
+      onNotify?.()
       onChanged(validated)
 
       const blob = await buildSchedulePdfBlob(validated)
@@ -149,15 +157,14 @@ export function ValidadorWorkspace({
         const saved = await savePdfInSpecialtyFolder(folder, file, blob)
         if (saved.mode === 'folder') {
           setRootHint(getArchiveRootHint())
-          onFlash(`Validado · PDF en ${saved.path}`)
+          onFlash(`Validado y firmado · PDF institucional en ${saved.path}`)
         } else {
           onFlash(
-            `Validado · descargado ZIP con carpeta «${folder}» (use Chrome/Edge para guardar directo en disco)`,
+            `Validado y firmado · ZIP «${folder}» (use Chrome/Edge para carpeta en disco)`,
           )
         }
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') {
-          // Canceló carpeta: igual validó; descarga PDF suelta
           downloadPdfDirect(blob, file)
           onFlash('Validado · PDF descargado (no eligió carpeta)')
         } else {
@@ -209,6 +216,17 @@ export function ValidadorWorkspace({
     const canValidate = detail.status === 'APROBADO'
     return (
       <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
+        <SignatureGate
+          open={signOpen}
+          title="Firmar y validar horario"
+          subtitle="Se genera el PDF institucional (mismo formato de impresión) y se notifica al jefe de servicio."
+          defaultName={user.name}
+          confirmLabel="Firmar, validar y archivar PDF"
+          onCancel={() => setSignOpen(false)}
+          onConfirm={(signedName) => {
+            void validateAndArchive(detail, signedName)
+          }}
+        />
         <button
           type="button"
           onClick={backToCards}
@@ -234,28 +252,34 @@ export function ValidadorWorkspace({
 
         {canValidate && (
           <section className="mb-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 shadow-sm">
-            <h2 className="font-display text-lg text-navy">Validar y archivar</h2>
+            <h2 className="font-display text-lg text-navy">
+              Firmar, validar y archivar
+            </h2>
             <p className="mb-3 text-sm text-muted">
-              Al validar se genera el PDF y se guarda en la carpeta de la
-              especialidad
+              Al firmar se genera el PDF con el mismo formato institucional que
+              imprime el médico (encabezados y firmas) y se guarda en la carpeta
+              de la especialidad
               {rootHint ? (
                 <>
                   {' '}
-                  (<strong>{rootHint}/{specialtyFolderName(detail)}</strong>)
+                  (<strong>
+                    {rootHint}/{specialtyFolderName(detail)}
+                  </strong>
+                  )
                 </>
               ) : (
                 <> (se pedirá la carpeta raíz del archivo)</>
               )}
-              .
+              . El jefe de servicio recibirá un aviso de horario aprobado.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void validateAndArchive(detail)}
+                onClick={() => setSignOpen(true)}
                 className="rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
               >
-                {busy ? 'Procesando…' : 'Validar · guardar PDF'}
+                {busy ? 'Procesando…' : 'Firmar y validar · PDF'}
               </button>
               {supportsDirectoryPicker() && (
                 <button

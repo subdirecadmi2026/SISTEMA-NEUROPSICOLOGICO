@@ -7,7 +7,6 @@ import type {
 import { MONTHS_ES, STATUS_LABEL, uid } from './types'
 import { createBlankSchedule } from './data/demo'
 import {
-  SERVICE_LABEL,
   UNITS_ENFERMERIA,
   UNITS_MEDICO,
   shiftsFor,
@@ -56,6 +55,7 @@ import { PrintSheet } from './components/PrintSheet'
 import { MonthSummary } from './components/MonthSummary'
 import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
+import { MonthComparePanel } from './components/MonthComparePanel'
 import { AuditTrail } from './components/AuditTrail'
 import { CellAdjustModule } from './components/CellAdjustModule'
 import { ToolsToolbar } from './components/ToolsToolbar'
@@ -71,6 +71,10 @@ import { CorrectionsAlert } from './components/CorrectionsAlert'
 import { ScheduleContextBar } from './components/ScheduleContextBar'
 import { ConfigModule } from './components/ConfigModule'
 import { EditorTabs, type EditorTabId } from './components/EditorTabs'
+import {
+  NotificationsBell,
+  ValidationNoticeBanner,
+} from './components/NotificationsBell'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -110,8 +114,13 @@ export default function App() {
   const [compactTable, setCompactTable] = useState(false)
   const [focusDay, setFocusDay] = useState<number | null>(null)
   const [jumpDay, setJumpDay] = useState(1)
+  const [notifyTick, setNotifyTick] = useState(0)
   const docRefApp = useRef(doc)
   docRefApp.current = doc
+
+  function bumpNotifications() {
+    setNotifyTick((n) => n + 1)
+  }
 
   function pickCode(code: string) {
     setActiveCode(code)
@@ -444,6 +453,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <NotificationsBell user={user} refreshKey={notifyTick} />
             <AuthBar
               user={user}
               pendingCount={pendingCount}
@@ -558,6 +568,7 @@ export default function App() {
           loading={listLoading}
           onRefresh={() => void refreshList()}
           onFlash={flash}
+          onNotify={bumpNotifications}
           onChanged={(d) => {
             void persistSchedule(d, user)
               .then(() => refreshList())
@@ -572,6 +583,7 @@ export default function App() {
       {workspace === 'editor' && (
         <>
       <RoleModeBanner user={user} doc={doc} canEdit={!readOnly} />
+      <ValidationNoticeBanner user={user} refreshKey={notifyTick} />
 
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
         <CorrectionsAlert
@@ -1020,6 +1032,7 @@ export default function App() {
         <ApprovalPanel
           doc={doc}
           user={user}
+          onNotify={bumpNotifications}
           onChange={(d) => {
             setDoc(d)
             void persistSchedule(d, user)

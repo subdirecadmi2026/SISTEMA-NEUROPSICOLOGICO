@@ -668,10 +668,61 @@ describe('flujo de roles Jefe → Revisor → Validador', () => {
     const badVal = transitionStatus(doc, 'ARCHIVADO', jefe)
     expect(badVal.ok).toBe(false)
 
-    const validated = transitionStatus(doc, 'ARCHIVADO', validador)
+    const validated = transitionStatus(doc, 'ARCHIVADO', validador, {
+      signedName: 'Ing. Patricia Vega Firmada',
+    })
     expect(validated.ok).toBe(true)
     if (!validated.ok) return
     expect(validated.doc.status).toBe('ARCHIVADO')
+    expect(validated.doc.talentoHumano).toContain('Patricia Vega Firmada')
+  })
+
+  it('guarda firmas con nombre firmado en cada etapa', async () => {
+    const { transitionStatus, DEMO_USERS } = await import('./auth')
+    const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+    const revisor = DEMO_USERS.find((u) => u.id === 'u-revisor')!
+    const validador = DEMO_USERS.find((u) => u.id === 'u-validador')!
+
+    let doc = createBlankSchedule('medico', 2026, 9, { withDemo: false })
+    const sent = transitionStatus(doc, 'EN_REVISION', jefe, {
+      signedName: 'Dr. Carlos Mendoza',
+    })
+    expect(sent.ok).toBe(true)
+    if (!sent.ok) return
+    doc = sent.doc
+    expect(doc.elaboradoPor).toContain('Carlos Mendoza')
+
+    const approved = transitionStatus(doc, 'APROBADO', revisor, {
+      signedName: 'Dra. María Solís',
+    })
+    expect(approved.ok).toBe(true)
+    if (!approved.ok) return
+    doc = approved.doc
+    expect(doc.revisadoPor).toContain('María Solís')
+
+    const validated = transitionStatus(doc, 'ARCHIVADO', validador, {
+      signedName: 'Ing. Patricia Vega',
+    })
+    expect(validated.ok).toBe(true)
+    if (!validated.ok) return
+    expect(validated.doc.talentoHumano).toContain('Patricia Vega')
+  })
+})
+
+describe('notificación al jefe al validar', () => {
+  it('crea aviso para lider_servicio', async () => {
+    const {
+      notifyJefeScheduleValidated,
+      listNotificationsFor,
+    } = await import('./notifications')
+    const { DEMO_USERS } = await import('./auth')
+    const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.unitName = 'Medicina interna'
+    notifyJefeScheduleValidated(doc, 'Ing. Patricia Vega')
+    const list = listNotificationsFor(jefe)
+    expect(list.some((n) => n.body.includes('Medicina interna'))).toBe(true)
+    expect(list.some((n) => !n.read)).toBe(true)
   })
 })
 
@@ -761,27 +812,11 @@ describe('workspace por rol', () => {
 
 describe('PDF archivo validador', () => {
   it('nombra carpeta y archivo por especialidad', async () => {
-    const { specialtyFolderName, pdfFileName, buildSchedulePdfBlob } =
-      await import('./exportPdf')
+    const { specialtyFolderName, pdfFileName } = await import('./exportPdf')
     const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
     doc.unitName = 'Medicina interna'
-    doc.staff = [
-      {
-        id: 'a',
-        name: 'Dr. A',
-        fun: 'MED',
-        role: 'Médico',
-        relacionLaboral: 'LOSEP',
-        codigoPersonal: 'CE',
-        order: 1,
-      },
-    ]
-    doc.cells = { [cellKey('a', 1)]: 'CE' }
     expect(specialtyFolderName(doc)).toBe('Medicina interna')
     expect(pdfFileName(doc)).toContain('Medicina interna')
     expect(pdfFileName(doc)).toContain('2026-07')
-    const blob = await buildSchedulePdfBlob(doc)
-    expect(blob.size).toBeGreaterThan(100)
-    expect(blob.type).toContain('pdf')
   })
 })

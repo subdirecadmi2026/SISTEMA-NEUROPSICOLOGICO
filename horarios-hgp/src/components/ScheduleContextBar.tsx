@@ -1,4 +1,4 @@
-import type { ScheduleDoc, ServiceType } from '../types'
+import type { ScheduleDoc } from '../types'
 import { MONTHS_ES } from '../types'
 import { SERVICE_LABEL } from '../data/templates'
 

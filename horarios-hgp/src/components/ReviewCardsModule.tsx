@@ -8,10 +8,12 @@ import {
   transitionStatus,
 } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
+import { notifyJefeScheduleValidated } from '../lib/notifications'
 import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
 import { runAllValidations } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
+import { SignatureGate } from './SignatureGate'
 
 type Mode = 'revisor' | 'validador'
 
@@ -47,6 +49,7 @@ export function ReviewCardsModule({
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [correction, setCorrection] = useState('')
   const [filter, setFilter] = useState('')
+  const [signNext, setSignNext] = useState<ScheduleDoc['status'] | null>(null)
 
   const pending = useMemo(() => {
     const st = targetStatus(mode)
@@ -95,18 +98,34 @@ export function ReviewCardsModule({
     return pending[idx + 1]?.id ?? pending[0]?.id ?? null
   }
 
-  function applyTransition(next: ScheduleDoc['status'], comment?: string) {
+  function applyTransition(
+    next: ScheduleDoc['status'],
+    opts?: { comment?: string; signedName?: string },
+  ) {
     if (!detail) return
     const currentId = detail.id
     const queue = pending.filter((p) => p.id !== currentId)
-    const res = transitionStatus(detail, next, user, { comment })
+    const res = transitionStatus(detail, next, user, opts)
     if (!res.ok) {
       onFlash(res.error)
       return
     }
+    if (next === 'ARCHIVADO') {
+      notifyJefeScheduleValidated(
+        res.doc,
+        opts?.signedName?.trim() || user.name,
+      )
+    }
     onChanged(res.doc)
-    onFlash(`Estado: ${STATUS_LABEL[next]}`)
+    onFlash(
+      next === 'APROBADO'
+        ? `Firmado y aprobado · ${opts?.signedName || user.name}`
+        : next === 'ARCHIVADO'
+          ? `Firmado y validado · aviso al jefe`
+          : `Estado: ${STATUS_LABEL[next]}`,
+    )
     setCorrection('')
+    setSignNext(null)
     onRefresh()
     if (queue.length > 0) {
       void openCard(queue[0].id)
@@ -129,6 +148,24 @@ export function ReviewCardsModule({
 
     return (
       <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
+        <SignatureGate
+          open={!!signNext}
+          title={
+            signNext === 'APROBADO'
+              ? 'Firmar y aprobar (Revisor)'
+              : 'Firmar y validar'
+          }
+          subtitle="Su firma quedará en el formato institucional del horario."
+          defaultName={user.name}
+          confirmLabel={
+            signNext === 'APROBADO' ? 'Firmar y aprobar' : 'Firmar y validar'
+          }
+          onCancel={() => setSignNext(null)}
+          onConfirm={(signedName) => {
+            if (!signNext) return
+            applyTransition(signNext, { signedName })
+          }}
+        />
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <button
@@ -185,14 +222,14 @@ export function ReviewCardsModule({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => applyTransition('APROBADO')}
+                onClick={() => setSignNext('APROBADO')}
                 className="rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-deep"
               >
-                Aprobar
+                Firmar y aprobar
               </button>
               <button
                 type="button"
-                onClick={() => applyTransition('BORRADOR', correction)}
+                onClick={() => applyTransition('BORRADOR', { comment: correction })}
                 className="rounded-xl border border-amber-700 bg-white px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-100"
               >
                 Devolver con comentario
@@ -205,14 +242,14 @@ export function ReviewCardsModule({
           <section className="mb-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 shadow-sm">
             <h2 className="font-display text-lg text-navy">Validar</h2>
             <p className="mb-3 text-sm text-muted">
-              Confirme la planilla y valide formalmente.
+              Firme y valide formalmente. Se avisará al jefe de servicio.
             </p>
             <button
               type="button"
-              onClick={() => applyTransition('ARCHIVADO')}
+              onClick={() => setSignNext('ARCHIVADO')}
               className="rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110"
             >
-              Validar horario
+              Firmar y validar
             </button>
           </section>
         )}
