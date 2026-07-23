@@ -32,15 +32,10 @@ import {
   clearStaffLibraryBucket,
   listStaffLibraryBuckets,
 } from '../lib/staffLibrary'
-import {
-  holidaysForYear,
-  loadCustomHolidays,
-  removeCustomHoliday,
-  saveCustomHoliday,
-} from '../lib/holidays'
 import { SchedulesHome } from './SchedulesHome'
 import { StaffManager } from './StaffManager'
 import { AdminClavesPanel } from './AdminClavesPanel'
+import { AdminFeriadosPanel } from './AdminFeriadosPanel'
 import { shiftsFor } from '../lib/shiftsStore'
 
 type TabId =
@@ -113,8 +108,6 @@ export function AdminWorkspace({
   const [staffUnit, setStaffUnit] = useState('')
   const [staffTick, setStaffTick] = useState(0)
   const [holidayYear, setHolidayYear] = useState(new Date().getFullYear())
-  const [holidayDate, setHolidayDate] = useState('')
-  const [holidayName, setHolidayName] = useState('')
 
   function refreshUsers() {
     setUsers(listManagedUsers())
@@ -721,13 +714,9 @@ export function AdminWorkspace({
       )}
 
       {tab === 'feriados' && (
-        <AdminHolidaysPanel
+        <AdminFeriadosPanel
           year={holidayYear}
           onYear={setHolidayYear}
-          date={holidayDate}
-          onDate={setHolidayDate}
-          name={holidayName}
-          onName={setHolidayName}
           onFlash={onFlash}
         />
       )}
@@ -735,103 +724,6 @@ export function AdminWorkspace({
   )
 }
 
-function AdminHolidaysPanel({
-  year,
-  onYear,
-  date,
-  onDate,
-  name,
-  onName,
-  onFlash,
-}: {
-  year: number
-  onYear: (y: number) => void
-  date: string
-  onDate: (d: string) => void
-  name: string
-  onName: (n: string) => void
-  onFlash: (msg: string) => void
-}) {
-  const [, setTick] = useState(0)
-  const all = holidaysForYear(year)
-  const custom = loadCustomHolidays(year)
-
-  return (
-    <section className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="font-display text-lg text-navy">Feriados</h2>
-        <input
-          type="number"
-          className="w-24 rounded-xl border border-line px-2 py-1.5 text-sm"
-          value={year}
-          onChange={(e) => onYear(Number(e.target.value) || year)}
-        />
-      </div>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <input
-          type="date"
-          className="rounded-xl border border-line px-3 py-2 text-sm"
-          value={date}
-          onChange={(e) => onDate(e.target.value)}
-        />
-        <input
-          className="min-w-[180px] flex-1 rounded-xl border border-line px-3 py-2 text-sm"
-          value={name}
-          onChange={(e) => onName(e.target.value)}
-          placeholder="Nombre del feriado"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            if (!date || !name.trim()) {
-              onFlash('Indique fecha y nombre')
-              return
-            }
-            saveCustomHoliday({ date, name: name.trim(), editable: true })
-            onDate('')
-            onName('')
-            setTick((n) => n + 1)
-            onFlash('Feriado guardado')
-          }}
-          className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white"
-        >
-          Agregar / reemplazar
-        </button>
-      </div>
-      <ul className="grid gap-1 sm:grid-cols-2">
-        {all.map((h) => {
-          const isCustom = custom.some((c) => c.date === h.date)
-          return (
-            <li
-              key={h.date}
-              className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5 text-sm"
-            >
-              <span>
-                <strong>{h.date}</strong> · {h.name}
-                {isCustom ? (
-                  <span className="ml-1 text-xs text-teal">(custom)</span>
-                ) : null}
-              </span>
-              {isCustom ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    removeCustomHoliday(h.date)
-                    setTick((n) => n + 1)
-                    onFlash('Feriado custom eliminado')
-                  }}
-                  className="text-xs font-semibold text-rose-800 underline"
-                >
-                  Quitar
-                </button>
-              ) : null}
-            </li>
-          )
-        })}
-      </ul>
-    </section>
-  )
-}
 
 export async function adminReopenDoc(
   doc: ScheduleDoc,

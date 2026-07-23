@@ -4,9 +4,12 @@ export type Holiday = {
   date: string // YYYY-MM-DD
   name: string
   editable?: boolean
+  /** Origen: nacional (base) o creado/editado por admin. */
+  source?: 'nacional' | 'custom'
 }
 
 const CUSTOM_KEY = 'hgp-feriados-custom-v1'
+const SUPPRESSED_KEY = 'hgp-feriados-suppressed-v1'
 
 function easterSunday(year: number): Date {
   // Algoritmo de Meeus/Jones/Butcher
@@ -40,6 +43,34 @@ function addDays(d: Date, n: number): Date {
   return x
 }
 
+function readAllCustom(): Holiday[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as Holiday[]
+  } catch {
+    return []
+  }
+}
+
+function writeAllCustom(all: Holiday[]) {
+  localStorage.setItem(CUSTOM_KEY, JSON.stringify(all))
+}
+
+function readSuppressed(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SUPPRESSED_KEY)
+    if (!raw) return new Set()
+    return new Set(JSON.parse(raw) as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+function writeSuppressed(ids: Set<string>) {
+  localStorage.setItem(SUPPRESSED_KEY, JSON.stringify([...ids]))
+}
+
 /** Feriados fijos + móviles (Carnaval, Viernes Santo) para un año. */
 export function ecuadorHolidays(year: number): Holiday[] {
   const easter = easterSunday(year)
@@ -62,47 +93,128 @@ export function ecuadorHolidays(year: number): Holiday[] {
     ...fixed.map(([m, d, name]) => ({
       date: `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
       name,
+      source: 'nacional' as const,
     })),
-    { date: iso(carnivalMon), name: 'Carnaval' },
-    { date: iso(carnivalTue), name: 'Carnaval' },
-    { date: iso(goodFriday), name: 'Viernes Santo' },
+    { date: iso(carnivalMon), name: 'Carnaval', source: 'nacional' },
+    { date: iso(carnivalTue), name: 'Carnaval', source: 'nacional' },
+    { date: iso(goodFriday), name: 'Viernes Santo', source: 'nacional' },
   ]
 
   return list.sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export function loadCustomHolidays(year: number): Holiday[] {
-  try {
-    const raw = localStorage.getItem(CUSTOM_KEY)
-    if (!raw) return []
-    const all = JSON.parse(raw) as Holiday[]
-    return all.filter((h) => h.date.startsWith(`${year}-`))
-  } catch {
-    return []
+  return readAllCustom()
+    .filter((h) => h.date.startsWith(`${year}-`))
+    .map((h) => ({ ...h, editable: true, source: 'custom' as const }))
+}
+
+/** Crea o actualiza un feriado custom en esa fecha. */
+export function saveCustomHoliday(holiday: Holiday) {
+  const date = holiday.date.trim()
+  const name = holiday.name.trim()
+  if (!date || !name) throw new Error('Indique fecha y nombre del feriado')
+  const all = readAllCustom().filter((h) => h.date !== date)
+  all.push({ date, name, editable: true, source: 'custom' })
+  writeAllCustom(all)
+  // Si estaba oculto, al crearlo de nuevo lo restauramos
+  const suppressed = readSuppressed()
+  if (suppressed.delete(date)) writeSuppressed(suppressed)
+}
+
+/**
+ * Actualiza un feriado (permite cambiar fecha y nombre).
+ * `previousDate` = fecha original si se está editando.
+ */
+export function updateHoliday(
+  previousDate: string | null,
+  holiday: Holiday,
+): void {
+  const date = holiday.date.trim()
+  const name = holiday.name.trim()
+  if (!date || !name) throw new Error('Indique fecha y nombre del feriado')
+
+  let all = readAllCustom()
+  if (previousDate) {
+    all = all.filter((h) => h.date !== previousDate)
+    const suppressed = readSuppressed()
+    // Si era nacional y cambió de fecha, ocultar la fecha original
+    const wasNational = ecuadorHolidays(Number(previousDate.slice(0, 4))).some(
+      (h) => h.date === previousDate,
+    )
+    if (wasNational && previousDate !== date) {
+      suppressed.add(previousDate)
+      writeSuppressed(suppressed)
+    } else if (suppressed.has(previousDate) && previousDate === date) {
+      suppressed.delete(previousDate)
+      writeSuppressed(suppressed)
+    }
+  }
+
+  // Evitar choque con otra custom distinta
+  all = all.filter((h) => h.date !== date)
+  all.push({ date, name, editable: true, source: 'custom' })
+  writeAllCustom(all)
+
+  const suppressed = readSuppressed()
+  if (suppressed.delete(date)) writeSuppressed(suppressed)
+}
+
+/**
+ * Elimina un feriado:
+ * - custom → se borra del almacenamiento
+ * - nacional → se marca como oculto (suppressed)
+ */
+export function deleteHoliday(date: string): void {
+  const all = readAllCustom().filter((h) => h.date !== date)
+  writeAllCustom(all)
+
+  const year = Number(date.slice(0, 4))
+  const isNational = ecuadorHolidays(year).some((h) => h.date === date)
+  if (isNational) {
+    const suppressed = readSuppressed()
+    suppressed.add(date)
+    writeSuppressed(suppressed)
   }
 }
 
-export function saveCustomHoliday(holiday: Holiday) {
-  const raw = localStorage.getItem(CUSTOM_KEY)
-  const all: Holiday[] = raw ? (JSON.parse(raw) as Holiday[]) : []
-  const next = all.filter((h) => h.date !== holiday.date)
-  next.push({ ...holiday, editable: true })
-  localStorage.setItem(CUSTOM_KEY, JSON.stringify(next))
+/** Alias legado. */
+export function removeCustomHoliday(date: string) {
+  deleteHoliday(date)
 }
 
-export function removeCustomHoliday(date: string) {
-  const raw = localStorage.getItem(CUSTOM_KEY)
-  if (!raw) return
-  const all = (JSON.parse(raw) as Holiday[]).filter((h) => h.date !== date)
-  localStorage.setItem(CUSTOM_KEY, JSON.stringify(all))
+/** Restaura feriados nacionales ocultos y limpia custom del año (opcional). */
+export function restoreNationalHolidays(year?: number) {
+  if (year == null) {
+    localStorage.removeItem(SUPPRESSED_KEY)
+    return
+  }
+  const prefix = `${year}-`
+  const suppressed = readSuppressed()
+  for (const d of [...suppressed]) {
+    if (d.startsWith(prefix)) suppressed.delete(d)
+  }
+  writeSuppressed(suppressed)
+}
+
+export function clearCustomHolidays(year?: number) {
+  if (year == null) {
+    localStorage.removeItem(CUSTOM_KEY)
+    return
+  }
+  const prefix = `${year}-`
+  writeAllCustom(readAllCustom().filter((h) => !h.date.startsWith(prefix)))
 }
 
 export function holidaysForYear(year: number): Holiday[] {
-  const base = ecuadorHolidays(year)
+  const suppressed = readSuppressed()
+  const base = ecuadorHolidays(year).filter((h) => !suppressed.has(h.date))
   const custom = loadCustomHolidays(year)
   const map = new Map<string, Holiday>()
-  for (const h of base) map.set(h.date, h)
-  for (const h of custom) map.set(h.date, h)
+  for (const h of base) map.set(h.date, { ...h, source: 'nacional' })
+  for (const h of custom) {
+    map.set(h.date, { ...h, editable: true, source: 'custom' })
+  }
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
