@@ -18,6 +18,7 @@ function toIndexItem(doc: ScheduleDoc): SavedIndexItem {
     year: doc.year,
     updatedAt: doc.updatedAt,
     status: doc.status,
+    hasOpenCorrections: (doc.reviewComments ?? []).some((c) => !c.resolved),
   }
 }
 

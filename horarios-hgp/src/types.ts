@@ -183,6 +183,8 @@ export type SavedIndexItem = {
   year: number
   updatedAt: string
   status?: ScheduleStatus
+  /** Hay comentarios de corrección del revisor sin atender */
+  hasOpenCorrections?: boolean
 }
 
 export function uid(prefix: string): string {

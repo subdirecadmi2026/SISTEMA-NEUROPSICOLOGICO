@@ -63,10 +63,10 @@ También: resaltar vacíos, modo compacto, ir a un día, reemplazar clave.
 
 ## 7. Guardar y enviar (flujo de roles)
 1. **Jefe** elabora → **Guardar** → **Enviar a revisión**
-2. **Revisor** entra y usa su **bandeja** → abre el pendiente → **Aprobar** *o* **Devolver con comentario**
-3. Si hay corrección: el jefe ajusta y vuelve a enviar
-4. **Validador** entra a su **bandeja** → **Validar horario** (queda bloqueado)
-5. **Exportar Excel / CSV** o **Imprimir / PDF** (1 hoja A4 horizontal)
+2. **Revisor** ve solo **tarjetas** → abre una → aprueba o deja comentario → pasa al siguiente
+3. Si hay corrección: el jefe ve el aviso rojo al abrir el horario, corrige y reenvía
+4. **Validador** ve solo **tarjetas** → abre una → **Validar**
+5. **Exportar Excel / CSV** o **Imprimir / PDF** (jefe)
 
 ## Claves frecuentes (Enfermería)
 | Clave | Horario | Horas |

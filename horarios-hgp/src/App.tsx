@@ -70,6 +70,7 @@ import {
   ReviewCardsModule,
   workspaceModeFor,
 } from './components/ReviewCardsModule'
+import { CorrectionsAlert } from './components/CorrectionsAlert'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -564,6 +565,17 @@ export default function App() {
       <RoleModeBanner user={user} doc={doc} canEdit={!readOnly} />
 
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
+        <CorrectionsAlert
+          doc={doc}
+          user={user}
+          canResolve={!readOnly}
+          onChange={(d) => {
+            setDoc(d)
+            setDirty(true)
+          }}
+          onFlash={flash}
+        />
+
         {/* Checklist operativo */}
         <section className="no-print mb-4 rounded-2xl border border-line bg-white/90 p-4 shadow-sm">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">

@@ -48,6 +48,7 @@ export function listSavedSchedules(): SavedIndexItem[] {
       year: d.year,
       updatedAt: d.updatedAt,
       status: d.status,
+      hasOpenCorrections: (d.reviewComments ?? []).some((c) => !c.resolved),
     }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }

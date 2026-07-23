@@ -174,6 +174,11 @@ export function SchedulesHome({
                     >
                       {s.status ? STATUS_LABEL[s.status] : '—'}
                     </span>
+                    {s.hasOpenCorrections && (
+                      <span className="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-900">
+                        Corrección
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted">
                     {new Date(s.updatedAt).toLocaleString('es-EC')}
