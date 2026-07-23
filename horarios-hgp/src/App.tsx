@@ -65,7 +65,11 @@ import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { ToolsToolbar } from './components/ToolsToolbar'
 import { SubmissionChecklist } from './components/SubmissionChecklist'
 import { RoleModeBanner } from './components/RoleModeBanner'
-import { RoleInbox, countPendingForRole } from './components/RoleInbox'
+import { countPendingForRole } from './components/RoleInbox'
+import {
+  ReviewCardsModule,
+  workspaceModeFor,
+} from './components/ReviewCardsModule'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -142,6 +146,7 @@ export default function App() {
     return saved.filter((s) => user.serviceUnits.includes(s.unitName))
   })()
   const pendingCount = countPendingForRole(user, visibleSaved)
+  const workspace = workspaceModeFor(user)
   const namedStaff = doc.staff.filter((s) => s.name.trim().length > 0).length
   const emptySlots = doc.staff.length - namedStaff
   const staffOk = namedStaff >= 1
@@ -436,8 +441,13 @@ export default function App() {
                 Hospital General Puyo
               </p>
               <p className="text-xs text-white/70">
-                Sistema de horarios · Claves oficiales · MSP Ecuador
-                {isRemoteEnabled() ? ' · Supabase' : ' · Local'}
+                {workspace === 'revisor'
+                  ? 'Módulo de revisión · solo visualización'
+                  : workspace === 'validador'
+                    ? 'Módulo de validación · solo visualización'
+                    : workspace === 'login'
+                      ? 'Entre con su perfil para continuar'
+                      : `Sistema de horarios · MSP Ecuador${isRemoteEnabled() ? ' · Supabase' : ' · Local'}`}
               </p>
             </div>
           </div>
@@ -451,7 +461,7 @@ export default function App() {
                 const n = countPendingForRole(u, saved)
                 flash(
                   n > 0
-                    ? `Sesión: ${u.name} · ${n} pendiente(s) en bandeja`
+                    ? `Sesión: ${u.name} · ${n} pendiente(s)`
                     : `Sesión: ${u.name}`,
                 )
               }}
@@ -462,7 +472,7 @@ export default function App() {
                 flash('Sesión cerrada')
               }}
             />
-            {canCreate && (
+            {workspace === 'editor' && canCreate && (
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
@@ -471,7 +481,7 @@ export default function App() {
                 + Crear horario
               </button>
             )}
-            {(!user || isJefeRole(user.role)) && (
+            {workspace === 'editor' && (
               <button
                 type="button"
                 disabled={saving || readOnly}
@@ -481,31 +491,34 @@ export default function App() {
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => {
-                setTab('imprimir')
-                // Esperar montaje/escala de la planilla a 1 hoja
-                window.setTimeout(() => window.print(), 180)
-              }}
-              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-            >
-              Imprimir / PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleExport()}
-              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-            >
-              Exportar Excel
-            </button>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
-            >
-              Exportar CSV
-            </button>
+            {workspace === 'editor' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab('imprimir')
+                    window.setTimeout(() => window.print(), 180)
+                  }}
+                  className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                >
+                  Imprimir / PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExport()}
+                  className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                >
+                  Exportar Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+                >
+                  Exportar CSV
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -516,6 +529,38 @@ export default function App() {
         </div>
       )}
 
+      {workspace === 'login' && (
+        <main className="mx-auto max-w-lg px-4 py-16 text-center">
+          <h1 className="font-display text-3xl text-navy">Horarios HGP</h1>
+          <p className="mt-2 text-muted">
+            Elija su perfil arriba: <strong>Jefe</strong> elabora horarios
+            médicos, <strong>Revisor</strong> aprueba o comenta,{' '}
+            <strong>Validador</strong> valida.
+          </p>
+        </main>
+      )}
+
+      {(workspace === 'revisor' || workspace === 'validador') && user && (
+        <ReviewCardsModule
+          mode={workspace}
+          user={user}
+          items={saved}
+          loading={listLoading}
+          onRefresh={() => void refreshList()}
+          onFlash={flash}
+          onChanged={(d) => {
+            void persistSchedule(d, user)
+              .then(() => refreshList())
+              .catch(() => {
+                saveSchedule(d)
+                void refreshList()
+              })
+          }}
+        />
+      )}
+
+      {workspace === 'editor' && (
+        <>
       <RoleModeBanner user={user} doc={doc} canEdit={!readOnly} />
 
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
@@ -1071,21 +1116,6 @@ export default function App() {
           </>
         )}
 
-        <RoleInbox
-          user={user}
-          items={visibleSaved}
-          currentId={doc.id}
-          onOpen={(id) => {
-            void handleLoad(id).then(() => {
-              window.setTimeout(() => {
-                document
-                  .getElementById('flujo-aprobacion')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }, 180)
-            })
-          }}
-        />
-
         <SchedulesHome
           items={visibleSaved}
           remote={isRemoteEnabled()}
@@ -1093,24 +1123,10 @@ export default function App() {
           canCreate={canCreate}
           canDelete={canDeleteSaved}
           defaultStatus={listDefaultStatus}
-          title={
-            user && isRevisorRole(user.role) && user.role !== 'admin'
-              ? 'Horarios por revisar'
-              : user && isValidadorRole(user.role) && user.role !== 'admin'
-                ? 'Horarios por validar'
-                : 'Mis horarios'
-          }
+          title="Mis horarios"
           onCreate={() => setShowCreate(true)}
           onRefresh={() => void refreshList()}
-          onOpen={(id) => {
-            void handleLoad(id).then(() => {
-              window.setTimeout(() => {
-                document
-                  .getElementById('flujo-aprobacion')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }, 180)
-            })
-          }}
+          onOpen={(id) => void handleLoad(id)}
           onDelete={(id) => void handleDeleteSaved(id)}
         />
 
@@ -1129,7 +1145,7 @@ export default function App() {
           onFlash={flash}
         />
 
-        {(!user || isJefeRole(user.role)) && doc.status === 'BORRADOR' && (
+        {doc.status === 'BORRADOR' && (
           <SubmissionChecklist
             doc={doc}
             onGoFix={(hint) => {
@@ -1350,9 +1366,11 @@ export default function App() {
           · IMPRIMIR
         </p>
       </main>
+        </>
+      )}
 
       <CreateScheduleWizard
-        open={showCreate && canCreate}
+        open={showCreate && canCreate && workspace === 'editor'}
         defaultMonth={doc.month}
         defaultYear={doc.year}
         onClose={() => setShowCreate(false)}

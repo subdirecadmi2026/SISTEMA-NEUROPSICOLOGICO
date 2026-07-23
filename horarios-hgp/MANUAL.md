@@ -1,12 +1,12 @@
 # Manual corto — Jefes de servicio (HGP)
 
 ## Roles
-| Rol | Qué puede hacer |
-|-----|-----------------|
-| **Jefe de servicio** | Crear y editar horarios (borrador), enviar a revisión |
-| **Revisor** | Solo visualiza; **aprobar** o **devolver con comentario** de corrección |
-| **Validador** | Validar formalmente el horario ya aprobado |
-| **Admin** | Todo + reabrir horarios cerrados |
+| Rol | Qué ve |
+|-----|--------|
+| **Jefe (médico)** | Sistema completo: crear, pintar, personal, enviar |
+| **Revisor** | Solo módulo de **tarjetas**: abrir uno, ver grilla, aprobar o comentar |
+| **Validador** | Solo módulo de **tarjetas**: abrir uno y validar |
+| **Admin** | Sistema completo + reabrir |
 
 ## 1. Abrir el sistema
 Entre con su usuario (selector «Entrar como»). Use **Jefe** para elaborar.

@@ -695,3 +695,37 @@ describe('bandeja por rol', () => {
     expect(countPendingForRole(jefe, items)).toBe(1)
   })
 })
+
+describe('workspace por rol', () => {
+  it('revisor y validador van a módulo de tarjetas; jefe a editor', async () => {
+    const { workspaceModeFor } = await import('../components/ReviewCardsModule')
+    expect(
+      workspaceModeFor({
+        id: '1',
+        email: 'a',
+        name: 'J',
+        role: 'lider_servicio',
+        serviceUnits: [],
+      }),
+    ).toBe('editor')
+    expect(
+      workspaceModeFor({
+        id: '2',
+        email: 'b',
+        name: 'R',
+        role: 'revisor',
+        serviceUnits: [],
+      }),
+    ).toBe('revisor')
+    expect(
+      workspaceModeFor({
+        id: '3',
+        email: 'c',
+        name: 'V',
+        role: 'validador',
+        serviceUnits: [],
+      }),
+    ).toBe('validador')
+    expect(workspaceModeFor(null)).toBe('login')
+  })
+})
