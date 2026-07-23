@@ -46,7 +46,7 @@ export function addNotification(
   return n
 }
 
-/** Aviso al jefe cuando el validador firma y aprueba. */
+/** Aviso al jefe cuando el validador firma y valida. */
 export function notifyJefeScheduleValidated(
   doc: ScheduleDoc,
   validatorName: string,
@@ -56,8 +56,25 @@ export function notifyJefeScheduleValidated(
     toRole: 'lider_servicio',
     unitName: doc.unitName,
     scheduleId: doc.id,
-    title: 'Horario aprobado',
-    body: `Su horario de ${doc.unitName} (${period}) fue firmado y aprobado por el validador ${validatorName}.`,
+    title: 'Horario validado',
+    body: `Su horario de ${doc.unitName} (${period}) fue firmado y validado por ${validatorName}. Ya puede consultarlo en archivo.`,
+  })
+}
+
+/** Aviso al jefe cuando el revisor devuelve con corrección. */
+export function notifyJefeScheduleReturned(
+  doc: ScheduleDoc,
+  reviewerName: string,
+  comment: string,
+): HgpNotification {
+  const period = `${MONTHS_ES[doc.month - 1]} ${doc.year}`
+  const short = comment.trim().slice(0, 160)
+  return addNotification({
+    toRole: 'lider_servicio',
+    unitName: doc.unitName,
+    scheduleId: doc.id,
+    title: 'Corrección solicitada',
+    body: `El revisor ${reviewerName} devolvió el horario de ${doc.unitName} (${period}): «${short}»`,
   })
 }
 

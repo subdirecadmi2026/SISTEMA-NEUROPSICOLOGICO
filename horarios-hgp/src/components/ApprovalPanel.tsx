@@ -10,7 +10,7 @@ import {
   resolveReviewComments,
 } from '../lib/auth'
 import { runAllValidations } from '../lib/validation'
-import { notifyJefeScheduleValidated } from '../lib/notifications'
+import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/notifications'
 import { SignatureGate } from './SignatureGate'
 import { slotForStatus } from '../lib/firmaEc'
 
@@ -103,6 +103,10 @@ export function ApprovalPanel({
         res.doc,
         opts?.signedName?.trim() || user.name,
       )
+      onNotify?.()
+    }
+    if (next === 'BORRADOR' && opts?.comment?.trim()) {
+      notifyJefeScheduleReturned(res.doc, user.name, opts.comment.trim())
       onNotify?.()
     }
     const elec = opts?.electronic ? ' (FirmaEC)' : ''
@@ -267,8 +271,14 @@ export function ApprovalPanel({
           />
           <button
             type="button"
+            disabled={correction.trim().length < 5}
             onClick={() => go('BORRADOR', { comment: correction })}
-            className="rounded-lg border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+            className="rounded-lg border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+            title={
+              correction.trim().length < 5
+                ? 'Escriba un comentario de al menos 5 caracteres'
+                : undefined
+            }
           >
             Devolver con comentario
           </button>

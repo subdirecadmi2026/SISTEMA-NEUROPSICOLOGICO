@@ -154,13 +154,17 @@ export function SignatureGate({
                 onChange={(e) => setUseElectronic(e.target.checked)}
               />
               <span>
-                <strong>¿Firmar electrónicamente?</strong>
+                <strong>
+                  {hasCert
+                    ? '¿Firmar con certificado FirmaEC (.p12)?'
+                    : '¿Estampar imagen de firma?'}
+                </strong>
                 <br />
                 <span className="text-xs text-muted">
                   {hasCert
-                    ? `Certificado: ${certCn || 'cargado'}`
-                    : 'Imagen de firma cargada'}
-                  {' · '}se estampa en la casilla del {slotLabel(slot)}.
+                    ? `Certificado: ${certCn || 'cargado'}${hasImage ? ' + imagen' : ''}`
+                    : 'Solo imagen (no es firma criptográfica FirmaEC)'}
+                  {' · '}casilla {slotLabel(slot)}.
                 </span>
               </span>
             </label>
@@ -209,7 +213,9 @@ export function SignatureGate({
           <span>
             Confirmo que firmo este horario bajo mi responsabilidad
             {useElectronic
-              ? ' con mi certificado de firma electrónica.'
+              ? hasCert
+                ? ' con mi certificado de firma electrónica.'
+                : ' estampando mi imagen de firma (no criptográfica).'
               : ' y que los datos son correctos.'}
           </span>
         </label>

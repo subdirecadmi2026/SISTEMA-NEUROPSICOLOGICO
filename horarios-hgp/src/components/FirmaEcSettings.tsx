@@ -3,9 +3,11 @@ import type { AppUser } from '../types'
 import {
   clearFirmaEcVault,
   clearSignatureImage,
+  certificateDaysLeft,
   getSignatureImage,
   getStoredCertMeta,
   hasStoredCertificate,
+  isCertificateExpired,
   loadFirmaEcConfig,
   saveCertificateForUser,
   saveFirmaEcConfig,
@@ -160,6 +162,25 @@ export function FirmaEcSettings({ user, onFlash }: Props) {
                       ? ' · sin clave privada detectada'
                       : ''}
                   </p>
+                  {meta.notAfter && (
+                    <p
+                      className={`mt-1 text-xs font-semibold ${
+                        isCertificateExpired(meta)
+                          ? 'text-rose-800'
+                          : (certificateDaysLeft(meta) ?? 99) <= 30
+                            ? 'text-amber-800'
+                            : 'text-muted'
+                      }`}
+                    >
+                      {isCertificateExpired(meta)
+                        ? `Vencido desde ${new Date(meta.notAfter).toLocaleDateString('es-EC')}`
+                        : `Vigente hasta ${new Date(meta.notAfter).toLocaleDateString('es-EC')}${
+                            (certificateDaysLeft(meta) ?? 999) <= 30
+                              ? ` · quedan ${certificateDaysLeft(meta)} día(s)`
+                              : ''
+                          }`}
+                    </p>
+                  )}
                 </div>
               )}
 

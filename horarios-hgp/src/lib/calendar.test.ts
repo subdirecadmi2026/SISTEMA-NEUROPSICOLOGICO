@@ -713,6 +713,7 @@ describe('notificación al jefe al validar', () => {
   it('crea aviso para lider_servicio', async () => {
     const {
       notifyJefeScheduleValidated,
+      notifyJefeScheduleReturned,
       listNotificationsFor,
     } = await import('./notifications')
     const { DEMO_USERS } = await import('./auth')
@@ -721,8 +722,15 @@ describe('notificación al jefe al validar', () => {
     doc.unitName = 'Medicina interna'
     notifyJefeScheduleValidated(doc, 'Ing. Patricia Vega')
     const list = listNotificationsFor(jefe)
+    expect(list.some((n) => n.title === 'Horario validado')).toBe(true)
     expect(list.some((n) => n.body.includes('Medicina interna'))).toBe(true)
     expect(list.some((n) => !n.read)).toBe(true)
+
+    doc.unitName = 'Pediatría'
+    notifyJefeScheduleReturned(doc, 'Dra. María Solís', 'Falta cobertura día 10')
+    const list2 = listNotificationsFor(jefe)
+    expect(list2.some((n) => n.title === 'Corrección solicitada')).toBe(true)
+    expect(list2.some((n) => n.body.includes('Pediatría'))).toBe(true)
   })
 })
 

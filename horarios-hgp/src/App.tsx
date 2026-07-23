@@ -209,23 +209,39 @@ export default function App() {
   useEffect(() => {
     if (!dirty || readOnly) return
     const t = window.setTimeout(() => {
-      try {
-        const savedDoc = saveSchedule(docRefApp.current)
-        setDoc(savedDoc)
-        setDirty(false)
-        setAutoSavedAt(
-          new Date().toLocaleTimeString('es-EC', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
-        )
-      } catch {
-        /* silencioso */
-      }
+      const current = docRefApp.current
+      void (async () => {
+        try {
+          const savedDoc = await persistSchedule(current, user)
+          setDoc(savedDoc)
+          setDirty(false)
+          setAutoSavedAt(
+            new Date().toLocaleTimeString('es-EC', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            }),
+          )
+        } catch {
+          try {
+            const local = saveSchedule(current)
+            setDoc(local)
+            setDirty(false)
+            setAutoSavedAt(
+              new Date().toLocaleTimeString('es-EC', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              }),
+            )
+          } catch {
+            /* silencioso */
+          }
+        }
+      })()
     }, 12000)
     return () => window.clearTimeout(t)
-  }, [dirty, doc, readOnly])
+  }, [dirty, doc, readOnly, user])
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -503,7 +519,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setTab('imprimir')
-                    window.setTimeout(() => window.print(), 180)
+                    window.setTimeout(() => window.print(), 450)
                   }}
                   className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
                 >
@@ -554,6 +570,7 @@ export default function App() {
           loading={listLoading}
           onRefresh={() => void refreshList()}
           onFlash={flash}
+          onNotify={bumpNotifications}
           onChanged={(d) => {
             void persistSchedule(d, user)
               .then(() => refreshList())

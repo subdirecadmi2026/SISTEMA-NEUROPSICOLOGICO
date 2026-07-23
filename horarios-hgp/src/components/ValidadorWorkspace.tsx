@@ -21,6 +21,7 @@ import {
   downloadPdfDirect,
 } from '../lib/archiveFolder'
 import { SignatureGate } from './SignatureGate'
+import { InstitutionalPreview } from './InstitutionalPreview'
 
 type Props = {
   user: AppUser
@@ -220,15 +221,22 @@ export function ValidadorWorkspace({
     }
   }
 
+  function nextPendingId(afterId: string): string | null {
+    const idx = pending.findIndex((p) => p.id === afterId)
+    if (idx < 0) return pending[0]?.id ?? null
+    return pending[idx + 1]?.id ?? pending[0]?.id ?? null
+  }
+
   // ——— Detalle ———
   if (detail) {
     const canValidate = detail.status === 'APROBADO'
+    const others = pending.filter((p) => p.id !== detail.id).length
     return (
       <div className="mx-auto max-w-[1400px] px-3 py-4 sm:px-6 sm:py-6">
         <SignatureGate
           open={signOpen}
           title="Firmar y validar horario"
-          subtitle="Puede firmar electrónicamente con FirmaEC (.p12). Se genera el PDF institucional y se notifica al jefe."
+          subtitle="Puede firmar con certificado FirmaEC (.p12) o imagen. Se genera el PDF institucional y se notifica al jefe."
           defaultName={user.name}
           confirmLabel="Firmar, validar y archivar PDF"
           slot="validador"
@@ -258,11 +266,26 @@ export function ValidadorWorkspace({
               {SERVICE_LABEL[detail.serviceType]} ·{' '}
               {MONTHS_ES[detail.month - 1]} {detail.year} ·{' '}
               <strong>{STATUS_LABEL[detail.status]}</strong>
+              {detail.jefeServicio ? ` · Jefe: ${detail.jefeServicio}` : ''}
             </p>
           </div>
-          <span className="rounded-full bg-sand px-3 py-1 text-xs font-semibold text-muted">
-            {roleLabel(user.role)} · solo lectura
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-sand px-3 py-1 text-xs font-semibold text-muted">
+              {roleLabel(user.role)} · solo lectura
+            </span>
+            {others > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const nxt = nextPendingId(detail.id)
+                  if (nxt) void openCard(nxt)
+                }}
+                className="rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-semibold text-navy hover:bg-sand"
+              >
+                Siguiente pendiente →
+              </button>
+            )}
+          </div>
         </div>
 
         {canValidate && (
@@ -285,7 +308,7 @@ export function ValidadorWorkspace({
               ) : (
                 <> (se pedirá la carpeta raíz del archivo)</>
               )}
-              . El jefe de servicio recibirá un aviso de horario aprobado.
+              . El jefe de servicio recibirá un aviso de horario validado.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -323,6 +346,7 @@ export function ValidadorWorkspace({
         )}
 
         <MonthSummary doc={detail} />
+        <InstitutionalPreview doc={detail} onFlash={onFlash} />
         <div className="mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
           <div className="border-b border-line bg-sand/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted">
             Planilla (solo visualización)

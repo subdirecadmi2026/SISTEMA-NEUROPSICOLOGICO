@@ -182,6 +182,19 @@ export function hasStoredCertificate(userId: string): boolean {
   return !!getStoredCertMeta(userId)
 }
 
+/** true si el certificado está vencido (según notAfter). */
+export function isCertificateExpired(meta: FirmaEcCertMeta | null): boolean {
+  if (!meta?.notAfter) return false
+  return new Date(meta.notAfter).getTime() < Date.now()
+}
+
+/** Días restantes de vigencia (negativo = vencido). */
+export function certificateDaysLeft(meta: FirmaEcCertMeta | null): number | null {
+  if (!meta?.notAfter) return null
+  const ms = new Date(meta.notAfter).getTime() - Date.now()
+  return Math.ceil(ms / (1000 * 60 * 60 * 24))
+}
+
 export function getSignatureImage(userId: string): string | null {
   try {
     return localStorage.getItem(imgKey(userId))
@@ -490,6 +503,11 @@ export async function signWithStoredCertificate(
   }
 
   const parsed = parsePkcs12(bytes, password)
+  if (parsed.notAfter && new Date(parsed.notAfter).getTime() < Date.now()) {
+    throw new Error(
+      `El certificado está vencido (hasta ${new Date(parsed.notAfter).toLocaleDateString('es-EC')}). Renueve su firma electrónica.`,
+    )
+  }
   setSessionPassword(user.id, password)
   const signedAt = new Date().toISOString()
   return {

@@ -8,9 +8,10 @@ import {
   transitionStatus,
 } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
-import { notifyJefeScheduleValidated } from '../lib/notifications'
+import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/notifications'
 import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
+import { InstitutionalPreview } from './InstitutionalPreview'
 import { runAllValidations } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
 import { SignatureGate } from './SignatureGate'
@@ -26,6 +27,7 @@ type Props = {
   onRefresh: () => void
   onChanged: (doc: ScheduleDoc) => void
   onFlash: (msg: string) => void
+  onNotify?: () => void
 }
 
 function targetStatus(mode: Mode): ScheduleDoc['status'] {
@@ -44,6 +46,7 @@ export function ReviewCardsModule({
   onRefresh,
   onChanged,
   onFlash,
+  onNotify,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ScheduleDoc | null>(null)
@@ -120,6 +123,15 @@ export function ReviewCardsModule({
         res.doc,
         opts?.signedName?.trim() || user.name,
       )
+      onNotify?.()
+    }
+    if (next === 'BORRADOR' && opts?.comment?.trim()) {
+      notifyJefeScheduleReturned(
+        res.doc,
+        user.name,
+        opts.comment.trim(),
+      )
+      onNotify?.()
     }
     onChanged(res.doc)
     const elec = opts?.electronic ? ' (FirmaEC)' : ''
@@ -128,7 +140,9 @@ export function ReviewCardsModule({
         ? `Firmado y aprobado${elec} · ${opts?.signedName || user.name}`
         : next === 'ARCHIVADO'
           ? `Firmado y validado${elec} · aviso al jefe`
-          : `Estado: ${STATUS_LABEL[next]}`,
+          : next === 'BORRADOR'
+            ? 'Devuelto al jefe con comentario · aviso enviado'
+            : `Estado: ${STATUS_LABEL[next]}`,
     )
     setCorrection('')
     setSignNext(null)
@@ -244,8 +258,16 @@ export function ReviewCardsModule({
               </button>
               <button
                 type="button"
-                onClick={() => applyTransition('BORRADOR', { comment: correction })}
-                className="rounded-xl border border-amber-700 bg-white px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-100"
+                disabled={correction.trim().length < 5}
+                onClick={() =>
+                  applyTransition('BORRADOR', { comment: correction })
+                }
+                className="rounded-xl border border-amber-700 bg-white px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-40"
+                title={
+                  correction.trim().length < 5
+                    ? 'Escriba un comentario de al menos 5 caracteres'
+                    : undefined
+                }
               >
                 Devolver con comentario
               </button>
@@ -253,23 +275,8 @@ export function ReviewCardsModule({
           </section>
         )}
 
-        {mode === 'validador' && (
-          <section className="mb-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 shadow-sm">
-            <h2 className="font-display text-lg text-navy">Validar</h2>
-            <p className="mb-3 text-sm text-muted">
-              Firme y valide formalmente. Se avisará al jefe de servicio.
-            </p>
-            <button
-              type="button"
-              onClick={() => setSignNext('ARCHIVADO')}
-              className="rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110"
-            >
-              Firmar y validar
-            </button>
-          </section>
-        )}
-
         <MonthSummary doc={detail} />
+        <InstitutionalPreview doc={detail} onFlash={onFlash} />
 
         {errors > 0 && (
           <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
