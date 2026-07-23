@@ -64,6 +64,21 @@ export type ApprovalSignature = {
   cargo: string
   at: string
   userId?: string
+  /** true si se usó certificado FirmaEC (.p12) */
+  electronic?: boolean
+  subjectCn?: string
+  certSerial?: string
+}
+
+/** Registro de firma electrónica estampada en el horario. */
+export type ElectronicSignRecord = {
+  slot: 'jefe' | 'revisor' | 'validador'
+  subjectCn: string
+  serialNumber?: string
+  issuerCn?: string
+  signedAt: string
+  method: 'pkcs12_local' | 'firmaec_protocol'
+  stampText: string
 }
 
 export type AuditEntry = {
@@ -118,6 +133,8 @@ export type ScheduleDoc = {
   status: ScheduleStatus
   version: number
   signatures: ApprovalSignature[]
+  /** Firmas electrónicas (FirmaEC / PKCS#12) por casilla. */
+  electronicSigns?: ElectronicSignRecord[]
   audit: AuditEntry[]
   /** Comentarios de corrección del revisor (devolver a borrador). */
   reviewComments: ReviewComment[]

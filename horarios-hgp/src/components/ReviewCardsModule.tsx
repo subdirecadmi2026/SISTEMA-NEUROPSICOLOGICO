@@ -14,6 +14,7 @@ import { MonthSummary } from './MonthSummary'
 import { runAllValidations } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
 import { SignatureGate } from './SignatureGate'
+import { slotForStatus } from '../lib/firmaEc'
 
 type Mode = 'revisor' | 'validador'
 
@@ -100,7 +101,11 @@ export function ReviewCardsModule({
 
   function applyTransition(
     next: ScheduleDoc['status'],
-    opts?: { comment?: string; signedName?: string },
+    opts?: {
+      comment?: string
+      signedName?: string
+      electronic?: import('../types').ElectronicSignRecord
+    },
   ) {
     if (!detail) return
     const currentId = detail.id
@@ -117,11 +122,12 @@ export function ReviewCardsModule({
       )
     }
     onChanged(res.doc)
+    const elec = opts?.electronic ? ' (FirmaEC)' : ''
     onFlash(
       next === 'APROBADO'
-        ? `Firmado y aprobado · ${opts?.signedName || user.name}`
+        ? `Firmado y aprobado${elec} · ${opts?.signedName || user.name}`
         : next === 'ARCHIVADO'
-          ? `Firmado y validado · aviso al jefe`
+          ? `Firmado y validado${elec} · aviso al jefe`
           : `Estado: ${STATUS_LABEL[next]}`,
     )
     setCorrection('')
@@ -155,15 +161,24 @@ export function ReviewCardsModule({
               ? 'Firmar y aprobar (Revisor)'
               : 'Firmar y validar'
           }
-          subtitle="Su firma quedará en el formato institucional del horario."
+          subtitle="Puede firmar con nombre o electrónicamente con FirmaEC (.p12)."
           defaultName={user.name}
           confirmLabel={
             signNext === 'APROBADO' ? 'Firmar y aprobar' : 'Firmar y validar'
           }
+          slot={
+            signNext === 'APROBADO' || signNext === 'ARCHIVADO'
+              ? slotForStatus(signNext)
+              : 'revisor'
+          }
+          user={user}
           onCancel={() => setSignNext(null)}
-          onConfirm={(signedName) => {
+          onConfirm={(result) => {
             if (!signNext) return
-            applyTransition(signNext, { signedName })
+            applyTransition(signNext, {
+              signedName: result.signedName,
+              electronic: result.electronic,
+            })
           }}
         />
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

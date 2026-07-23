@@ -1,6 +1,7 @@
 import type {
   ApprovalSignature,
   AppUser,
+  ElectronicSignRecord,
   ReviewComment,
   ScheduleDoc,
   ScheduleStatus,
@@ -204,7 +205,12 @@ export function transitionStatus(
   doc: ScheduleDoc,
   next: ScheduleStatus,
   user: AppUser,
-  opts?: { cargo?: string; comment?: string; signedName?: string },
+  opts?: {
+    cargo?: string
+    comment?: string
+    signedName?: string
+    electronic?: ElectronicSignRecord
+  },
 ): { ok: true; doc: ScheduleDoc } | { ok: false; error: string } {
   const allowed: Record<ScheduleStatus, ScheduleStatus[]> = {
     BORRADOR: ['EN_REVISION'],
@@ -266,13 +272,21 @@ export function transitionStatus(
           ? 'validado'
           : 'revisado'
 
-  const signedName = (opts?.signedName?.trim() || user.name).trim()
+  const signedName = (
+    opts?.electronic?.subjectCn ||
+    opts?.signedName?.trim() ||
+    user.name
+  ).trim()
+  const stampText = opts?.electronic?.stampText
   const signature: ApprovalSignature = {
     role: sigRole,
     name: signedName,
     cargo: opts?.cargo ?? roleLabel(user.role),
-    at: new Date().toISOString(),
+    at: opts?.electronic?.signedAt ?? new Date().toISOString(),
     userId: user.id,
+    electronic: !!opts?.electronic,
+    subjectCn: opts?.electronic?.subjectCn,
+    certSerial: opts?.electronic?.serialNumber,
   }
 
   let updated: ScheduleDoc = {
@@ -280,12 +294,23 @@ export function transitionStatus(
     status: next,
     signatures: [...doc.signatures, signature],
     reviewComments: doc.reviewComments ?? [],
+    electronicSigns: [...(doc.electronicSigns ?? [])],
+  }
+
+  if (opts?.electronic) {
+    // Reemplaza firma electrónica previa del mismo slot
+    updated.electronicSigns = [
+      ...(updated.electronicSigns ?? []).filter(
+        (e) => e.slot !== opts.electronic!.slot,
+      ),
+      opts.electronic,
+    ]
   }
 
   if (next === 'EN_REVISION') {
     updated = {
       ...updated,
-      elaboradoPor: `${signedName} — ${signature.cargo}`,
+      elaboradoPor: stampText ?? `${signedName} — ${signature.cargo}`,
     }
     // Al reenviar, marcar correcciones previas como atendidas
     if ((updated.reviewComments ?? []).some((c) => !c.resolved)) {
@@ -300,17 +325,18 @@ export function transitionStatus(
   }
 
   if (next === 'APROBADO') {
+    const text = stampText ?? `${signedName} — ${signature.cargo}`
     updated = {
       ...updated,
-      aprobadoPor: `${signedName} — ${signature.cargo}`,
-      revisadoPor: `${signedName} — ${signature.cargo}`,
+      aprobadoPor: text,
+      revisadoPor: text,
     }
   }
 
   if (next === 'ARCHIVADO') {
     updated = {
       ...updated,
-      talentoHumano: `${signedName} — ${signature.cargo}`,
+      talentoHumano: stampText ?? `${signedName} — ${signature.cargo}`,
     }
   }
 

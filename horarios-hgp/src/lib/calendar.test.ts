@@ -726,6 +726,94 @@ describe('notificación al jefe al validar', () => {
   })
 })
 
+describe('FirmaEC PKCS#12 local', () => {
+  it('parsea certificado .p12 y formatea estampa', async () => {
+    const forge = (await import('node-forge')).default
+    const {
+      parsePkcs12,
+      formatElectronicStamp,
+      slotForStatus,
+    } = await import('./firmaEc')
+
+    const keys = forge.pki.rsa.generateKeyPair(1024)
+    const cert = forge.pki.createCertificate()
+    cert.publicKey = keys.publicKey
+    cert.serialNumber = '01'
+    cert.validity.notBefore = new Date()
+    cert.validity.notAfter = new Date()
+    cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear() + 1)
+    const attrs = [
+      { name: 'commonName', value: 'Dra. María Solís' },
+      { name: 'emailAddress', value: 'revisor@hgp.gob.ec' },
+    ]
+    cert.setSubject(attrs)
+    cert.setIssuer(attrs)
+    cert.sign(keys.privateKey, forge.md.sha256.create())
+
+    const p12Asn1 = forge.pkcs12.toPkcs12Asn1(
+      keys.privateKey,
+      [cert],
+      'clave123',
+      { algorithm: '3des' },
+    )
+    const der = forge.asn1.toDer(p12Asn1).getBytes()
+    const bytes = new Uint8Array(der.length)
+    for (let i = 0; i < der.length; i++) bytes[i] = der.charCodeAt(i)
+
+    const parsed = parsePkcs12(bytes, 'clave123')
+    expect(parsed.subjectCn).toContain('María Solís')
+    expect(slotForStatus('APROBADO')).toBe('revisor')
+
+    const stamp = formatElectronicStamp({
+      signedName: parsed.subjectCn,
+      slot: 'revisor',
+      subjectCn: parsed.subjectCn,
+      signedAt: '2026-07-23T12:00:00.000Z',
+      method: 'pkcs12_local',
+    })
+    expect(stamp).toContain('Firmado electrónicamente')
+    expect(stamp).toContain('María Solís')
+  })
+
+  it('transitionStatus estampa firma electrónica en casilla del validador', async () => {
+    const { transitionStatus, DEMO_USERS } = await import('./auth')
+    const validador = DEMO_USERS.find((u) => u.id === 'u-validador')!
+    const revisor = DEMO_USERS.find((u) => u.id === 'u-revisor')!
+    const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+
+    const sent = transitionStatus(
+      createBlankSchedule('medico', 2026, 10, { withDemo: false }),
+      'EN_REVISION',
+      jefe,
+    )
+    expect(sent.ok).toBe(true)
+    if (!sent.ok) return
+    let doc = sent.doc
+
+    const ap = transitionStatus(doc, 'APROBADO', revisor)
+    expect(ap.ok).toBe(true)
+    if (!ap.ok) return
+    doc = ap.doc
+
+    const validated = transitionStatus(doc, 'ARCHIVADO', validador, {
+      electronic: {
+        slot: 'validador',
+        subjectCn: 'Ing. Patricia Vega',
+        signedAt: new Date().toISOString(),
+        method: 'pkcs12_local',
+        stampText:
+          'Ing. Patricia Vega\nFirmado electrónicamente · FirmaEC\n23/7/2026',
+      },
+    })
+    expect(validated.ok).toBe(true)
+    if (!validated.ok) return
+    expect(validated.doc.talentoHumano).toContain('Firmado electrónicamente')
+    expect(
+      validated.doc.electronicSigns?.some((e) => e.slot === 'validador'),
+    ).toBe(true)
+  })
+})
+
 describe('bandeja por rol', () => {
   it('cuenta pendientes de revisor y validador', async () => {
     const { countPendingForRole } = await import('../components/RoleInbox')

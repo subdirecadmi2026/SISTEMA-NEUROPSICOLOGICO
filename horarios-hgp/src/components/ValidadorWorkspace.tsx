@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { AppUser, SavedIndexItem, ScheduleDoc } from '../types'
+import type { AppUser, ElectronicSignRecord, SavedIndexItem, ScheduleDoc } from '../types'
 import { MONTHS_ES, STATUS_LABEL } from '../types'
 import { roleLabel, transitionStatus } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
@@ -135,11 +135,18 @@ export function ValidadorWorkspace({
     }
   }
 
-  async function validateAndArchive(doc: ScheduleDoc, signedName: string) {
+  async function validateAndArchive(
+    doc: ScheduleDoc,
+    signedName: string,
+    electronic?: ElectronicSignRecord,
+  ) {
     setBusy(true)
     setSignOpen(false)
     try {
-      const res = transitionStatus(doc, 'ARCHIVADO', user, { signedName })
+      const res = transitionStatus(doc, 'ARCHIVADO', user, {
+        signedName,
+        electronic,
+      })
       if (!res.ok) {
         onFlash(res.error)
         return
@@ -157,10 +164,12 @@ export function ValidadorWorkspace({
         const saved = await savePdfInSpecialtyFolder(folder, file, blob)
         if (saved.mode === 'folder') {
           setRootHint(getArchiveRootHint())
-          onFlash(`Validado y firmado · PDF institucional en ${saved.path}`)
+          onFlash(
+            `Validado${electronic ? ' (FirmaEC)' : ''} · PDF institucional en ${saved.path}`,
+          )
         } else {
           onFlash(
-            `Validado y firmado · ZIP «${folder}» (use Chrome/Edge para carpeta en disco)`,
+            `Validado${electronic ? ' (FirmaEC)' : ''} · ZIP «${folder}» (use Chrome/Edge para carpeta en disco)`,
           )
         }
       } catch (e) {
@@ -219,12 +228,18 @@ export function ValidadorWorkspace({
         <SignatureGate
           open={signOpen}
           title="Firmar y validar horario"
-          subtitle="Se genera el PDF institucional (mismo formato de impresión) y se notifica al jefe de servicio."
+          subtitle="Puede firmar electrónicamente con FirmaEC (.p12). Se genera el PDF institucional y se notifica al jefe."
           defaultName={user.name}
           confirmLabel="Firmar, validar y archivar PDF"
+          slot="validador"
+          user={user}
           onCancel={() => setSignOpen(false)}
-          onConfirm={(signedName) => {
-            void validateAndArchive(detail, signedName)
+          onConfirm={(result) => {
+            void validateAndArchive(
+              detail,
+              result.signedName,
+              result.electronic,
+            )
           }}
         />
         <button

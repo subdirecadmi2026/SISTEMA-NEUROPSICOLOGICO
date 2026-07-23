@@ -10,6 +10,7 @@ function migrate(doc: ScheduleDoc): ScheduleDoc {
     status: doc.status ?? 'BORRADOR',
     version: doc.version ?? 1,
     signatures: doc.signatures ?? [],
+    electronicSigns: doc.electronicSigns ?? [],
     audit: doc.audit ?? [],
     reviewComments: doc.reviewComments ?? [],
     coverageRule: doc.coverageRule ?? {

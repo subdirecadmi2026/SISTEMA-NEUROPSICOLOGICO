@@ -28,6 +28,7 @@ function migratePayload(raw: ScheduleDoc): ScheduleDoc {
     status: raw.status ?? 'BORRADOR',
     version: raw.version ?? 1,
     signatures: raw.signatures ?? [],
+    electronicSigns: raw.electronicSigns ?? [],
     audit: raw.audit ?? [],
     reviewComments: raw.reviewComments ?? [],
     coverageRule: raw.coverageRule ?? {

@@ -12,6 +12,7 @@ import {
 import { runAllValidations } from '../lib/validation'
 import { notifyJefeScheduleValidated } from '../lib/notifications'
 import { SignatureGate } from './SignatureGate'
+import { slotForStatus } from '../lib/firmaEc'
 
 type Props = {
   doc: ScheduleDoc
@@ -79,7 +80,11 @@ export function ApprovalPanel({
 
   function go(
     next: ScheduleDoc['status'],
-    opts?: { comment?: string; signedName?: string },
+    opts?: {
+      comment?: string
+      signedName?: string
+      electronic?: import('../types').ElectronicSignRecord
+    },
   ) {
     if (!user) {
       onFlash('Seleccione un usuario arriba (Entrar como) para el flujo')
@@ -100,13 +105,14 @@ export function ApprovalPanel({
       )
       onNotify?.()
     }
+    const elec = opts?.electronic ? ' (FirmaEC)' : ''
     onFlash(
       next === 'EN_REVISION'
-        ? `Firmado y enviado a revisión · ${opts?.signedName || user.name}`
+        ? `Firmado y enviado a revisión${elec} · ${opts?.signedName || user.name}`
         : next === 'APROBADO'
-          ? `Firmado y aprobado · ${opts?.signedName || user.name}`
+          ? `Firmado y aprobado${elec} · ${opts?.signedName || user.name}`
           : next === 'ARCHIVADO'
-            ? `Firmado y validado · aviso enviado al jefe`
+            ? `Firmado y validado${elec} · aviso enviado al jefe`
             : `Estado: ${STATUS_LABEL[next]} · ${user.name}`,
     )
   }
@@ -127,6 +133,10 @@ export function ApprovalPanel({
         ? 'Firmar y aprobar'
         : 'Firmar y validar'
 
+  const signSlot = signIntent
+    ? slotForStatus(signIntent.next)
+    : 'jefe'
+
   return (
     <section
       className="no-print mb-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm"
@@ -135,13 +145,18 @@ export function ApprovalPanel({
       <SignatureGate
         open={!!signIntent}
         title={signTitle}
-        subtitle="Su firma quedará impresa en el horario institucional (Jefe / Revisor / Validador)."
+        subtitle="Puede firmar con nombre o electrónicamente con su certificado FirmaEC (.p12)."
         defaultName={user?.name ?? ''}
         confirmLabel={signConfirm}
+        slot={signSlot}
+        user={user}
         onCancel={() => setSignIntent(null)}
-        onConfirm={(signedName) => {
+        onConfirm={(result) => {
           if (!signIntent) return
-          go(signIntent.next, { signedName })
+          go(signIntent.next, {
+            signedName: result.signedName,
+            electronic: result.electronic,
+          })
         }}
       />
 

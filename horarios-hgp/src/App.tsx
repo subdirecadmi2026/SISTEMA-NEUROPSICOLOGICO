@@ -75,6 +75,7 @@ import {
   NotificationsBell,
   ValidationNoticeBanner,
 } from './components/NotificationsBell'
+import { FirmaEcSettings } from './components/FirmaEcSettings'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -454,6 +455,9 @@ export default function App() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <NotificationsBell user={user} refreshKey={notifyTick} />
+            {user && (
+              <FirmaEcSettings user={user} onFlash={flash} />
+            )}
             <AuthBar
               user={user}
               pendingCount={pendingCount}
