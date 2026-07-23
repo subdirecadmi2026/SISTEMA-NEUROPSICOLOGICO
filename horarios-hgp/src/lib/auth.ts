@@ -129,12 +129,85 @@ export function loginByEmail(email: string): AppUser | null {
   return loginAs(found)
 }
 
+/** Contraseña demo compartida (entorno de prueba HGP). */
+export const DEMO_PASSWORD = 'hgp2026'
+
+/** Perfiles principales del flujo (login destacado). */
+export const PRIMARY_DEMO_IDS = [
+  'u-jefe',
+  'u-revisor',
+  'u-validador',
+  'u-admin',
+] as const
+
+export function primaryDemoUsers(): AppUser[] {
+  return PRIMARY_DEMO_IDS.map((id) =>
+    DEMO_USERS.find((u) => u.id === id),
+  ).filter((u): u is AppUser => !!u)
+}
+
+export function otherDemoUsers(): AppUser[] {
+  return DEMO_USERS.filter(
+    (u) => !(PRIMARY_DEMO_IDS as readonly string[]).includes(u.id),
+  )
+}
+
+/**
+ * Login por correo + contraseña demo.
+ * Acepta DEMO_PASSWORD o dejar contraseña vacía solo en acceso rápido por tarjeta.
+ */
+export function authenticateDemo(
+  email: string,
+  password: string,
+): { ok: true; user: AppUser } | { ok: false; error: string } {
+  const found = DEMO_USERS.find(
+    (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
+  )
+  if (!found) {
+    return { ok: false, error: 'No existe un perfil con ese correo' }
+  }
+  if (password !== DEMO_PASSWORD) {
+    return {
+      ok: false,
+      error: `Contraseña incorrecta. En demo use: ${DEMO_PASSWORD}`,
+    }
+  }
+  return { ok: true, user: loginAs(found) }
+}
+
 export function logout() {
   localStorage.removeItem(USER_KEY)
 }
 
 export function roleLabel(role: UserRole): string {
   return ROLE_LABEL[role]
+}
+
+/** Qué hace cada rol en el flujo (texto corto para login / perfil). */
+export function roleMission(role: UserRole): string {
+  switch (role) {
+    case 'lider_servicio':
+      return 'Elabora el horario del servicio, firma y lo envía a revisión.'
+    case 'revisor':
+    case 'direccion_asistencial':
+    case 'subdireccion':
+    case 'gestion_enfermeria':
+      return 'Revisa en solo lectura: aprueba o devuelve con comentario.'
+    case 'validador':
+    case 'talento_humano':
+      return 'Valida horarios aprobados, firma con QR y archiva el PDF.'
+    case 'admin':
+      return 'Acceso completo a elaboración, revisión y validación.'
+    default:
+      return ROLE_LABEL[role]
+  }
+}
+
+export function userInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
 export function appendAudit(

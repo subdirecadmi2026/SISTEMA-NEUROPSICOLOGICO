@@ -1,84 +1,83 @@
+import { useState } from 'react'
 import type { AppUser } from '../types'
-import { DEMO_USERS, loginAs, roleLabel } from '../lib/auth'
+import { roleLabel, userInitials } from '../lib/auth'
+import { ProfilePanel } from './ProfilePanel'
 
 type Props = {
   user: AppUser | null
   pendingCount?: number
   onLogin: (u: AppUser) => void
   onLogout: () => void
+  onFlash: (msg: string) => void
 }
 
-/** Acceso rápido: los 3 roles del flujo + admin. */
-const QUICK = ['u-jefe', 'u-revisor', 'u-validador', 'u-admin'] as const
+/**
+ * Barra de sesión: sin usuario apunta al login; con sesión abre «Mi perfil».
+ */
+export function AuthBar({
+  user,
+  pendingCount = 0,
+  onLogin,
+  onLogout,
+  onFlash,
+}: Props) {
+  const [profileOpen, setProfileOpen] = useState(false)
 
-const SHORT: Record<string, string> = {
-  'u-jefe': 'Jefe',
-  'u-revisor': 'Revisor',
-  'u-validador': 'Validador',
-  'u-admin': 'Admin',
-}
-
-export function AuthBar({ user, pendingCount = 0, onLogin, onLogout }: Props) {
   if (!user) {
     return (
       <div className="no-print flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-teal-soft">Entrar:</span>
-        {QUICK.map((id) => {
-          const u = DEMO_USERS.find((x) => x.id === id)
-          if (!u) return null
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onLogin(loginAs(u))}
-              className="rounded-lg border border-white/30 bg-white/10 px-2.5 py-1 text-xs font-semibold hover:bg-white/20"
-              title={`${u.name} · ${u.email}`}
-            >
-              {SHORT[id] ?? roleLabel(u.role)}
-            </button>
-          )
-        })}
-        <select
-          className="rounded-lg border border-white/25 bg-navy-deep px-2 py-1.5 text-xs text-white"
-          defaultValue=""
-          onChange={(e) => {
-            const u = DEMO_USERS.find((x) => x.id === e.target.value)
-            if (u) onLogin(loginAs(u))
-          }}
-        >
-          <option value="" disabled>
-            Más usuarios…
-          </option>
-          {DEMO_USERS.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} ({roleLabel(u.role)})
-            </option>
-          ))}
-        </select>
+        <span className="rounded-lg border border-white/25 bg-white/10 px-2.5 py-1.5 text-xs text-white/80">
+          Sin sesión · use la pantalla de acceso
+        </span>
       </div>
     )
   }
 
   return (
-    <div className="no-print flex flex-wrap items-center gap-2 text-sm">
-      <span className="rounded-lg border border-teal-soft/40 bg-teal/20 px-2 py-1 font-semibold">
-        {user.name} · {roleLabel(user.role)}
-      </span>
-      {pendingCount > 0 && (
-        <span
-          className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-navy-deep"
-          title="Pendientes en bandeja"
+    <>
+      <div className="no-print flex flex-wrap items-center gap-2 text-sm">
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="flex items-center gap-2 rounded-xl border border-teal-soft/40 bg-teal/20 px-2 py-1 pr-2.5 font-semibold hover:bg-teal/30"
+          title="Abrir mi perfil"
         >
-          {pendingCount} pend.
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={onLogout}
-        className="rounded-lg border border-white/25 px-2 py-1 text-xs hover:bg-white/10"
-      >
-        Salir
-      </button>
-    </div>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-navy-deep text-[11px] font-bold text-white">
+            {userInitials(user.name)}
+          </span>
+          <span className="hidden text-left leading-tight sm:block">
+            <span className="block text-xs sm:text-sm">{user.name}</span>
+            <span className="block text-[10px] font-medium text-teal-soft">
+              {roleLabel(user.role).replace(' (visualización)', '')}
+            </span>
+          </span>
+        </button>
+        {pendingCount > 0 && (
+          <span
+            className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-navy-deep"
+            title="Pendientes en bandeja"
+          >
+            {pendingCount} pend.
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className="rounded-lg border border-white/25 px-2 py-1 text-xs hover:bg-white/10 sm:hidden"
+        >
+          Perfil
+        </button>
+      </div>
+
+      <ProfilePanel
+        user={user}
+        pendingCount={pendingCount}
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onSwitchUser={onLogin}
+        onLogout={onLogout}
+        onFlash={onFlash}
+      />
+    </>
   )
 }

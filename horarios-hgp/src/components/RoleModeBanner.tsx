@@ -18,8 +18,7 @@ export function RoleModeBanner({ user, doc, canEdit }: Props) {
   if (!user) {
     return (
       <div className="no-print border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950">
-        Sin sesión · use <strong>Entrar</strong> (Jefe / Revisor / Validador)
-        para trabajar el flujo.
+        Sin sesión · elija su perfil en la pantalla de acceso
       </div>
     )
   }

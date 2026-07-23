@@ -41,6 +41,7 @@ import {
 } from './lib/api'
 import { seedServicesIfEmpty } from './lib/seedServices'
 import { AuthBar } from './components/AuthBar'
+import { LoginScreen } from './components/LoginScreen'
 import { StaffManager } from './components/StaffManager'
 import { ApprovalPanel } from './components/ApprovalPanel'
 import { DistributionPanel } from './components/DistributionPanel'
@@ -75,7 +76,6 @@ import {
   NotificationsBell,
   ValidationNoticeBanner,
 } from './components/NotificationsBell'
-import { FirmaEcSettings } from './components/FirmaEcSettings'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -464,19 +464,17 @@ export default function App() {
                   : workspace === 'validador'
                     ? 'Módulo de validación · solo visualización'
                     : workspace === 'login'
-                      ? 'Entre con su perfil para continuar'
+                      ? 'Acceso por perfil · Jefe · Revisor · Validador'
                       : `Sistema de horarios · MSP Ecuador${isRemoteEnabled() ? ' · Supabase' : ' · Local'}`}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <NotificationsBell user={user} refreshKey={notifyTick} />
-            {user && (
-              <FirmaEcSettings user={user} onFlash={flash} />
-            )}
             <AuthBar
               user={user}
               pendingCount={pendingCount}
+              onFlash={flash}
               onLogin={(u) => {
                 setUser(u)
                 setShowCreate(isJefeRole(u.role) && saved.length === 0)
@@ -552,14 +550,18 @@ export default function App() {
       )}
 
       {workspace === 'login' && (
-        <main className="mx-auto max-w-lg px-4 py-16 text-center">
-          <h1 className="font-display text-3xl text-navy">Horarios HGP</h1>
-          <p className="mt-2 text-muted">
-            Elija su perfil arriba: <strong>Jefe</strong> elabora horarios
-            médicos, <strong>Revisor</strong> aprueba o comenta,{' '}
-            <strong>Validador</strong> valida.
-          </p>
-        </main>
+        <LoginScreen
+          onLogin={(u) => {
+            setUser(u)
+            setShowCreate(isJefeRole(u.role) && saved.length === 0)
+            const n = countPendingForRole(u, saved)
+            flash(
+              n > 0
+                ? `Bienvenido · ${u.name} · ${n} pendiente(s)`
+                : `Bienvenido · ${u.name}`,
+            )
+          }}
+        />
       )}
 
       {workspace === 'revisor' && user && (

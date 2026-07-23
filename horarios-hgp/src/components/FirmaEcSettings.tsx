@@ -20,12 +20,14 @@ import {
 type Props = {
   user: AppUser
   onFlash: (msg: string) => void
+  /** Estilo del botón: header (oscuro) o panel claro. */
+  tone?: 'header' | 'panel'
 }
 
 /**
  * Carga certificado FirmaEC (.p12) y/o imagen de firma.
  */
-export function FirmaEcSettings({ user, onFlash }: Props) {
+export function FirmaEcSettings({ user, onFlash, tone = 'header' }: Props) {
   const [open, setOpen] = useState(false)
   const [meta, setMeta] = useState<FirmaEcCertMeta | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -102,12 +104,22 @@ export function FirmaEcSettings({ user, onFlash }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg border border-teal-soft/50 bg-teal/25 px-3 py-2 text-sm font-semibold text-white hover:bg-teal/40"
+        className={
+          tone === 'panel'
+            ? 'rounded-xl border border-teal/40 bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110'
+            : 'rounded-lg border border-teal-soft/50 bg-teal/25 px-3 py-2 text-sm font-semibold text-white hover:bg-teal/40'
+        }
         title="Cargar certificado o imagen de firma"
       >
         FirmaEC
         {loaded ? (
-          <span className="ml-1.5 text-[10px] font-bold text-teal-soft">●</span>
+          <span
+            className={`ml-1.5 text-[10px] font-bold ${
+              tone === 'panel' ? 'text-teal-soft' : 'text-teal-soft'
+            }`}
+          >
+            ●
+          </span>
         ) : null}
       </button>
 
