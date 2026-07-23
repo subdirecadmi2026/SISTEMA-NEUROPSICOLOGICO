@@ -162,13 +162,22 @@ export function createBlankSchedule(
       ...base,
       department: 'Gestión de Cuidados de Enfermería',
       unitName: options?.unitName ?? 'Centro Obstétrico',
-      jefeServicio: 'Lic. Ana Parra',
+      jefeServicio: withDemo ? 'Lic. Ana Parra' : '',
       notes: '',
       contingencyPlan: '',
-      elaboradoPor: 'Lic. Ana Parra — Líder del servicio',
-      revisadoPor: 'Lic. Irma Naveda — Gestión de Enfermería',
-      aprobadoPor: 'Mgs. Alex Naranjo — Dirección Asistencial',
-      talentoHumano: 'Ing. Elizabeth Yánez — Talento Humano',
+      elaboradoPor: withDemo
+        ? 'Lic. Ana Parra — Líder del servicio'
+        : '',
+      revisadoPor: withDemo
+        ? 'Lic. Irma Naveda — Gestión de Enfermería'
+        : '',
+      aprobadoPor: withDemo
+        ? 'Mgs. Alex Naranjo — Dirección Asistencial'
+        : '',
+      talentoHumano: withDemo
+        ? 'Ing. Elizabeth Yánez — Talento Humano'
+        : '',
+      electronicSigns: [],
     }
   }
 
@@ -177,13 +186,22 @@ export function createBlankSchedule(
     department: 'Unidad de Administración de Talento Humano',
     unitName: options?.unitName ?? 'Medicina interna',
     jefeServicio: '',
-    notes:
-      'Todas las actividades extras deben anotarse y enviarse mensualmente. Registrar interconsultas en la matriz.',
-    contingencyPlan:
-      'Todo permiso o vacaciones del personal médico debe incluir plan de contingencia de cobertura.',
-    elaboradoPor: 'Líder del servicio',
-    revisadoPor: 'Dr. Santiago Pacheco — Dirección Asistencial',
-    aprobadoPor: 'Mgs. Alex Naranjo — Subdirección Médica',
-    talentoHumano: 'Ing. Lourdes Yánez — Talento Humano',
+    notes: withDemo
+      ? 'Todas las actividades extras deben anotarse y enviarse mensualmente. Registrar interconsultas en la matriz.'
+      : '',
+    contingencyPlan: withDemo
+      ? 'Todo permiso o vacaciones del personal médico debe incluir plan de contingencia de cobertura.'
+      : '',
+    elaboradoPor: withDemo ? 'Líder del servicio' : '',
+    revisadoPor: withDemo
+      ? 'Dr. Santiago Pacheco — Dirección Asistencial'
+      : '',
+    aprobadoPor: withDemo
+      ? 'Mgs. Alex Naranjo — Subdirección Médica'
+      : '',
+    talentoHumano: withDemo
+      ? 'Ing. Lourdes Yánez — Talento Humano'
+      : '',
+    electronicSigns: [],
   }
 }

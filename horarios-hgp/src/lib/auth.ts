@@ -386,6 +386,27 @@ export function transitionStatus(
     updated = {
       ...updated,
       reviewComments: [...(updated.reviewComments ?? []), comment],
+      // Quitar firma del revisor; se mantiene la del jefe
+      revisadoPor: '',
+      aprobadoPor: '',
+      electronicSigns: (updated.electronicSigns ?? []).filter(
+        (e) => e.slot === 'jefe',
+      ),
+    }
+  }
+
+  // Admin reabre horario cerrado → borrador limpio de firmas
+  if (
+    next === 'BORRADOR' &&
+    (doc.status === 'APROBADO' || doc.status === 'ARCHIVADO')
+  ) {
+    updated = {
+      ...updated,
+      elaboradoPor: '',
+      revisadoPor: '',
+      aprobadoPor: '',
+      talentoHumano: '',
+      electronicSigns: [],
     }
   }
 

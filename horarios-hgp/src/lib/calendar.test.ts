@@ -381,6 +381,8 @@ describe('operaciones de mes', () => {
     expect(Object.keys(next.cells)).toHaveLength(0)
     expect(next.status).toBe('BORRADOR')
     expect(next.id).not.toBe(doc.id)
+    expect(next.elaboradoPor).toBe('')
+    expect(next.electronicSigns ?? []).toHaveLength(0)
   })
 
   it('pega nombres y copia turnos entre personas', async () => {
@@ -473,6 +475,9 @@ describe('operaciones de mes', () => {
     expect(copy.status).toBe('BORRADOR')
     expect(copy.staff[0].name).toBe('Ana')
     expect(Object.values(copy.cells)).toContain('HA')
+    expect(copy.elaboradoPor).toBe('')
+    expect(copy.talentoHumano).toBe('')
+    expect(copy.electronicSigns ?? []).toHaveLength(0)
   })
 })
 
@@ -923,5 +928,44 @@ describe('PDF archivo validador', () => {
     expect(specialtyFolderName(doc)).toBe('Medicina interna')
     expect(pdfFileName(doc)).toContain('Medicina interna')
     expect(pdfFileName(doc)).toContain('2026-07')
+  })
+})
+
+describe('integridad de firmas en borradores', () => {
+  it('horario nuevo sin demo no trae firmas falsas', () => {
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    expect(doc.elaboradoPor).toBe('')
+    expect(doc.revisadoPor).toBe('')
+    expect(doc.aprobadoPor).toBe('')
+    expect(doc.talentoHumano).toBe('')
+    expect(doc.electronicSigns ?? []).toHaveLength(0)
+  })
+
+  it('admin al reabrir limpia firmas del horario cerrado', async () => {
+    const { transitionStatus, DEMO_USERS } = await import('./auth')
+    const admin = DEMO_USERS.find((u) => u.id === 'u-admin')!
+    let doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.status = 'ARCHIVADO'
+    doc.elaboradoPor = 'Jefe'
+    doc.revisadoPor = 'Revisor'
+    doc.aprobadoPor = 'Revisor'
+    doc.talentoHumano = 'Validador'
+    doc.electronicSigns = [
+      {
+        slot: 'validador',
+        subjectCn: 'Validador',
+        signedAt: new Date().toISOString(),
+        method: 'nombre_qr',
+        stampText: 'Validador',
+      },
+    ]
+    const result = transitionStatus(doc, 'BORRADOR', admin)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.doc.status).toBe('BORRADOR')
+      expect(result.doc.elaboradoPor).toBe('')
+      expect(result.doc.talentoHumano).toBe('')
+      expect(result.doc.electronicSigns ?? []).toHaveLength(0)
+    }
   })
 })

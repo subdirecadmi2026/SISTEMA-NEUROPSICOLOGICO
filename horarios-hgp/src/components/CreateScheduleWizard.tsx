@@ -5,7 +5,7 @@ import { createBlankSchedule } from '../data/demo'
 import { SERVICE_LABEL } from '../data/templates'
 import { createEmptyStaff, listStaff } from '../lib/staffLibrary'
 import { copyStaffFromPreviousMonth } from '../lib/scheduleOps'
-import { listUnits } from '../lib/unitsStore'
+import { addUnit, listUnits } from '../lib/unitsStore'
 
 export type CreateScheduleInput = {
   serviceType: ServiceType
@@ -88,6 +88,14 @@ export function CreateScheduleWizard({
     if (staffCount < MIN_STAFF) return
     setCreating(true)
     try {
+      if (useCustomUnit && resolvedUnit) {
+        try {
+          addUnit(serviceType, resolvedUnit)
+        } catch {
+          /* ya existe: continuar */
+        }
+      }
+
       const lib = listStaff(serviceType, resolvedUnit).filter(
         (s) => s.active !== false,
       )

@@ -576,6 +576,11 @@ export function createNextMonthDraft(doc: ScheduleDoc): ScheduleDoc {
     version: 1,
     signatures: [],
     reviewComments: [],
+    electronicSigns: [],
+    elaboradoPor: '',
+    revisadoPor: '',
+    aprobadoPor: '',
+    talentoHumano: '',
     notes: '',
     contingencyPlan: '',
     contingencyStaff: [],
@@ -895,6 +900,11 @@ export function duplicateScheduleAsNew(doc: ScheduleDoc): ScheduleDoc {
     version: 1,
     signatures: [],
     reviewComments: [],
+    electronicSigns: [],
+    elaboradoPor: '',
+    revisadoPor: '',
+    aprobadoPor: '',
+    talentoHumano: '',
     updatedAt: new Date().toISOString(),
     audit: [
       {
