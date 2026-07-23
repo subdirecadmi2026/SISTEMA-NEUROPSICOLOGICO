@@ -11,6 +11,7 @@ function migrate(doc: ScheduleDoc): ScheduleDoc {
     version: doc.version ?? 1,
     signatures: doc.signatures ?? [],
     audit: doc.audit ?? [],
+    reviewComments: doc.reviewComments ?? [],
     coverageRule: doc.coverageRule ?? {
       minStaffPerDay: 2,
       minHoursPerDay: 16,

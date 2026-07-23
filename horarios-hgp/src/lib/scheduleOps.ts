@@ -575,6 +575,7 @@ export function createNextMonthDraft(doc: ScheduleDoc): ScheduleDoc {
     status: 'BORRADOR',
     version: 1,
     signatures: [],
+    reviewComments: [],
     notes: '',
     contingencyPlan: '',
     contingencyStaff: [],
@@ -893,6 +894,7 @@ export function duplicateScheduleAsNew(doc: ScheduleDoc): ScheduleDoc {
     status: 'BORRADOR',
     version: 1,
     signatures: [],
+    reviewComments: [],
     updatedAt: new Date().toISOString(),
     audit: [
       {

@@ -7,7 +7,15 @@ type Props = {
   onLogout: () => void
 }
 
-const QUICK = ['u-lider', 'u-dir', 'u-th', 'u-admin'] as const
+/** Acceso rápido: los 3 roles del flujo + admin. */
+const QUICK = ['u-jefe', 'u-revisor', 'u-validador', 'u-admin'] as const
+
+const SHORT: Record<string, string> = {
+  'u-jefe': 'Jefe',
+  'u-revisor': 'Revisor',
+  'u-validador': 'Validador',
+  'u-admin': 'Admin',
+}
 
 export function AuthBar({ user, onLogin, onLogout }: Props) {
   if (!user) {
@@ -22,10 +30,10 @@ export function AuthBar({ user, onLogin, onLogout }: Props) {
               key={id}
               type="button"
               onClick={() => onLogin(loginAs(u))}
-              className="rounded-lg border border-white/30 bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/20"
-              title={u.email}
+              className="rounded-lg border border-white/30 bg-white/10 px-2.5 py-1 text-xs font-semibold hover:bg-white/20"
+              title={`${u.name} · ${u.email}`}
             >
-              {roleLabel(u.role)}
+              {SHORT[id] ?? roleLabel(u.role)}
             </button>
           )
         })}

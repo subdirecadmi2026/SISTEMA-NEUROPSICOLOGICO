@@ -28,6 +28,7 @@ function migratePayload(raw: ScheduleDoc): ScheduleDoc {
     version: raw.version ?? 1,
     signatures: raw.signatures ?? [],
     audit: raw.audit ?? [],
+    reviewComments: raw.reviewComments ?? [],
     coverageRule: raw.coverageRule ?? {
       minStaffPerDay: 2,
       minHoursPerDay: 16,

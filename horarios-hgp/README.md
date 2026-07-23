@@ -47,26 +47,27 @@ npm test          # tests unitarios (horas, cobertura, feriados)
 npm run lint      # oxlint
 ```
 
-## Uso rápido (líder de servicio)
+## Uso rápido (jefe de servicio)
 
-1. **Entrar** con un usuario demo (selector arriba a la derecha), p. ej. líder.
+1. **Entrar** como **Jefe** (selector arriba).
 2. Elegir plantilla **Enfermería** o **Médico**, mes, año y servicio.
 3. Pestaña **PERSONAL**: CRUD, descargar plantilla Excel, importar CSV/Excel, «Cargar al horario».
 4. Pestaña **HORARIO**: seleccionar clave y pintar celdas (clic derecho borra).
 5. **Limpiar mes** / **Duplicar mes anterior** / **Autocompletar feriados**.
 6. Revisar **DISTRIBUCIÓN** (rojo = cobertura bajo umbral) y **CONTINGENCIA**.
-7. **Guardar**, **Exportar Excel** (hojas HORARIO, CLAVES, DISTRIBUCION, IMPRIMIR) o **Imprimir / PDF**.
-8. **Enviar a revisión** → Gestión/Dirección/TH **Aprueba** → el horario queda bloqueado (salvo admin).
+7. **Guardar**, **Exportar Excel** o **Imprimir / PDF**.
+8. **Enviar a revisión** → **Revisor** aprueba o devuelve con comentario → **Validador** valida (queda bloqueado).
 
 ### Roles
 
 | Rol | Función |
 |-----|---------|
-| `lider_servicio` | Elabora y envía a revisión |
-| `gestion_enfermeria` / `subdireccion` | Revisa / aprueba |
-| `direccion_asistencial` | Aprueba |
-| `talento_humano` | Registro / archivo |
-| `admin` | Todo + reabrir aprobados |
+| `lider_servicio` (Jefe) | Crea y edita horarios; envía a revisión |
+| `revisor` | Solo visualiza; aprueba o pide corrección con comentario |
+| `validador` | Valida formalmente el horario aprobado |
+| `admin` | Todo + reabrir cerrados |
+
+Roles institucionales legacy (`gestion_enfermeria`, `subdireccion`, `direccion_asistencial`, `talento_humano`) siguen mapeados a revisor/validador.
 
 ## Despliegue (Vercel)
 

@@ -143,6 +143,7 @@ export function createBlankSchedule(
     status: 'BORRADOR' as const,
     version: 1,
     signatures: [],
+    reviewComments: [],
     audit: [
       {
         id: uid('aud'),

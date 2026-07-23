@@ -1,6 +1,14 @@
+import { useMemo, useState } from 'react'
 import type { ScheduleDoc, AppUser } from '../types'
 import { STATUS_LABEL } from '../types'
-import { transitionStatus, roleLabel } from '../lib/auth'
+import {
+  transitionStatus,
+  roleLabel,
+  isJefeRole,
+  isRevisorRole,
+  isValidadorRole,
+  resolveReviewComments,
+} from '../lib/auth'
 import { runAllValidations } from '../lib/validation'
 
 type Props = {
@@ -11,21 +19,31 @@ type Props = {
 }
 
 const STEPS: Array<{ key: ScheduleDoc['status']; label: string }> = [
-  { key: 'BORRADOR', label: '1. Elaborar' },
+  { key: 'BORRADOR', label: '1. Elaborar (Jefe)' },
   { key: 'EN_REVISION', label: '2. Revisar' },
-  { key: 'APROBADO', label: '3. Aprobar' },
-  { key: 'ARCHIVADO', label: '4. Archivar' },
+  { key: 'APROBADO', label: '3. Aprobado' },
+  { key: 'ARCHIVADO', label: '4. Validar' },
 ]
 
 export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
+  const [correction, setCorrection] = useState('')
   const alerts = runAllValidations(doc)
   const errors = alerts.filter((a) => a.level === 'error')
   const named = doc.staff.filter((s) => s.name.trim()).length
   const stepIdx = STEPS.findIndex((s) => s.key === doc.status)
+  const comments = doc.reviewComments ?? []
+  const openComments = useMemo(
+    () => comments.filter((c) => !c.resolved),
+    [comments],
+  )
 
-  function go(next: ScheduleDoc['status']) {
+  const canSend = !!user && isJefeRole(user.role)
+  const canReview = !!user && isRevisorRole(user.role)
+  const canValidate = !!user && isValidadorRole(user.role)
+
+  function go(next: ScheduleDoc['status'], comment?: string) {
     if (!user) {
-      onFlash('Seleccione un usuario arriba (Entrar como) para firmar el flujo')
+      onFlash('Seleccione un usuario arriba (Entrar como) para el flujo')
       return
     }
     if (next === 'EN_REVISION') {
@@ -38,13 +56,14 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
         return
       }
     }
-    const res = transitionStatus(doc, next, user)
+    const res = transitionStatus(doc, next, user, { comment })
     if (!res.ok) {
       onFlash(res.error)
       return
     }
     onChange(res.doc)
-    onFlash(`Estado: ${STATUS_LABEL[next]} · firmó ${user.name}`)
+    setCorrection('')
+    onFlash(`Estado: ${STATUS_LABEL[next]} · ${user.name}`)
   }
 
   return (
@@ -71,7 +90,7 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {doc.status === 'BORRADOR' && (
+          {doc.status === 'BORRADOR' && canSend && (
             <button
               type="button"
               onClick={() => go('EN_REVISION')}
@@ -80,31 +99,22 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
               Enviar a revisión
             </button>
           )}
-          {doc.status === 'EN_REVISION' && (
-            <>
-              <button
-                type="button"
-                onClick={() => go('BORRADOR')}
-                className="rounded-lg border border-line px-3 py-2 text-sm"
-              >
-                Devolver a borrador
-              </button>
-              <button
-                type="button"
-                onClick={() => go('APROBADO')}
-                className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white"
-              >
-                Aprobar y firmar
-              </button>
-            </>
+          {doc.status === 'EN_REVISION' && canReview && (
+            <button
+              type="button"
+              onClick={() => go('APROBADO')}
+              className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white"
+            >
+              Aprobar
+            </button>
           )}
-          {doc.status === 'APROBADO' && (
+          {doc.status === 'APROBADO' && canValidate && (
             <button
               type="button"
               onClick={() => go('ARCHIVADO')}
-              className="rounded-lg border border-line px-3 py-2 text-sm"
+              className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
             >
-              Archivar en Talento Humano
+              Validar horario
             </button>
           )}
           {(doc.status === 'ARCHIVADO' || doc.status === 'APROBADO') &&
@@ -120,7 +130,6 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
         </div>
       </div>
 
-      {/* Stepper */}
       <ol className="mb-3 grid gap-2 sm:grid-cols-4">
         {STEPS.map((s, i) => {
           const active = s.key === doc.status
@@ -142,12 +151,95 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
         })}
       </ol>
 
-      <p className="mb-2 text-xs text-muted">
-        Guía: <strong>Líder</strong> elabora y envía →{' '}
-        <strong>Gestión / Subdirección / Dirección</strong> aprueba →{' '}
-        <strong>Talento Humano</strong> archiva. Al aprobarse, el horario se
-        bloquea.
+      <p className="mb-3 text-xs text-muted">
+        <strong>Jefe de servicio</strong> crea y envía →{' '}
+        <strong>Revisor</strong> visualiza, aprueba o pide corrección →{' '}
+        <strong>Validador</strong> valida. Tras aprobar/validar, el horario queda
+        bloqueado.
       </p>
+
+      {/* Revisor: devolver con comentario */}
+      {doc.status === 'EN_REVISION' && canReview && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3">
+          <p className="mb-1 text-sm font-semibold text-navy">
+            Pedir corrección (devolver al jefe)
+          </p>
+          <p className="mb-2 text-xs text-muted">
+            El horario vuelve a borrador. El jefe verá su comentario para
+            corregir.
+          </p>
+          <textarea
+            className="mb-2 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
+            rows={3}
+            placeholder="Ej.: Día 12 sin cobertura nocturna; complete N1 o justifique…"
+            value={correction}
+            onChange={(e) => setCorrection(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => go('BORRADOR', correction)}
+            className="rounded-lg border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
+          >
+            Devolver con comentario
+          </button>
+        </div>
+      )}
+
+      {/* Correcciones abiertas para el jefe */}
+      {openComments.length > 0 && (
+        <div className="mb-3 rounded-xl border border-rose-200 bg-rose-50/80 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-rose-900">
+              Correcciones pendientes ({openComments.length})
+            </p>
+            {doc.status === 'BORRADOR' && canSend && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(resolveReviewComments(doc, user))
+                  onFlash('Correcciones marcadas como atendidas')
+                }}
+                className="rounded-lg border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-900"
+              >
+                Marcar atendidas
+              </button>
+            )}
+          </div>
+          <ul className="space-y-2">
+            {openComments.map((c) => (
+              <li
+                key={c.id}
+                className="rounded-lg border border-rose-100 bg-white px-3 py-2 text-sm"
+              >
+                <p className="text-ink">{c.message}</p>
+                <p className="mt-1 text-[11px] text-muted">
+                  {c.userName} · {roleLabel(c.role)} ·{' '}
+                  {new Date(c.at).toLocaleString('es-EC')}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {comments.length > 0 && openComments.length === 0 && (
+        <details className="mb-3 rounded-lg border border-line">
+          <summary className="cursor-pointer bg-sand/50 px-3 py-2 text-xs font-semibold text-navy">
+            Historial de correcciones ({comments.length})
+          </summary>
+          <ul className="max-h-40 overflow-y-auto">
+            {comments.map((c) => (
+              <li
+                key={c.id}
+                className="border-t border-line px-3 py-2 text-xs text-muted"
+              >
+                <span className="font-semibold text-navy">{c.userName}:</span>{' '}
+                {c.message}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {doc.signatures.length > 0 && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

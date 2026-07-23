@@ -155,6 +155,13 @@ describe('cobertura y validaciones', () => {
     expect(canEditSchedule('APROBADO', 'admin')).toBe(true)
     expect(canEditSchedule('BORRADOR', 'lider_servicio')).toBe(true)
   })
+
+  it('revisor y validador solo visualizan (no editan celdas)', () => {
+    expect(canEditSchedule('BORRADOR', 'revisor')).toBe(false)
+    expect(canEditSchedule('EN_REVISION', 'revisor')).toBe(false)
+    expect(canEditSchedule('APROBADO', 'validador')).toBe(false)
+    expect(canEditSchedule('BORRADOR', null)).toBe(false)
+  })
 })
 
 describe('operaciones de mes', () => {
@@ -568,5 +575,73 @@ describe('feriados Ecuador', () => {
     expect(list.some((h) => h.date === '2026-01-01')).toBe(true)
     expect(list.some((h) => h.date === '2026-12-25')).toBe(true)
     expect(list.some((h) => h.name === 'Viernes Santo')).toBe(true)
+  })
+})
+
+describe('flujo de roles Jefe → Revisor → Validador', () => {
+  it('jefe envía, revisor aprueba o devuelve con comentario, validador valida', async () => {
+    const { transitionStatus } = await import('./auth')
+    const { DEMO_USERS } = await import('./auth')
+    const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+    const revisor = DEMO_USERS.find((u) => u.id === 'u-revisor')!
+    const validador = DEMO_USERS.find((u) => u.id === 'u-validador')!
+
+    let doc = createBlankSchedule('medico', 2026, 8, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'm1',
+        name: 'Dr. Demo',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+
+    // Validador no puede enviar
+    const badSend = transitionStatus(doc, 'EN_REVISION', validador)
+    expect(badSend.ok).toBe(false)
+
+    const sent = transitionStatus(doc, 'EN_REVISION', jefe)
+    expect(sent.ok).toBe(true)
+    if (!sent.ok) return
+    doc = sent.doc
+    expect(doc.status).toBe('EN_REVISION')
+
+    // Devolver sin comentario falla
+    const badReturn = transitionStatus(doc, 'BORRADOR', revisor)
+    expect(badReturn.ok).toBe(false)
+
+    const returned = transitionStatus(doc, 'BORRADOR', revisor, {
+      comment: 'Falta cobertura el día 15',
+    })
+    expect(returned.ok).toBe(true)
+    if (!returned.ok) return
+    doc = returned.doc
+    expect(doc.status).toBe('BORRADOR')
+    expect(doc.reviewComments.some((c) => c.message.includes('día 15'))).toBe(
+      true,
+    )
+
+    const resent = transitionStatus(doc, 'EN_REVISION', jefe)
+    expect(resent.ok).toBe(true)
+    if (!resent.ok) return
+    doc = resent.doc
+    expect(doc.reviewComments.every((c) => c.resolved)).toBe(true)
+
+    const approved = transitionStatus(doc, 'APROBADO', revisor)
+    expect(approved.ok).toBe(true)
+    if (!approved.ok) return
+    doc = approved.doc
+
+    // Jefe no valida
+    const badVal = transitionStatus(doc, 'ARCHIVADO', jefe)
+    expect(badVal.ok).toBe(false)
+
+    const validated = transitionStatus(doc, 'ARCHIVADO', validador)
+    expect(validated.ok).toBe(true)
+    if (!validated.ok) return
+    expect(validated.doc.status).toBe('ARCHIVADO')
   })
 })

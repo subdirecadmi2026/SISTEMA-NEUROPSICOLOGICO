@@ -15,19 +15,12 @@ export function canEditSchedule(
   status: ScheduleDoc['status'],
   role: UserRole | null,
 ): boolean {
-  if (!role) return status === 'BORRADOR'
+  if (!role) return false
   if (role === 'admin') return true
-  if (status === 'APROBADO' || status === 'ARCHIVADO') return false
-  if (status === 'EN_REVISION') {
-    return (
-      role === 'gestion_enfermeria' ||
-      role === 'subdireccion' ||
-      role === 'direccion_asistencial' ||
-      role === 'talento_humano'
-    )
-  }
-  // BORRADOR
-  return role === 'lider_servicio'
+  // Solo el jefe edita celdas/personal, y únicamente en borrador
+  if (status === 'BORRADOR') return role === 'lider_servicio'
+  // Revisor y validador: solo visualización (acciones de flujo aparte)
+  return false
 }
 
 export function validateCoverage(doc: ScheduleDoc): ValidationAlert[] {

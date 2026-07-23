@@ -498,7 +498,7 @@ export default function App() {
           <ol className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
             {(
               [
-                [!!user, '1. Entrar (Líder)'],
+                [!!user, '1. Entrar (Jefe)'],
                 [saved.length > 0 || namedStaff > 0, '2. Crear horario'],
                 [staffOk, '3. Nombres médicos'],
                 [Object.keys(doc.cells).length > 0, '4. Pintar turnos'],

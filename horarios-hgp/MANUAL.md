@@ -1,7 +1,15 @@
-# Manual corto — Líderes de servicio (HGP)
+# Manual corto — Jefes de servicio (HGP)
+
+## Roles
+| Rol | Qué puede hacer |
+|-----|-----------------|
+| **Jefe de servicio** | Crear y editar horarios (borrador), enviar a revisión |
+| **Revisor** | Solo visualiza; **aprobar** o **devolver con comentario** de corrección |
+| **Validador** | Validar formalmente el horario ya aprobado |
+| **Admin** | Todo + reabrir horarios cerrados |
 
 ## 1. Abrir el sistema
-Entre con su usuario (selector «Entrar como»). Use **Líder de servicio** para elaborar.
+Entre con su usuario (selector «Entrar como»). Use **Jefe** para elaborar.
 
 ## 2. Crear / configurar el mes
 1. **+ Crear horario** (asistente)
@@ -53,11 +61,11 @@ También: resaltar vacíos, modo compacto, ir a un día, reemplazar clave.
 - **Comparar con mes anterior**: Δ de horas
 - **CONTINGENCIA**: obligatorio en médico si hay V/P/INC/CD (botón sugerir)
 
-## 7. Guardar y enviar
-1. **Guardar** (también hay autoguardado local)
-2. Revisar checklist → **Enviar a revisión**
-3. Gestión / Dirección **Aprueba** → se bloquea
-4. Talento Humano **Archiva**
+## 7. Guardar y enviar (flujo de roles)
+1. **Jefe** elabora → **Guardar** → **Enviar a revisión**
+2. **Revisor** visualiza → **Aprobar** *o* **Devolver con comentario** de corrección
+3. Si hay corrección: el jefe ajusta y vuelve a enviar
+4. **Validador** → **Validar horario** (queda bloqueado)
 5. **Exportar Excel / CSV** o **Imprimir / PDF** (1 hoja A4 horizontal)
 
 ## Claves frecuentes (Enfermería)

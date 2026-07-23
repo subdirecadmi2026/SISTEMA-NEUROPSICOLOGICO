@@ -1,11 +1,13 @@
 export type ServiceType = 'enfermeria' | 'medico'
 
 export type UserRole =
-  | 'lider_servicio'
-  | 'gestion_enfermeria'
-  | 'subdireccion'
-  | 'direccion_asistencial'
-  | 'talento_humano'
+  | 'lider_servicio' // Jefe de servicio: crea y edita horarios
+  | 'revisor' // Visualiza: aprueba o pide corrección con comentario
+  | 'validador' // Valida formalmente el horario aprobado
+  | 'gestion_enfermeria' // legado → permisos de revisor
+  | 'subdireccion' // legado → permisos de revisor
+  | 'direccion_asistencial' // legado → permisos de revisor
+  | 'talento_humano' // legado → permisos de validador
   | 'admin'
 
 export type ScheduleStatus =
@@ -57,7 +59,7 @@ export type ContingencyRow = {
 }
 
 export type ApprovalSignature = {
-  role: UserRole | 'elaborado' | 'revisado' | 'aprobado' | 'talento_humano'
+  role: UserRole | 'elaborado' | 'revisado' | 'aprobado' | 'talento_humano' | 'validado'
   name: string
   cargo: string
   at: string
@@ -71,6 +73,18 @@ export type AuditEntry = {
   userName: string
   action: string
   detail?: string
+}
+
+/** Comentario de corrección del revisor al devolver el horario. */
+export type ReviewComment = {
+  id: string
+  at: string
+  userId?: string
+  userName: string
+  role: UserRole
+  message: string
+  /** true cuando el jefe indica que ya atendió la corrección */
+  resolved?: boolean
 }
 
 export type CoverageRule = {
@@ -105,6 +119,8 @@ export type ScheduleDoc = {
   version: number
   signatures: ApprovalSignature[]
   audit: AuditEntry[]
+  /** Comentarios de corrección del revisor (devolver a borrador). */
+  reviewComments: ReviewComment[]
   coverageRule: CoverageRule
   updatedAt: string
   createdBy?: string
@@ -136,7 +152,9 @@ export const MONTHS_ES = [
 export const WEEKDAYS_ES = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 
 export const ROLE_LABEL: Record<UserRole, string> = {
-  lider_servicio: 'Líder de servicio',
+  lider_servicio: 'Jefe de servicio',
+  revisor: 'Revisor (visualización)',
+  validador: 'Validador',
   gestion_enfermeria: 'Gestión de Enfermería',
   subdireccion: 'Subdirección Médica',
   direccion_asistencial: 'Dirección Asistencial',
@@ -148,7 +166,7 @@ export const STATUS_LABEL: Record<ScheduleStatus, string> = {
   BORRADOR: 'Borrador',
   EN_REVISION: 'En revisión',
   APROBADO: 'Aprobado',
-  ARCHIVADO: 'Archivado',
+  ARCHIVADO: 'Validado',
 }
 
 export const DEFAULT_COVERAGE: CoverageRule = {
