@@ -65,6 +65,7 @@ import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { ToolsToolbar } from './components/ToolsToolbar'
 import { SubmissionChecklist } from './components/SubmissionChecklist'
 import { RoleModeBanner } from './components/RoleModeBanner'
+import { RoleInbox, countPendingForRole } from './components/RoleInbox'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -140,6 +141,7 @@ export default function App() {
     if (user.serviceUnits.length === 0) return saved
     return saved.filter((s) => user.serviceUnits.includes(s.unitName))
   })()
+  const pendingCount = countPendingForRole(user, visibleSaved)
   const namedStaff = doc.staff.filter((s) => s.name.trim().length > 0).length
   const emptySlots = doc.staff.length - namedStaff
   const staffOk = namedStaff >= 1
@@ -442,10 +444,16 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-2">
             <AuthBar
               user={user}
+              pendingCount={pendingCount}
               onLogin={(u) => {
                 setUser(u)
                 setShowCreate(isJefeRole(u.role) && saved.length === 0)
-                flash(`Sesión: ${u.name}`)
+                const n = countPendingForRole(u, saved)
+                flash(
+                  n > 0
+                    ? `Sesión: ${u.name} · ${n} pendiente(s) en bandeja`
+                    : `Sesión: ${u.name}`,
+                )
               }}
               onLogout={() => {
                 logout()
@@ -1063,6 +1071,21 @@ export default function App() {
           </>
         )}
 
+        <RoleInbox
+          user={user}
+          items={visibleSaved}
+          currentId={doc.id}
+          onOpen={(id) => {
+            void handleLoad(id).then(() => {
+              window.setTimeout(() => {
+                document
+                  .getElementById('flujo-aprobacion')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 180)
+            })
+          }}
+        />
+
         <SchedulesHome
           items={visibleSaved}
           remote={isRemoteEnabled()}
@@ -1079,7 +1102,15 @@ export default function App() {
           }
           onCreate={() => setShowCreate(true)}
           onRefresh={() => void refreshList()}
-          onOpen={(id) => void handleLoad(id)}
+          onOpen={(id) => {
+            void handleLoad(id).then(() => {
+              window.setTimeout(() => {
+                document
+                  .getElementById('flujo-aprobacion')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }, 180)
+            })
+          }}
           onDelete={(id) => void handleDeleteSaved(id)}
         />
 

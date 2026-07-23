@@ -645,3 +645,53 @@ describe('flujo de roles Jefe → Revisor → Validador', () => {
     expect(validated.doc.status).toBe('ARCHIVADO')
   })
 })
+
+describe('bandeja por rol', () => {
+  it('cuenta pendientes de revisor y validador', async () => {
+    const { countPendingForRole } = await import('../components/RoleInbox')
+    const items = [
+      {
+        id: '1',
+        label: 'a',
+        serviceType: 'medico' as const,
+        unitName: 'Medicina interna',
+        month: 7,
+        year: 2026,
+        updatedAt: '2026-07-01',
+        status: 'EN_REVISION' as const,
+      },
+      {
+        id: '2',
+        label: 'b',
+        serviceType: 'medico' as const,
+        unitName: 'Pediatría',
+        month: 7,
+        year: 2026,
+        updatedAt: '2026-07-02',
+        status: 'APROBADO' as const,
+      },
+      {
+        id: '3',
+        label: 'c',
+        serviceType: 'medico' as const,
+        unitName: 'Medicina interna',
+        month: 8,
+        year: 2026,
+        updatedAt: '2026-07-03',
+        status: 'BORRADOR' as const,
+      },
+    ]
+    const revisor = {
+      id: 'u-revisor',
+      email: 'r@hgp.gob.ec',
+      name: 'R',
+      role: 'revisor' as const,
+      serviceUnits: [] as string[],
+    }
+    const validador = { ...revisor, id: 'u-val', role: 'validador' as const }
+    const jefe = { ...revisor, id: 'u-j', role: 'lider_servicio' as const }
+    expect(countPendingForRole(revisor, items)).toBe(1)
+    expect(countPendingForRole(validador, items)).toBe(1)
+    expect(countPendingForRole(jefe, items)).toBe(1)
+  })
+})

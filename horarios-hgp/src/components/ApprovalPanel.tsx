@@ -67,7 +67,7 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
   }
 
   return (
-    <section className="no-print mb-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm">
+    <section className="no-print mb-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm" id="flujo-aprobacion">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-xl text-navy">Flujo de aprobación</h2>

@@ -3,6 +3,7 @@ import { DEMO_USERS, loginAs, roleLabel } from '../lib/auth'
 
 type Props = {
   user: AppUser | null
+  pendingCount?: number
   onLogin: (u: AppUser) => void
   onLogout: () => void
 }
@@ -17,7 +18,7 @@ const SHORT: Record<string, string> = {
   'u-admin': 'Admin',
 }
 
-export function AuthBar({ user, onLogin, onLogout }: Props) {
+export function AuthBar({ user, pendingCount = 0, onLogin, onLogout }: Props) {
   if (!user) {
     return (
       <div className="no-print flex flex-wrap items-center gap-2">
@@ -63,6 +64,14 @@ export function AuthBar({ user, onLogin, onLogout }: Props) {
       <span className="rounded-lg border border-teal-soft/40 bg-teal/20 px-2 py-1 font-semibold">
         {user.name} · {roleLabel(user.role)}
       </span>
+      {pendingCount > 0 && (
+        <span
+          className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-bold text-navy-deep"
+          title="Pendientes en bandeja"
+        >
+          {pendingCount} pend.
+        </span>
+      )}
       <button
         type="button"
         onClick={onLogout}
