@@ -5,7 +5,7 @@
 |-----|--------|
 | **Jefe (médico)** | Sistema completo: crear, pintar, personal, enviar |
 | **Revisor** | Solo módulo de **tarjetas**: abrir uno, ver grilla, aprobar o comentar |
-| **Validador** | Solo módulo de **tarjetas**: abrir uno y validar |
+| **Validador** | Dos módulos: **Pendientes** (tarjetas) y **Archivo validado**; al validar guarda PDF en carpeta de la especialidad |
 | **Admin** | Sistema completo + reabrir |
 
 ## 1. Abrir el sistema
@@ -65,7 +65,7 @@ También: resaltar vacíos, modo compacto, ir a un día, reemplazar clave.
 1. **Jefe** elabora → **Guardar** → **Enviar a revisión**
 2. **Revisor** ve solo **tarjetas** → abre una → aprueba o deja comentario → pasa al siguiente
 3. Si hay corrección: el jefe ve el aviso rojo al abrir el horario, corrige y reenvía
-4. **Validador** ve solo **tarjetas** → abre una → **Validar**
+4. **Validador** → módulo **Pendientes** → Validar · guardar PDF (crea carpeta de la especialidad) → queda en **Archivo validado**
 5. **Exportar Excel / CSV** o **Imprimir / PDF** (jefe)
 
 ## Claves frecuentes (Enfermería)

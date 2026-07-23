@@ -66,6 +66,7 @@ import {
   ReviewCardsModule,
   workspaceModeFor,
 } from './components/ReviewCardsModule'
+import { ValidadorWorkspace } from './components/ValidadorWorkspace'
 import { CorrectionsAlert } from './components/CorrectionsAlert'
 import { ScheduleContextBar } from './components/ScheduleContextBar'
 import { ConfigModule } from './components/ConfigModule'
@@ -531,9 +532,27 @@ export default function App() {
         </main>
       )}
 
-      {(workspace === 'revisor' || workspace === 'validador') && user && (
+      {workspace === 'revisor' && user && (
         <ReviewCardsModule
-          mode={workspace}
+          mode="revisor"
+          user={user}
+          items={saved}
+          loading={listLoading}
+          onRefresh={() => void refreshList()}
+          onFlash={flash}
+          onChanged={(d) => {
+            void persistSchedule(d, user)
+              .then(() => refreshList())
+              .catch(() => {
+                saveSchedule(d)
+                void refreshList()
+              })
+          }}
+        />
+      )}
+
+      {workspace === 'validador' && user && (
+        <ValidadorWorkspace
           user={user}
           items={saved}
           loading={listLoading}

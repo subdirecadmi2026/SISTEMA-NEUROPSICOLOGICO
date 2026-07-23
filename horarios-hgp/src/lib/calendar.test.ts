@@ -758,3 +758,30 @@ describe('workspace por rol', () => {
     expect(workspaceModeFor(null)).toBe('login')
   })
 })
+
+describe('PDF archivo validador', () => {
+  it('nombra carpeta y archivo por especialidad', async () => {
+    const { specialtyFolderName, pdfFileName, buildSchedulePdfBlob } =
+      await import('./exportPdf')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.unitName = 'Medicina interna'
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dr. A',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'CE' }
+    expect(specialtyFolderName(doc)).toBe('Medicina interna')
+    expect(pdfFileName(doc)).toContain('Medicina interna')
+    expect(pdfFileName(doc)).toContain('2026-07')
+    const blob = await buildSchedulePdfBlob(doc)
+    expect(blob.size).toBeGreaterThan(100)
+    expect(blob.type).toContain('pdf')
+  })
+})
