@@ -383,6 +383,32 @@ describe('operaciones de mes', () => {
     const swapped = swapCodesInSchedule(filled, 'D1', 'N1')
     expect(swapped.cells[cellKey('a', 1)]).toBe('N1')
   })
+
+  it('reemplaza clave y duplica horario como nuevo', async () => {
+    const { replaceCodeInSchedule, duplicateScheduleAsNew } =
+      await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Ana',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'CE', [cellKey('a', 2)]: 'CE' }
+    const replaced = replaceCodeInSchedule(doc, 'CE', 'HA')
+    expect(replaced.cells[cellKey('a', 1)]).toBe('HA')
+    expect(replaced.cells[cellKey('a', 2)]).toBe('HA')
+    const copy = duplicateScheduleAsNew(replaced)
+    expect(copy.id).not.toBe(doc.id)
+    expect(copy.status).toBe('BORRADOR')
+    expect(copy.staff[0].name).toBe('Ana')
+    expect(Object.values(copy.cells)).toContain('HA')
+  })
 })
 
 describe('export CSV', () => {

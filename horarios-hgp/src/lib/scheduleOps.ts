@@ -827,3 +827,75 @@ export function swapCodesInSchedule(
     ],
   }
 }
+
+/** Reemplaza una clave por otra en todas las celdas. */
+export function replaceCodeInSchedule(
+  doc: ScheduleDoc,
+  fromCode: string,
+  toCode: string,
+): ScheduleDoc {
+  const from = fromCode.trim().toUpperCase()
+  const to = toCode.trim().toUpperCase()
+  if (!from || !to || from === to) return doc
+  if (!shiftMeta(doc.serviceType, to)) return doc
+  const cells = { ...doc.cells }
+  let n = 0
+  for (const [k, v] of Object.entries(cells)) {
+    if (v !== from) continue
+    cells[k] = to
+    n += 1
+  }
+  if (n === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'reemplazar_clave',
+        detail: `${from} → ${to} (${n})`,
+      },
+    ],
+  }
+}
+
+/** Duplica el horario actual como un borrador nuevo (mismo contenido). */
+export function duplicateScheduleAsNew(doc: ScheduleDoc): ScheduleDoc {
+  const staff = doc.staff.map((s, i) => ({
+    ...s,
+    id: uid(s.fun === 'MED' || s.fun.startsWith('M') ? 'med' : 'enf'),
+    order: i + 1,
+  }))
+  const idMap = new Map(doc.staff.map((s, i) => [s.id, staff[i].id]))
+  const cells: ScheduleCell = {}
+  for (const [k, v] of Object.entries(doc.cells)) {
+    const [oldId, day] = k.split(':')
+    const newId = idMap.get(oldId)
+    if (!newId) continue
+    cells[`${newId}:${day}`] = v
+  }
+  return {
+    ...doc,
+    id: uid('sch'),
+    staff,
+    cells,
+    status: 'BORRADOR',
+    version: 1,
+    signatures: [],
+    updatedAt: new Date().toISOString(),
+    audit: [
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'duplicar_horario',
+        detail: `Copia de ${doc.id}`,
+      },
+    ],
+  }
+}

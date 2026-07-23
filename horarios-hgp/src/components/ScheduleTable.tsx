@@ -21,6 +21,8 @@ type Props = {
   paintMode: boolean
   activeCode: string
   highlightEmpty?: boolean
+  compact?: boolean
+  focusDay?: number | null
   onChange: (doc: ScheduleDoc) => void
   onAddStaff: () => void
   onNewDemo: () => void
@@ -32,6 +34,8 @@ export function ScheduleTable({
   paintMode,
   activeCode,
   highlightEmpty = false,
+  compact = false,
+  focusDay = null,
   onChange,
   onAddStaff,
   onNewDemo,
@@ -53,6 +57,13 @@ export function ScheduleTable({
     string
   > | null>(null)
   const [staffFilter, setStaffFilter] = useState('')
+  const dayRefs = useRef<Record<number, HTMLTableCellElement | null>>({})
+
+  useEffect(() => {
+    if (!focusDay) return
+    const el = dayRefs.current[focusDay]
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }, [focusDay])
 
   useEffect(() => {
     const stop = () => {
@@ -216,13 +227,16 @@ export function ScheduleTable({
           </button>
         )}
         <p className="text-[11px] text-muted">
-          Clic en el número del día = pintar columna con clave activa · Clic
-          derecho en día = borrar columna
+          Clic en el número del día = pintar columna · Clic derecho = borrar
+          columna
+          {compact ? ' · Modo compacto' : ''}
         </p>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1500px] border-collapse text-[11px]">
+        <table
+          className={`w-full border-collapse ${compact ? 'min-w-[1200px] text-[10px]' : 'min-w-[1500px] text-[11px]'}`}
+        >
           <thead>
             <tr className="bg-sand/90">
               <th className="sticky left-0 z-20 border border-line bg-sand px-1 py-2">
@@ -242,9 +256,14 @@ export function ScheduleTable({
                 const d = i + 1
                 const weekend = isWeekend(doc.year, doc.month, d)
                 const holiday = holidays.has(d)
+                const focused = focusDay === d
                 return (
                   <th
                     key={d}
+                    ref={(el) => {
+                      dayRefs.current[d] = el
+                    }}
+                    data-day={d}
                     title={
                       holiday
                         ? 'Feriado · clic pinta columna'
@@ -264,14 +283,18 @@ export function ScheduleTable({
                     className={`min-w-[30px] border border-line px-0 py-1 text-center ${
                       readOnly ? '' : 'cursor-pointer hover:ring-2 hover:ring-navy/40'
                     } ${
-                      holiday
-                        ? 'bg-amber-200/80'
-                        : weekend
-                          ? 'bg-teal/10'
-                          : ''
+                      focused
+                        ? 'bg-navy text-white'
+                        : holiday
+                          ? 'bg-amber-200/80'
+                          : weekend
+                            ? 'bg-teal/10'
+                            : ''
                     }`}
                   >
-                    <div className="text-[9px] font-normal text-muted">
+                    <div
+                      className={`text-[9px] font-normal ${focused ? 'text-white/80' : 'text-muted'}`}
+                    >
                       {weekdayLetter(doc.year, doc.month, d)}
                     </div>
                     <div className="font-semibold">{d}</div>
@@ -447,7 +470,9 @@ export function ScheduleTable({
                                 : 'Vacío · arrastre para pintar'
                           }
                         >
-                          <div className="grid h-7 place-items-center text-[10px] font-bold">
+                          <div
+                            className={`grid place-items-center font-bold ${compact ? 'h-5 text-[9px]' : 'h-7 text-[10px]'}`}
+                          >
                             {code}
                           </div>
                         </td>

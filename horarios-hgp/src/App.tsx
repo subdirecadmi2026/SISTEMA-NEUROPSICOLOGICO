@@ -30,6 +30,7 @@ import {
   createNextMonthDraft,
   applyHabitualCodesToEmpty,
   swapCodesInSchedule,
+  duplicateScheduleAsNew,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
 import {
@@ -59,9 +60,12 @@ import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
 import { AuditTrail } from './components/AuditTrail'
 import { EmptyCellsPanel } from './components/EmptyCellsPanel'
+import { ReplaceCodePanel } from './components/ReplaceCodePanel'
+import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
+import { assignmentsOnDay, daysInMonth } from './lib/calendar'
 
 type TabId =
   | 'horario'
@@ -99,6 +103,10 @@ export default function App() {
   const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null)
   const [highlightEmpty, setHighlightEmpty] = useState(false)
   const [recentCodes, setRecentCodes] = useState<string[]>([])
+  const [compactTable, setCompactTable] = useState(false)
+  const [focusDay, setFocusDay] = useState<number | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [jumpDay, setJumpDay] = useState(1)
   const docRefApp = useRef(doc)
   docRefApp.current = doc
 
@@ -929,6 +937,52 @@ export default function App() {
             />
             Resaltar vacíos
           </label>
+          <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={compactTable}
+              onChange={(e) => setCompactTable(e.target.checked)}
+            />
+            Compacto
+          </label>
+          <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+            Ir al día
+            <input
+              type="number"
+              min={1}
+              max={daysInMonth(doc.year, doc.month)}
+              value={jumpDay}
+              onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
+              className="w-14 rounded border border-line px-1 py-1 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const max = daysInMonth(doc.year, doc.month)
+                const d = Math.min(Math.max(1, jumpDay), max)
+                setFocusDay(d)
+                setTab('horario')
+                flash(`Enfocado día ${d}`)
+              }}
+              className="rounded bg-navy px-2 py-1 text-xs font-semibold text-white"
+            >
+              Ir
+            </button>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              const next = duplicateScheduleAsNew(doc)
+              undoStack.current = []
+              setUndoCount(0)
+              setDoc(next)
+              setDirty(true)
+              flash('Copia del horario creada como borrador nuevo')
+            }}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
+          >
+            Duplicar como nuevo
+          </button>
           <span className="ml-auto self-center text-xs text-muted">
             {dirty
               ? 'Cambios sin guardar… (auto en 12s)'
@@ -939,6 +993,8 @@ export default function App() {
         </section>
 
         <MonthSummary doc={doc} />
+
+        <ShortcutsHelp open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} />
 
         <AlertsBanner
           doc={doc}
@@ -959,13 +1015,21 @@ export default function App() {
         )}
 
         {tab === 'horario' && (
-          <EmptyCellsPanel
-            doc={doc}
-            readOnly={readOnly}
-            activeCode={activeCode}
-            onChange={patchDoc}
-            onFlash={flash}
-          />
+          <>
+            <EmptyCellsPanel
+              doc={doc}
+              readOnly={readOnly}
+              activeCode={activeCode}
+              onChange={patchDoc}
+              onFlash={flash}
+            />
+            <ReplaceCodePanel
+              doc={doc}
+              readOnly={readOnly}
+              onChange={patchDoc}
+              onFlash={flash}
+            />
+          </>
         )}
 
         <SchedulesHome
@@ -1115,6 +1179,8 @@ export default function App() {
               paintMode={paintMode}
               activeCode={activeCode}
               highlightEmpty={highlightEmpty}
+              compact={compactTable}
+              focusDay={focusDay}
               onChange={patchDoc}
               onAddStaff={addStaff}
               onNewDemo={() =>
@@ -1142,14 +1208,55 @@ export default function App() {
           <p className="mb-2 text-xs text-muted">
             Edición completa recomendada en escritorio. Resumen del mes:
           </p>
-          <ul className="space-y-1 text-sm">
+          <ul className="mb-3 space-y-1 text-sm">
             <li>
               <strong>{doc.unitName}</strong> · {MONTHS_ES[doc.month - 1]}{' '}
               {doc.year}
             </li>
-            <li>Personal: {doc.staff.length}</li>
+            <li>
+              Personal: {doc.staff.filter((s) => s.name.trim()).length}
+            </li>
             <li>Estado: {STATUS_LABEL[doc.status]}</li>
             <li>Jefe: {doc.jefeServicio || '—'}</li>
+          </ul>
+          <label className="mb-2 block text-xs text-muted">
+            Ver quién trabaja el día
+            <input
+              type="number"
+              min={1}
+              max={daysInMonth(doc.year, doc.month)}
+              value={jumpDay}
+              onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
+              className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm"
+            />
+          </label>
+          <ul className="space-y-1 text-sm">
+            {assignmentsOnDay(
+              doc,
+              Math.min(
+                Math.max(1, jumpDay),
+                daysInMonth(doc.year, doc.month),
+              ),
+            ).map((a) => (
+              <li
+                key={`${a.staffId}-${a.code}`}
+                className="flex justify-between gap-2 rounded border border-line px-2 py-1"
+              >
+                <span>
+                  {a.fun} {a.name}
+                </span>
+                <strong>{a.code}</strong>
+              </li>
+            ))}
+            {assignmentsOnDay(
+              doc,
+              Math.min(
+                Math.max(1, jumpDay),
+                daysInMonth(doc.year, doc.month),
+              ),
+            ).length === 0 && (
+              <li className="text-muted">Sin asignaciones ese día.</li>
+            )}
           </ul>
         </section>
 
