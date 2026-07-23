@@ -591,3 +591,129 @@ export function createNextMonthDraft(doc: ScheduleDoc): ScheduleDoc {
     ],
   }
 }
+
+/**
+ * Copia el patrón de turnos de una persona hacia otra,
+ * solo en celdas vacías del destino.
+ */
+export function copyCellsBetweenStaff(
+  doc: ScheduleDoc,
+  fromId: string,
+  toId: string,
+): ScheduleDoc {
+  if (fromId === toId) return doc
+  const days = daysInMonth(doc.year, doc.month)
+  const cells = { ...doc.cells }
+  let painted = 0
+  for (let d = 1; d <= days; d++) {
+    const src = cells[`${fromId}:${d}`]
+    if (!src) continue
+    const destKey = `${toId}:${d}`
+    if (cells[destKey]) continue
+    cells[destKey] = src
+    painted += 1
+  }
+  if (painted === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'copiar_turnos_persona',
+        detail: `from=${fromId} to=${toId} celdas=${painted}`,
+      },
+    ],
+  }
+}
+
+/** Ordena personal A–Z por nombre (mantiene FUN como secundario). */
+export function sortStaffByName(doc: ScheduleDoc): ScheduleDoc {
+  const staff = [...doc.staff]
+    .sort((a, b) => {
+      const an = a.name.trim().toLowerCase()
+      const bn = b.name.trim().toLowerCase()
+      if (!an && bn) return 1
+      if (an && !bn) return -1
+      return an.localeCompare(bn, 'es') || a.fun.localeCompare(b.fun)
+    })
+    .map((s, i) => ({ ...s, order: i + 1 }))
+  return {
+    ...doc,
+    staff,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'ordenar_personal',
+        detail: 'A-Z por nombre',
+      },
+    ],
+  }
+}
+
+/**
+ * Agrega nombres pegados (uno por línea) como filas nuevas.
+ * Líneas vacías se ignoran; no duplica nombres exactos ya existentes.
+ */
+export function addStaffFromNameList(
+  doc: ScheduleDoc,
+  text: string,
+): ScheduleDoc {
+  const existing = new Set(
+    doc.staff.map((s) => s.name.trim().toLowerCase()).filter(Boolean),
+  )
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return doc
+
+  const isEnf = doc.serviceType === 'enfermeria'
+  const extras: StaffMember[] = []
+  for (const name of lines) {
+    const key = name.toLowerCase()
+    if (existing.has(key)) continue
+    existing.add(key)
+    extras.push({
+      id: uid(isEnf ? 'enf' : 'med'),
+      name,
+      fun: isEnf ? 'ENF' : 'MED',
+      role: isEnf ? 'Enfermera/o' : 'Médico',
+      relacionLaboral: 'LOSEP',
+      codigoPersonal: isEnf ? 'D1' : 'CE',
+      order: doc.staff.length + extras.length + 1,
+      section: isEnf
+        ? 'Enfermeras/os y Auxiliar de Enfermería'
+        : 'Personal médico',
+      serviceUnit: doc.unitName,
+      active: true,
+    })
+  }
+  if (extras.length === 0) return doc
+  return {
+    ...doc,
+    staff: [...doc.staff, ...extras].map((s, i) => ({ ...s, order: i + 1 })),
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'pegar_nombres',
+        detail: `${extras.length} nombres agregados`,
+      },
+    ],
+  }
+}

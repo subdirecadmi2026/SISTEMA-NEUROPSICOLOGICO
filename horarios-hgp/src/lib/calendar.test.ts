@@ -346,6 +346,44 @@ describe('operaciones de mes', () => {
     expect(next.status).toBe('BORRADOR')
     expect(next.id).not.toBe(doc.id)
   })
+
+  it('pega nombres y copia turnos entre personas', async () => {
+    const { addStaffFromNameList, copyCellsBetweenStaff, sortStaffByName } =
+      await import('./scheduleOps')
+    let doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = []
+    doc = addStaffFromNameList(doc, 'Dr. Uno\nDra. Dos\nDr. Uno')
+    expect(doc.staff).toHaveLength(2)
+    doc.cells = { [cellKey(doc.staff[0].id, 1)]: 'CE' }
+    const copied = copyCellsBetweenStaff(doc, doc.staff[0].id, doc.staff[1].id)
+    expect(copied.cells[cellKey(doc.staff[1].id, 1)]).toBe('CE')
+    const sorted = sortStaffByName(copied)
+    expect(sorted.staff[0].name.startsWith('Dr')).toBe(true)
+  })
+})
+
+describe('export CSV', () => {
+  it('genera CSV con BOM y totales', async () => {
+    const { buildScheduleCsv } = await import('./exportCsv')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Ana',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'CE' }
+    const csv = buildScheduleCsv(doc)
+    expect(csv.startsWith('\uFEFF')).toBe(true)
+    expect(csv).toContain('Ana')
+    expect(csv).toContain('CE')
+    expect(csv).toContain('TOTAL HORAS DÍA')
+  })
 })
 
 describe('asignaciones y ranking', () => {

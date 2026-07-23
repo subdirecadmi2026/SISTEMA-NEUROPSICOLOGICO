@@ -1,6 +1,11 @@
+import { useState } from 'react'
 import type { ScheduleDoc, StaffMember } from '../types'
 import { createEmptyStaff } from '../lib/staffLibrary'
 import { uid } from '../types'
+import {
+  addStaffFromNameList,
+  sortStaffByName,
+} from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -21,6 +26,8 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
     : 'Nombres del personal de enfermería'
   const named = doc.staff.filter((s) => s.name.trim()).length
   const sorted = [...doc.staff].sort((a, b) => a.order - b.order)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
 
   function update(id: string, patch: Partial<StaffMember>) {
     onChange({
@@ -60,6 +67,14 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
     })
   }
 
+  function applyPaste() {
+    const next = addStaffFromNameList(doc, pasteText)
+    if (next === doc) return
+    onChange(next)
+    setPasteText('')
+    setPasteOpen(false)
+  }
+
   return (
     <section
       className={`no-print mb-4 rounded-2xl border p-4 shadow-sm ${
@@ -85,15 +100,53 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
           </p>
         </div>
         {!readOnly && (
-          <button
-            type="button"
-            onClick={addRow}
-            className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white hover:bg-navy-deep"
-          >
-            + Agregar {isMed ? 'médico' : 'persona'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onChange(sortStaffByName(doc))}
+              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
+            >
+              Ordenar A–Z
+            </button>
+            <button
+              type="button"
+              onClick={() => setPasteOpen((v) => !v)}
+              className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
+            >
+              Pegar lista
+            </button>
+            <button
+              type="button"
+              onClick={addRow}
+              className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white hover:bg-navy-deep"
+            >
+              + Agregar {isMed ? 'médico' : 'persona'}
+            </button>
+          </div>
         )}
       </div>
+
+      {pasteOpen && !readOnly && (
+        <div className="mb-3 rounded-xl border border-teal/30 bg-teal/5 p-3">
+          <p className="mb-2 text-xs text-muted">
+            Pegue un nombre por línea. Se agregan sin duplicar nombres exactos.
+          </p>
+          <textarea
+            rows={5}
+            className="mb-2 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
+            placeholder={'Dr. Ana Pérez\nDr. Luis Gómez\nDra. María Castro'}
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={applyPaste}
+            className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
+          >
+            Agregar nombres
+          </button>
+        </div>
+      )}
 
       {sorted.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-sand/40 px-4 py-6 text-center">

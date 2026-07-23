@@ -55,7 +55,9 @@ import { MonthSummary } from './components/MonthSummary'
 import { NotesPanel } from './components/NotesPanel'
 import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
+import { AuditTrail } from './components/AuditTrail'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
+import { downloadScheduleCsv } from './lib/exportCsv'
 
 type TabId =
   | 'horario'
@@ -332,6 +334,15 @@ export default function App() {
     }
   }
 
+  function handleExportCsv() {
+    try {
+      downloadScheduleCsv(doc)
+      flash('CSV exportado')
+    } catch {
+      flash('Error al exportar CSV')
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <header className="no-print border-b border-line/80 bg-navy text-white">
@@ -397,6 +408,13 @@ export default function App() {
               className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
             >
               Exportar Excel
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+            >
+              Exportar CSV
             </button>
           </div>
         </div>
@@ -870,6 +888,8 @@ export default function App() {
           }}
           onFlash={flash}
         />
+
+        <AuditTrail doc={doc} />
 
         <div className="no-print mb-3 flex flex-wrap gap-1">
           {(

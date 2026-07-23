@@ -13,7 +13,7 @@ import {
   weekdayLetter,
 } from '../lib/calendar'
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
-import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, clearStaffRowCells } from '../lib/scheduleOps'
+import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, clearStaffRowCells, copyCellsBetweenStaff } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -556,6 +556,25 @@ export function ScheduleTable({
                             className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand"
                           >
                             Dup
+                          </button>
+                          <button
+                            type="button"
+                            title="Copiar turnos de la fila anterior (solo vacíos)"
+                            disabled={globalIdx <= 0}
+                            onClick={() => {
+                              const prev = staffSorted[globalIdx - 1]
+                              if (!prev) return
+                              onChange(
+                                copyCellsBetweenStaff(
+                                  docRef.current,
+                                  prev.id,
+                                  s.id,
+                                ),
+                              )
+                            }}
+                            className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand disabled:opacity-40"
+                          >
+                            ←Copia
                           </button>
                           <button
                             type="button"
