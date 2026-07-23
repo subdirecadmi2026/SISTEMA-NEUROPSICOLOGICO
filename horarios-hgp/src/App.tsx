@@ -54,12 +54,10 @@ import { NamesEditor } from './components/NamesEditor'
 import { SchedulesHome } from './components/SchedulesHome'
 import { PrintSheet } from './components/PrintSheet'
 import { MonthSummary } from './components/MonthSummary'
-import { NotesPanel } from './components/NotesPanel'
 import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
 import { AuditTrail } from './components/AuditTrail'
 import { CellAdjustModule } from './components/CellAdjustModule'
-import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { ToolsToolbar } from './components/ToolsToolbar'
 import { SubmissionChecklist } from './components/SubmissionChecklist'
 import { RoleModeBanner } from './components/RoleModeBanner'
@@ -69,18 +67,13 @@ import {
   workspaceModeFor,
 } from './components/ReviewCardsModule'
 import { CorrectionsAlert } from './components/CorrectionsAlert'
+import { ScheduleContextBar } from './components/ScheduleContextBar'
+import { ConfigModule } from './components/ConfigModule'
+import { EditorTabs, type EditorTabId } from './components/EditorTabs'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
 import { assignmentsOnDay, daysInMonth } from './lib/calendar'
-
-type TabId =
-  | 'horario'
-  | 'claves'
-  | 'distribucion'
-  | 'contingencia'
-  | 'personal'
-  | 'imprimir'
 
 const now = new Date()
 
@@ -96,7 +89,7 @@ export default function App() {
   const [claveTab, setClaveTab] = useState<'turno' | 'area' | 'ausencia' | 'todas'>(
     'todas',
   )
-  const [tab, setTab] = useState<TabId>('horario')
+  const [tab, setTab] = useState<EditorTabId>('horario')
   const [saved, setSaved] = useState<SavedIndexItem[]>([])
   const [toast, setToast] = useState('')
   const [user, setUser] = useState<AppUser | null>(() => loadSession())
@@ -573,259 +566,40 @@ export default function App() {
           onFlash={flash}
         />
 
-        {/* Checklist operativo */}
-        <section className="no-print mb-4 rounded-2xl border border-line bg-white/90 p-4 shadow-sm">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-            Pasos del mes
-          </p>
-          <ol className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
-            {(
-              [
-                [!!user, '1. Entrar (Jefe)'],
-                [saved.length > 0 || namedStaff > 0, '2. Crear horario'],
-                [staffOk, '3. Nombres médicos'],
-                [Object.keys(doc.cells).length > 0, '4. Pintar turnos'],
-                [doc.status !== 'BORRADOR', '5. Enviar / aprobar'],
-              ] as const
-            ).map(([done, label]) => (
-              <li
-                key={label}
-                className={`rounded-lg border px-3 py-2 ${
-                  done
-                    ? 'border-teal/40 bg-teal/10 font-semibold text-navy'
-                    : 'border-line bg-sand/40 text-muted'
-                }`}
-              >
-                {done ? '✓ ' : '○ '}
-                {label}
-              </li>
-            ))}
-          </ol>
-        </section>
+        <ScheduleContextBar
+          doc={doc}
+          namedStaff={namedStaff}
+          emptySlots={emptySlots}
+          staffOk={staffOk}
+          canCreate={canCreate}
+          readOnly={readOnly}
+          onCreate={() => setShowCreate(true)}
+          onEditNames={() => {
+            setTab('personal')
+            setHighlightNames(true)
+            flash('Edite los nombres en Personal')
+            window.setTimeout(() => setHighlightNames(false), 5000)
+          }}
+          onAddStaff={(n) => addManyStaff(n)}
+        />
 
-        {/* Banner crear + estado de personal */}
-        <section className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3">
-          <div>
-            <p className="font-display text-lg text-navy">
-              {doc.unitName} · {MONTHS_ES[doc.month - 1]} {doc.year}
-            </p>
-            <p className="text-sm text-muted">
-              Personal en este horario:{' '}
-              <strong className="text-navy">{namedStaff}</strong> con nombre ·{' '}
-              <strong>{doc.staff.length}</strong> filas
-              {emptySlots > 0 ? ` · ${emptySlots} por completar` : ''}
-              {!staffOk && (
-                <span className="ml-2 font-semibold text-red-700">
-                  Debe constar al menos 1 especialista
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {canCreate && (
-              <button
-                type="button"
-                onClick={() => setShowCreate(true)}
-                className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-deep"
-              >
-                + Crear horario nuevo
-              </button>
-            )}
-            {canCreate && !readOnly && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTab('horario')
-                  setHighlightNames(true)
-                  flash('Escriba los nombres en la lista de abajo')
-                  window.setTimeout(() => setHighlightNames(false), 5000)
-                }}
-                className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
-              >
-                Editar nombres
-              </button>
-            )}
-            {!readOnly && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => addManyStaff(1)}
-                  className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
-                >
-                  + 1 personal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addManyStaff(5)}
-                  className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand"
-                >
-                  + 5 personal
-                </button>
-              </>
-            )}
-          </div>
-        </section>
-
-        <section className="no-print mb-4 grid gap-3 lg:grid-cols-[1.1fr_1fr]">
-          <div className="rounded-2xl border border-line bg-white/85 p-4 shadow-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              Tipo de horario
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {(['enfermeria', 'medico'] as ServiceType[]).map((t) => {
-                const active = doc.serviceType === t
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => switchService(t)}
-                    className={`rounded-xl border px-4 py-3 text-left transition ${
-                      active
-                        ? 'border-teal bg-teal text-white shadow'
-                        : 'border-line bg-sand/50 hover:border-teal/40'
-                    }`}
-                  >
-                    <p className="font-display text-lg">{SERVICE_LABEL[t]}</p>
-                    <p
-                      className={`text-xs ${active ? 'text-white/80' : 'text-muted'}`}
-                    >
-                      {t === 'enfermeria'
-                        ? 'Plantilla Gestión de Enfermería'
-                        : 'Cuadro de trabajo médico'}
-                    </p>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-line bg-white/85 p-4 shadow-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              Período y servicio
-            </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <label className="text-xs text-muted">
-                Mes
-                <select
-                  disabled={readOnly}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-2 text-sm disabled:opacity-70"
-                  value={doc.month}
-                  onChange={(e) =>
-                    patchDoc({ ...doc, month: Number(e.target.value) })
-                  }
-                >
-                  {MONTHS_ES.map((m, i) => (
-                    <option key={m} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-xs text-muted">
-                Año
-                <input
-                  type="number"
-                  disabled={readOnly}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-2 text-sm disabled:opacity-70"
-                  value={doc.year}
-                  onChange={(e) =>
-                    patchDoc({
-                      ...doc,
-                      year: Number(e.target.value) || doc.year,
-                    })
-                  }
-                />
-              </label>
-              <label className="col-span-2 text-xs text-muted sm:col-span-1">
-                Servicio
-                <select
-                  disabled={readOnly}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-2 text-sm disabled:opacity-70"
-                  value={doc.unitName}
-                  onChange={(e) =>
-                    patchDoc({ ...doc, unitName: e.target.value })
-                  }
-                >
-                  {units.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="col-span-2 text-xs text-muted sm:col-span-3">
-                Jefe / líder de servicio
-                <input
-                  disabled={readOnly}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-2 text-sm disabled:opacity-70"
-                  value={doc.jefeServicio}
-                  onChange={(e) =>
-                    patchDoc({ ...doc, jefeServicio: e.target.value })
-                  }
-                />
-              </label>
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  disabled={readOnly}
-                  checked={doc.llamado}
-                  onChange={(e) =>
-                    patchDoc({ ...doc, llamado: e.target.checked })
-                  }
-                />
-                Llamado
-              </label>
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  disabled={readOnly}
-                  checked={doc.vacacionesFlag}
-                  onChange={(e) =>
-                    patchDoc({ ...doc, vacacionesFlag: e.target.checked })
-                  }
-                />
-                Vacaciones (mes)
-              </label>
-              <label className="col-span-2 text-xs text-muted sm:col-span-3">
-                Cobertura mínima (personas / horas día)
-                <div className="mt-1 flex gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    disabled={readOnly}
-                    className="w-24 rounded-lg border border-line px-2 py-1.5 text-sm"
-                    value={doc.coverageRule.minStaffPerDay}
-                    onChange={(e) =>
-                      patchDoc({
-                        ...doc,
-                        coverageRule: {
-                          ...doc.coverageRule,
-                          minStaffPerDay: Number(e.target.value) || 0,
-                        },
-                      })
-                    }
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    disabled={readOnly}
-                    className="w-24 rounded-lg border border-line px-2 py-1.5 text-sm"
-                    value={doc.coverageRule.minHoursPerDay}
-                    onChange={(e) =>
-                      patchDoc({
-                        ...doc,
-                        coverageRule: {
-                          ...doc.coverageRule,
-                          minHoursPerDay: Number(e.target.value) || 0,
-                        },
-                      })
-                    }
-                  />
-                </div>
-              </label>
-            </div>
-          </div>
-        </section>
+        <ConfigModule
+          doc={doc}
+          readOnly={readOnly}
+          units={units}
+          onSwitchService={switchService}
+          onPatch={patchDoc}
+          notesSlot={
+            <textarea
+              disabled={readOnly}
+              rows={4}
+              className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-teal disabled:opacity-70"
+              value={doc.notes}
+              placeholder="Observaciones del mes (impresión / archivo)…"
+              onChange={(e) => patchDoc({ ...doc, notes: e.target.value })}
+            />
+          }
+        />
 
         {!readOnly && (
           <ToolsToolbar
@@ -1088,7 +862,7 @@ export default function App() {
 
         <MonthSummary doc={doc} />
 
-        <NotesPanel doc={doc} readOnly={readOnly} onChange={patchDoc} />
+        <EditorTabs tab={tab} onChange={setTab} />
 
         {(tab === 'horario' || tab === 'claves') && (
           <CodeUsageBar
@@ -1099,85 +873,6 @@ export default function App() {
             }}
           />
         )}
-
-        {tab === 'horario' && !readOnly && (
-          <CellAdjustModule
-            doc={doc}
-            readOnly={readOnly}
-            activeCode={activeCode}
-            onChange={patchDoc}
-            onFlash={flash}
-          />
-        )}
-
-        <SchedulesHome
-          items={visibleSaved}
-          remote={isRemoteEnabled()}
-          loading={listLoading}
-          canCreate={canCreate}
-          canDelete={canDeleteSaved}
-          defaultStatus={listDefaultStatus}
-          title="Mis horarios"
-          onCreate={() => setShowCreate(true)}
-          onRefresh={() => void refreshList()}
-          onOpen={(id) => void handleLoad(id)}
-          onDelete={(id) => void handleDeleteSaved(id)}
-        />
-
-        <ApprovalPanel
-          doc={doc}
-          user={user}
-          onChange={(d) => {
-            setDoc(d)
-            void persistSchedule(d, user)
-              .then(() => refreshList())
-              .catch(() => {
-                saveSchedule(d)
-                void refreshList()
-              })
-          }}
-          onFlash={flash}
-        />
-
-        {doc.status === 'BORRADOR' && (
-          <SubmissionChecklist
-            doc={doc}
-            onGoFix={(hint) => {
-              if (hint === 'personal') setTab('personal')
-              else if (hint === 'contingencia') setTab('contingencia')
-              else if (hint === 'distribucion') setTab('distribucion')
-              else setTab('horario')
-            }}
-          />
-        )}
-
-        <AuditTrail doc={doc} />
-
-        <div className="no-print mb-3 flex flex-wrap gap-1">
-          {(
-            [
-              ['horario', 'HORARIO'],
-              ['claves', 'CLAVES'],
-              ['distribucion', 'DISTRIBUCIÓN'],
-              ['contingencia', 'CONTINGENCIA'],
-              ['personal', 'PERSONAL'],
-              ['imprimir', 'IMPRIMIR'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`rounded-t-lg border border-b-0 px-4 py-2 text-sm font-semibold ${
-                tab === id
-                  ? 'border-line bg-white text-navy'
-                  : 'border-transparent bg-sand/60 text-muted hover:bg-white/70'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
 
         {tab === 'personal' && (
           <>
@@ -1261,31 +956,76 @@ export default function App() {
         )}
 
         {tab === 'horario' && (
-          <>
-            <NamesEditor
-              doc={doc}
-              readOnly={readOnly}
-              onChange={patchDoc}
-              highlight={highlightNames}
-            />
-            <ScheduleTable
-              doc={doc}
-              readOnly={readOnly}
-              paintMode={paintMode}
-              activeCode={activeCode}
-              highlightEmpty={highlightEmpty}
-              compact={compactTable}
-              focusDay={focusDay}
-              onChange={patchDoc}
-              onAddStaff={addStaff}
-              onNewDemo={() =>
-                setDoc(
-                  createBlankSchedule(doc.serviceType, doc.year, doc.month),
-                )
-              }
-            />
-          </>
+          <ScheduleTable
+            doc={doc}
+            readOnly={readOnly}
+            paintMode={paintMode}
+            activeCode={activeCode}
+            highlightEmpty={highlightEmpty}
+            compact={compactTable}
+            focusDay={focusDay}
+            onChange={patchDoc}
+            onAddStaff={addStaff}
+            onNewDemo={() =>
+              setDoc(
+                createBlankSchedule(doc.serviceType, doc.year, doc.month),
+              )
+            }
+          />
         )}
+
+        {tab === 'horario' && !readOnly && (
+          <CellAdjustModule
+            doc={doc}
+            readOnly={readOnly}
+            activeCode={activeCode}
+            onChange={patchDoc}
+            onFlash={flash}
+          />
+        )}
+
+        <SchedulesHome
+          items={visibleSaved}
+          remote={isRemoteEnabled()}
+          loading={listLoading}
+          canCreate={canCreate}
+          canDelete={canDeleteSaved}
+          defaultStatus={listDefaultStatus}
+          title="Mis horarios"
+          onCreate={() => setShowCreate(true)}
+          onRefresh={() => void refreshList()}
+          onOpen={(id) => void handleLoad(id)}
+          onDelete={(id) => void handleDeleteSaved(id)}
+        />
+
+        <ApprovalPanel
+          doc={doc}
+          user={user}
+          onChange={(d) => {
+            setDoc(d)
+            void persistSchedule(d, user)
+              .then(() => refreshList())
+              .catch(() => {
+                saveSchedule(d)
+                void refreshList()
+              })
+          }}
+          onFlash={flash}
+        />
+
+        {doc.status === 'BORRADOR' && (
+          <SubmissionChecklist
+            doc={doc}
+            onGoFix={(hint) => {
+              if (hint === 'personal') setTab('personal')
+              else if (hint === 'contingencia') setTab('contingencia')
+              else if (hint === 'distribucion') setTab('distribucion')
+              else setTab('horario')
+            }}
+          />
+        )}
+
+        <AuditTrail doc={doc} />
 
         {/* Siempre montada: en pantalla solo en pestaña Imprimir; al imprimir siempre 1 hoja */}
         <div
