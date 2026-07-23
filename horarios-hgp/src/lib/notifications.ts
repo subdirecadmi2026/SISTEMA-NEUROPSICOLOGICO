@@ -1,6 +1,10 @@
 import type { AppUser, ScheduleDoc } from '../types'
 import { MONTHS_ES, uid } from '../types'
 import { isJefeRole } from './auth'
+import {
+  markNotificationReadRemote,
+  pushAllNotificationsRemote,
+} from './remoteCatalog'
 
 const KEY = 'hgp-notifications-v1'
 
@@ -32,6 +36,24 @@ function saveAll(list: HgpNotification[]) {
   localStorage.setItem(KEY, JSON.stringify(list.slice(0, 200)))
 }
 
+export function readNotificationsLocal(): HgpNotification[] {
+  return loadAll()
+}
+
+export function replaceNotificationsLocal(list: HgpNotification[]) {
+  saveAll(
+    [...list]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 200),
+  )
+}
+
+function queueRemoteNotificationsPush(list?: HgpNotification[]) {
+  if (typeof window === 'undefined') return
+  const payload = list ?? loadAll()
+  void pushAllNotificationsRemote(payload).catch(() => undefined)
+}
+
 export function addNotification(
   partial: Omit<HgpNotification, 'id' | 'createdAt' | 'read'>,
 ): HgpNotification {
@@ -44,6 +66,7 @@ export function addNotification(
   const all = loadAll()
   all.unshift(n)
   saveAll(all)
+  queueRemoteNotificationsPush(all)
   return n
 }
 
@@ -157,6 +180,8 @@ export function unreadCountFor(user: AppUser | null): number {
 export function markNotificationRead(id: string) {
   const all = loadAll().map((n) => (n.id === id ? { ...n, read: true } : n))
   saveAll(all)
+  queueRemoteNotificationsPush(all)
+  void markNotificationReadRemote(id, true).catch(() => undefined)
 }
 
 export function markAllNotificationsRead(user: AppUser) {
@@ -165,4 +190,5 @@ export function markAllNotificationsRead(user: AppUser) {
     mine.has(n.id) ? { ...n, read: true } : n,
   )
   saveAll(all)
+  queueRemoteNotificationsPush(all)
 }

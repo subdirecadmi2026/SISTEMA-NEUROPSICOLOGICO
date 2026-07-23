@@ -1,5 +1,6 @@
 import type { AppUser, ServiceType } from '../types'
 import { uid } from '../types'
+import { pushAllLeavesRemote, deleteLeaveRemote } from './remoteCatalog'
 
 const KEY = 'hgp-staff-leaves-v1'
 
@@ -137,6 +138,26 @@ function writeAll(list: StaffLeave[]) {
   localStorage.setItem(KEY, JSON.stringify(list.slice(0, 2000)))
 }
 
+/** Lectura cruda para sync remoto. */
+export function readLeavesLocal(): StaffLeave[] {
+  return readAll()
+}
+
+/** Reemplazo total tras sync (mantener orden por fecha). */
+export function replaceLeavesLocal(list: StaffLeave[]) {
+  writeAll(
+    [...list].sort((a, b) => b.startDate.localeCompare(a.startDate)).slice(0, 2000),
+  )
+}
+
+function queueRemoteLeavesPush(leaves?: StaffLeave[]) {
+  if (typeof window === 'undefined') return
+  const payload = leaves ?? readAll()
+  void pushAllLeavesRemote(payload).catch(() => {
+    /* silencioso: local sigue siendo fuente usable */
+  })
+}
+
 export function listLeaves(opts?: {
   unitName?: string
   serviceType?: ServiceType
@@ -260,6 +281,7 @@ export function upsertLeave(
     }
     all[idx] = next
     writeAll(all)
+    queueRemoteLeavesPush(all)
     return next
   }
 
@@ -284,6 +306,7 @@ export function upsertLeave(
   }
   all.unshift(created)
   writeAll(all)
+  queueRemoteLeavesPush(all)
   return created
 }
 
@@ -297,11 +320,15 @@ export function cancelLeave(id: string): StaffLeave {
     updatedAt: new Date().toISOString(),
   }
   writeAll(all)
+  queueRemoteLeavesPush(all)
   return all[idx]
 }
 
 export function deleteLeave(id: string) {
-  writeAll(readAll().filter((l) => l.id !== id))
+  const next = readAll().filter((l) => l.id !== id)
+  writeAll(next)
+  queueRemoteLeavesPush(next)
+  void deleteLeaveRemote(id).catch(() => undefined)
 }
 
 /** Detecta solapes de fechas del mismo personal (permisos activos). */

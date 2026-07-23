@@ -37,6 +37,12 @@ import {
   deleteRemoteSchedule,
 } from './lib/api'
 import { seedServicesIfEmpty } from './lib/seedServices'
+import { syncCatalogsFromRemote } from './lib/remoteCatalog'
+import { readLeavesLocal, replaceLeavesLocal } from './lib/leavesStore'
+import {
+  readNotificationsLocal,
+  replaceNotificationsLocal,
+} from './lib/notifications'
 import { AuthBar } from './components/AuthBar'
 import { LoginScreen } from './components/LoginScreen'
 import { AdminWorkspace } from './components/AdminWorkspace'
@@ -172,6 +178,17 @@ export default function App() {
     if (isRemoteEnabled()) {
       void seedServicesIfEmpty().catch(() => {
         /* silencioso: no bloquear UI */
+      })
+      void syncCatalogsFromRemote({
+        getLocalLeaves: readLeavesLocal,
+        setLocalLeaves: replaceLeavesLocal,
+        getLocalNotifications: readNotificationsLocal,
+        setLocalNotifications: (items) => {
+          replaceNotificationsLocal(items)
+          bumpNotifications()
+        },
+      }).catch(() => {
+        /* silencioso: local sigue operativo */
       })
     }
   }, [])

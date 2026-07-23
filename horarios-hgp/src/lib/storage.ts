@@ -40,6 +40,10 @@ function writeAll(all: Record<string, ScheduleDoc>) {
 export function listSavedSchedules(): SavedIndexItem[] {
   const all = readAll()
   return Object.values(all)
+    .filter(
+      (d) =>
+        !d.id.startsWith('sys-hgp-') && !d.unitName.startsWith('__SYSTEM__/'),
+    )
     .map((d) => ({
       id: d.id,
       label: `${d.serviceType === 'enfermeria' ? 'Enf' : 'Med'} · ${d.unitName} · ${d.month}/${d.year}`,

@@ -212,9 +212,15 @@ export async function listRemoteSchedules(): Promise<SavedIndexItem[]> {
       'id, service_type, unit_name, month, year, status, updated_at, payload',
     )
     .order('updated_at', { ascending: false })
-    .limit(80)
+    .limit(120)
   if (error) throw new Error(error.message)
-  return (data ?? []).map((r) => {
+  return (data ?? [])
+    .filter((r) => {
+      const unit = String(r.unit_name ?? '')
+      const id = String(r.id ?? '')
+      return !unit.startsWith('__SYSTEM__/') && !id.startsWith('sys-hgp-')
+    })
+    .map((r) => {
     const st = (r.service_type as ServiceType) ?? 'medico'
     return {
       id: r.id as string,

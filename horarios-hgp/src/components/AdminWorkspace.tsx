@@ -37,6 +37,7 @@ import { StaffManager } from './StaffManager'
 import { AdminClavesPanel } from './AdminClavesPanel'
 import { AdminFeriadosPanel } from './AdminFeriadosPanel'
 import { PermisosVacacionesPanel } from './PermisosVacacionesPanel'
+import { AdminSupabaseSync } from './AdminSupabaseSync'
 import { shiftsFor } from '../lib/shiftsStore'
 
 type TabId =
@@ -259,6 +260,7 @@ export function AdminWorkspace({
 
       {tab === 'resumen' && (
         <section className="space-y-4">
+          <AdminSupabaseSync onFlash={onFlash} onNotify={onNotify} />
           <div>
             <h2 className="font-display text-lg text-navy">Horarios</h2>
             <p className="text-xs text-muted">

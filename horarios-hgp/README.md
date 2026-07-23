@@ -37,6 +37,14 @@ Sin Supabase configurado, todo funciona con **localStorage** (ideal para pruebas
 
 Tablas: `hgp_users`, `services`, `staff`, `schedules`, `schedule_cells`, `approvals`, `contingency`, `audit_log`.
 
+Para permisos/vacaciones y notificaciones multi-navegador, ejecute también:
+
+```text
+supabase/migrations/20260723220000_leaves_notifications.sql
+```
+
+Sin esas tablas, la app igual sincroniza usando un **bundle** en `schedules` (`__SYSTEM__/…`). En Admin → Resumen puede ver el estado y forzar sync.
+
 ## Scripts
 
 ```bash
