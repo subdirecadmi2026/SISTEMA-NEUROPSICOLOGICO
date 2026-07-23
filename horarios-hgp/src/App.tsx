@@ -26,6 +26,8 @@ import {
   copyStaffFromPreviousMonth,
   fillEmptyWeekendsWithLibre,
   copyFirstWeekPattern,
+  applyPostGuardLibre,
+  createNextMonthDraft,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
 import {
@@ -52,6 +54,7 @@ import { AlertsBanner } from './components/AlertsBanner'
 import { MonthSummary } from './components/MonthSummary'
 import { NotesPanel } from './components/NotesPanel'
 import { CodeUsageBar } from './components/CodeUsageBar'
+import { StaffHoursPanel } from './components/StaffHoursPanel'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId =
@@ -778,6 +781,41 @@ export default function App() {
           >
             Copiar 1ª semana al mes
           </button>
+          {doc.serviceType === 'medico' && (
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={() => {
+                const next = applyPostGuardLibre(doc)
+                if (next === doc) {
+                  flash('No hay días vacíos tras guardia X/PT2/GD')
+                  return
+                }
+                patchDoc(next)
+                flash('L aplicado tras guardias (celdas vacías)')
+              }}
+              className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
+            >
+              L tras guardia
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const next = createNextMonthDraft(doc)
+              undoStack.current = []
+              setUndoCount(0)
+              setDoc(next)
+              setDirty(true)
+              setTab('horario')
+              flash(
+                `Borrador ${next.month}/${next.year} creado con el mismo personal`,
+              )
+            }}
+            className="rounded-lg border border-navy/30 bg-navy/5 px-3 py-2 text-sm font-semibold text-navy hover:bg-navy/10"
+          >
+            Crear mes siguiente
+          </button>
           <span className="ml-auto self-center text-xs text-muted">
             {dirty
               ? 'Cambios sin guardar… (auto en 12s)'
@@ -913,7 +951,21 @@ export default function App() {
           />
         )}
 
-        {tab === 'distribucion' && <DistributionPanel doc={doc} />}
+        {tab === 'distribucion' && (
+          <>
+            <DistributionPanel
+              doc={doc}
+              onPaintDay={(day) => {
+                setTab('horario')
+                setPaintMode(true)
+                flash(
+                  `Día ${day}: seleccione clave y clic en la cabecera del día para pintar la columna`,
+                )
+              }}
+            />
+            <StaffHoursPanel doc={doc} />
+          </>
+        )}
 
         {tab === 'contingencia' && (
           <ContingencyPanel

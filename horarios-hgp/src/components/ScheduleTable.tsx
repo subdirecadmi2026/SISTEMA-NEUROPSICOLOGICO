@@ -13,7 +13,7 @@ import {
   weekdayLetter,
 } from '../lib/calendar'
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
-import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow } from '../lib/scheduleOps'
+import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, clearStaffRowCells } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -556,6 +556,16 @@ export function ScheduleTable({
                             className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand"
                           >
                             Dup
+                          </button>
+                          <button
+                            type="button"
+                            title="Limpiar celdas de esta fila"
+                            onClick={() =>
+                              onChange(clearStaffRowCells(docRef.current, s.id))
+                            }
+                            className="rounded px-1 py-0.5 text-[10px] text-amber-800 hover:bg-amber-50"
+                          >
+                            Limpiar
                           </button>
                           <button
                             type="button"

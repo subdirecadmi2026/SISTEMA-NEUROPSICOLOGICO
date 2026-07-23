@@ -82,3 +82,48 @@ export function coverageByDay(doc: ScheduleDoc): { day: number; count: number; h
     return { day, count, hours }
   })
 }
+
+export type DayAssignment = {
+  staffId: string
+  name: string
+  fun: string
+  code: string
+  hours: number
+}
+
+/** Quién está asignado un día (incluye ausencias con hours=0). */
+export function assignmentsOnDay(
+  doc: ScheduleDoc,
+  day: number,
+): DayAssignment[] {
+  const out: DayAssignment[] = []
+  for (const s of [...doc.staff].sort((a, b) => a.order - b.order)) {
+    if (!s.name.trim()) continue
+    const code = doc.cells[cellKey(s.id, day)]
+    if (!code) continue
+    out.push({
+      staffId: s.id,
+      name: s.name,
+      fun: s.fun,
+      code,
+      hours: hoursForCode(doc.serviceType, code),
+    })
+  }
+  return out
+}
+
+/** Ranking de horas planificadas por persona con nombre. */
+export function staffHoursRanking(
+  doc: ScheduleDoc,
+): Array<{ staffId: string; name: string; fun: string; hours: number; shifts: number }> {
+  return [...doc.staff]
+    .filter((s) => s.name.trim())
+    .map((s) => ({
+      staffId: s.id,
+      name: s.name,
+      fun: s.fun,
+      hours: plannedHours(doc, s.id),
+      shifts: plannedShifts(doc, s.id),
+    }))
+    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name))
+}

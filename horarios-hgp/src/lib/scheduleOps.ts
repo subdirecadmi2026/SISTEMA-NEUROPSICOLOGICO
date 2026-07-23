@@ -479,3 +479,115 @@ export function countCodesUsed(
     .map(([code, count]) => ({ code, count }))
     .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
 }
+
+/** Borra todas las celdas de una fila de personal. */
+export function clearStaffRowCells(
+  doc: ScheduleDoc,
+  staffId: string,
+): ScheduleDoc {
+  const cells = { ...doc.cells }
+  let removed = 0
+  for (const key of Object.keys(cells)) {
+    if (key.startsWith(`${staffId}:`)) {
+      delete cells[key]
+      removed += 1
+    }
+  }
+  if (removed === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'limpiar_fila',
+        detail: `staff=${staffId} celdas=${removed}`,
+      },
+    ],
+  }
+}
+
+/**
+ * Tras guardia médica X / PT2 / GD, marca L el día siguiente si está vacío.
+ */
+export function applyPostGuardLibre(doc: ScheduleDoc): ScheduleDoc {
+  if (doc.serviceType !== 'medico') return doc
+  const days = daysInMonth(doc.year, doc.month)
+  const night = new Set(['X', 'PT2', 'GD'])
+  const cells = { ...doc.cells }
+  let painted = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    for (let d = 1; d < days; d++) {
+      const code = cells[`${s.id}:${d}`]
+      if (!code || !night.has(code)) continue
+      const nextKey = `${s.id}:${d + 1}`
+      if (cells[nextKey]) continue
+      cells[nextKey] = 'L'
+      painted += 1
+    }
+  }
+  if (painted === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'post_guardia_L',
+        detail: `${painted} días L tras guardia`,
+      },
+    ],
+  }
+}
+
+/** Crea borrador del mes siguiente con el mismo personal (celdas vacías). */
+export function createNextMonthDraft(doc: ScheduleDoc): ScheduleDoc {
+  const month = doc.month === 12 ? 1 : doc.month + 1
+  const year = doc.month === 12 ? doc.year + 1 : doc.year
+  const staff = doc.staff.map((s, i) => ({
+    ...s,
+    id: uid(s.fun === 'MED' || s.fun.startsWith('M') ? 'med' : 'enf'),
+    order: i + 1,
+    horasMedicas: 0,
+    horasViolenciaDomestica: 0,
+    horasLactancia: 0,
+    horasExtras: 0,
+  }))
+  return {
+    ...doc,
+    id: uid('sch'),
+    month,
+    year,
+    staff,
+    cells: {},
+    status: 'BORRADOR',
+    version: 1,
+    signatures: [],
+    notes: '',
+    contingencyPlan: '',
+    contingencyStaff: [],
+    llamado: false,
+    vacacionesFlag: false,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'crear_mes_siguiente',
+        detail: `Desde ${doc.month}/${doc.year} → ${month}/${year}`,
+      },
+    ],
+  }
+}

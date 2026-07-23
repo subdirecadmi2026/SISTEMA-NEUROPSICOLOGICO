@@ -12,6 +12,8 @@ import {
   totalPaidHours,
   coverageByDay,
   cellKey,
+  assignmentsOnDay,
+  staffHoursRanking,
 } from '../lib/calendar'
 import {
   validateCoverage,
@@ -300,6 +302,84 @@ describe('operaciones de mes', () => {
     expect(next.contingencyStaff.some((c) => c.name === 'Dr. Ausente')).toBe(
       true,
     )
+  })
+
+  it('aplica L tras guardia en celdas vacías', async () => {
+    const { applyPostGuardLibre } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dr. Guardia',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'X',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'X' }
+    const next = applyPostGuardLibre(doc)
+    expect(next.cells[cellKey('a', 2)]).toBe('L')
+  })
+
+  it('crea borrador del mes siguiente con mismo personal', async () => {
+    const { createNextMonthDraft } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dra. Test',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'CE' }
+    const next = createNextMonthDraft(doc)
+    expect(next.month).toBe(8)
+    expect(next.year).toBe(2026)
+    expect(next.staff[0].name).toBe('Dra. Test')
+    expect(Object.keys(next.cells)).toHaveLength(0)
+    expect(next.status).toBe('BORRADOR')
+    expect(next.id).not.toBe(doc.id)
+  })
+})
+
+describe('asignaciones y ranking', () => {
+  it('lista quién trabaja un día y ranking de horas', () => {
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Ana',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+      {
+        id: 'b',
+        name: 'Bruno',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'X',
+        order: 2,
+      },
+    ]
+    doc.cells = {
+      [cellKey('a', 1)]: 'CE',
+      [cellKey('b', 1)]: 'X',
+      [cellKey('b', 2)]: 'X',
+    }
+    const day1 = assignmentsOnDay(doc, 1)
+    expect(day1).toHaveLength(2)
+    const rank = staffHoursRanking(doc)
+    expect(rank[0].name).toBe('Bruno')
   })
 })
 
