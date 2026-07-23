@@ -40,12 +40,15 @@ import {
 } from '../lib/holidays'
 import { SchedulesHome } from './SchedulesHome'
 import { StaffManager } from './StaffManager'
+import { AdminClavesPanel } from './AdminClavesPanel'
+import { shiftsFor } from '../lib/shiftsStore'
 
 type TabId =
   | 'resumen'
-  | 'usuarios'
+  | 'perfiles'
   | 'horarios'
-  | 'servicios'
+  | 'especialidades'
+  | 'claves'
   | 'personal'
   | 'feriados'
 
@@ -64,9 +67,10 @@ type Props = {
 
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'resumen', label: 'Resumen' },
-  { id: 'usuarios', label: 'Usuarios' },
+  { id: 'perfiles', label: 'Perfiles' },
+  { id: 'especialidades', label: 'Especialidades' },
+  { id: 'claves', label: 'Claves' },
   { id: 'horarios', label: 'Horarios' },
-  { id: 'servicios', label: 'Servicios' },
   { id: 'personal', label: 'Personal' },
   { id: 'feriados', label: 'Feriados' },
 ]
@@ -141,6 +145,8 @@ export function AdminWorkspace({
       byStatus,
       unitsMed: listUnits('medico').length,
       unitsEnf: listUnits('enfermeria').length,
+      clavesMed: shiftsFor('medico').length,
+      clavesEnf: shiftsFor('enfermeria').length,
       staffBuckets: listStaffLibraryBuckets().length,
     }
   }, [users, items, unitType, staffTick])
@@ -155,7 +161,7 @@ export function AdminWorkspace({
       serviceUnitsText: u.serviceUnits.join(', '),
       password: '',
     })
-    setTab('usuarios')
+    setTab('perfiles')
   }
 
   function saveUser() {
@@ -190,7 +196,7 @@ export function AdminWorkspace({
     try {
       deleteManagedUser(id)
       refreshUsers()
-      onFlash('Usuario eliminado')
+      onFlash('Perfil eliminado')
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo eliminar')
     }
@@ -207,8 +213,8 @@ export function AdminWorkspace({
             Administrador HGP
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Crear, editar y eliminar usuarios, horarios, servicios, personal y
-            feriados · sesión: {user.name}
+            Crear perfiles, especialidades y claves; gestionar horarios,
+            personal y feriados · sesión: {user.name}
           </p>
         </div>
         <button
@@ -242,7 +248,7 @@ export function AdminWorkspace({
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(
             [
-              { label: 'Usuarios', value: counts.users, go: 'usuarios' as TabId },
+              { label: 'Perfiles', value: counts.users, go: 'perfiles' as TabId },
               {
                 label: 'Horarios',
                 value: counts.schedules,
@@ -251,12 +257,12 @@ export function AdminWorkspace({
               {
                 label: 'Servicios médico',
                 value: counts.unitsMed,
-                go: 'servicios' as TabId,
+                go: 'especialidades' as TabId,
               },
               {
                 label: 'Servicios enfermería',
                 value: counts.unitsEnf,
-                go: 'servicios' as TabId,
+                go: 'especialidades' as TabId,
               },
             ] as const
           ).map((c) => (
@@ -289,18 +295,26 @@ export function AdminWorkspace({
               )}
             </div>
             <p className="mt-3 text-sm text-muted">
-              Bibliotecas de personal: {counts.staffBuckets} · Contraseña demo:{' '}
+              Claves médico: {counts.clavesMed} · enfermería: {counts.clavesEnf} ·
+              bibliotecas personal: {counts.staffBuckets} · demo pass:{' '}
               <code className="rounded bg-sand px-1">{DEMO_PASSWORD}</code>
             </p>
+            <button
+              type="button"
+              onClick={() => setTab('claves')}
+              className="mt-2 text-xs font-semibold text-teal underline"
+            >
+              Gestionar claves →
+            </button>
           </div>
         </section>
       )}
 
-      {tab === 'usuarios' && (
+      {tab === 'perfiles' && (
         <section className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
           <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
             <h2 className="font-display text-lg text-navy">
-              {editingId ? 'Editar usuario' : 'Nuevo usuario'}
+              {editingId ? 'Editar perfil' : 'Nuevo perfil'}
             </h2>
             <div className="mt-3 space-y-2">
               <label className="block text-xs font-semibold text-muted">
@@ -375,7 +389,7 @@ export function AdminWorkspace({
                   onClick={saveUser}
                   className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white"
                 >
-                  {editingId ? 'Guardar cambios' : 'Crear usuario'}
+                  {editingId ? 'Guardar cambios' : 'Crear perfil'}
                 </button>
                 {editingId ? (
                   <button
@@ -396,7 +410,7 @@ export function AdminWorkspace({
           <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-lg text-navy">
-                Usuarios ({users.length})
+                Perfiles ({users.length})
               </h2>
               <button
                 type="button"
@@ -504,11 +518,11 @@ export function AdminWorkspace({
         </div>
       )}
 
-      {tab === 'servicios' && (
+      {tab === 'especialidades' && (
         <section className="rounded-2xl border border-line bg-white p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="font-display text-lg text-navy">
-              Servicios / unidades
+              Especialidades / servicios
             </h2>
             <select
               className="rounded-xl border border-line px-3 py-2 text-sm"
@@ -525,7 +539,7 @@ export function AdminWorkspace({
                 resetUnitsToDefaults()
                 refreshUnits()
                 setStaffTick((n) => n + 1)
-                onFlash('Servicios restablecidos')
+                onFlash('Especialidades restablecidas')
               }}
               className="ml-auto text-xs font-semibold text-teal underline"
             >
@@ -537,7 +551,7 @@ export function AdminWorkspace({
               className="min-w-[200px] flex-1 rounded-xl border border-line px-3 py-2 text-sm"
               value={newUnit}
               onChange={(e) => setNewUnit(e.target.value)}
-              placeholder="Nombre del nuevo servicio"
+              placeholder="Nombre de la nueva especialidad"
             />
             <button
               type="button"
@@ -547,7 +561,7 @@ export function AdminWorkspace({
                   setNewUnit('')
                   refreshUnits()
                   setStaffTick((n) => n + 1)
-                  onFlash('Servicio creado')
+                  onFlash('Especialidad creada')
                 } catch (e) {
                   onFlash(e instanceof Error ? e.message : 'Error')
                 }
@@ -563,7 +577,7 @@ export function AdminWorkspace({
               list="admin-units-list"
               value={renameFrom}
               onChange={(e) => setRenameFrom(e.target.value)}
-              placeholder="Servicio a renombrar"
+              placeholder="Especialidad a renombrar"
             />
             <datalist id="admin-units-list">
               {units.map((u) => (
@@ -585,7 +599,7 @@ export function AdminWorkspace({
                   setRenameTo('')
                   refreshUnits()
                   setStaffTick((n) => n + 1)
-                  onFlash('Servicio renombrado')
+                  onFlash('Especialidad renombrada')
                 } catch (e) {
                   onFlash(e instanceof Error ? e.message : 'Error')
                 }
@@ -609,7 +623,7 @@ export function AdminWorkspace({
                       removeUnit(unitType, u)
                       refreshUnits()
                       setStaffTick((n) => n + 1)
-                      onFlash('Servicio eliminado')
+                      onFlash('Especialidad eliminada')
                     } catch (e) {
                       onFlash(e instanceof Error ? e.message : 'Error')
                     }
@@ -623,6 +637,8 @@ export function AdminWorkspace({
           </ul>
         </section>
       )}
+
+      {tab === 'claves' && <AdminClavesPanel onFlash={onFlash} />}
 
       {tab === 'personal' && (
         <section className="space-y-3">

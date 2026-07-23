@@ -460,7 +460,7 @@ export default function App() {
               </p>
               <p className="text-xs text-white/70">
                 {workspaceBase === 'admin' && !adminEditorOpen
-                  ? 'Consola administrador · crear, editar y eliminar'
+                  ? 'Consola administrador · perfiles, especialidades y claves'
                   : workspace === 'revisor'
                     ? 'Módulo de revisión · solo visualización'
                     : workspace === 'validador'

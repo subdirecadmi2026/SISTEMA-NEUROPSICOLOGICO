@@ -408,17 +408,8 @@ export const SERVICE_LABEL: Record<ServiceType, string> = {
   medico: 'Médico',
 }
 
-export function shiftsFor(service: ServiceType): ShiftCode[] {
-  return service === 'enfermeria' ? SHIFTS_ENFERMERIA : SHIFTS_MEDICO
-}
-
-export function shiftMeta(service: ServiceType, code: string): ShiftCode | undefined {
-  return shiftsFor(service).find((s) => s.code === code)
-}
-
-export function hoursForCode(service: ServiceType, code: string): number {
-  return shiftMeta(service, code)?.hours ?? 0
-}
+/** Preferir import desde `lib/shiftsStore` (admite claves personalizadas). */
+export { shiftsFor, shiftMeta, hoursForCode } from '../lib/shiftsStore'
 
 export const UNITS_ENFERMERIA = [
   'Centro Obstétrico',
