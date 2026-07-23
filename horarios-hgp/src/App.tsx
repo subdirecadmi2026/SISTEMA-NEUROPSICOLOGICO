@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   AppUser,
   ScheduleDoc,
@@ -24,6 +24,7 @@ import {
   clearMonthCells,
   duplicatePreviousMonth,
   copyStaffFromPreviousMonth,
+  fillEmptyWeekendsWithLibre,
 } from './lib/scheduleOps'
 import { assertEditable, loadSession, logout } from './lib/auth'
 import {
@@ -46,6 +47,8 @@ import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
 import { NamesEditor } from './components/NamesEditor'
 import { SchedulesHome } from './components/SchedulesHome'
 import { PrintSheet } from './components/PrintSheet'
+import { AlertsBanner } from './components/AlertsBanner'
+import { MonthSummary } from './components/MonthSummary'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId =
@@ -78,6 +81,8 @@ export default function App() {
   const [showCreate, setShowCreate] = useState(true)
   const [highlightNames, setHighlightNames] = useState(false)
   const [listLoading, setListLoading] = useState(false)
+  const undoStack = useRef<ScheduleDoc[]>([])
+  const [undoCount, setUndoCount] = useState(0)
 
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
@@ -117,8 +122,40 @@ export default function App() {
       flash('Horario bloqueado (aprobado). Solo admin puede editar.')
       return
     }
+    undoStack.current = [...undoStack.current.slice(-29), doc]
+    setUndoCount(undoStack.current.length)
     setDoc(next)
   }
+
+  function undoLast() {
+    const prev = undoStack.current.pop()
+    setUndoCount(undoStack.current.length)
+    if (!prev) {
+      flash('Nada que deshacer')
+      return
+    }
+    setDoc(prev)
+    flash('Cambio deshecho')
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        const prev = undoStack.current.pop()
+        setUndoCount(undoStack.current.length)
+        if (!prev) return
+        setDoc(prev)
+        setToast('Cambio deshecho')
+        window.setTimeout(() => setToast(''), 2400)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   function switchService(serviceType: ServiceType) {
     const next = createBlankSchedule(serviceType, doc.year, doc.month)
@@ -636,7 +673,40 @@ export default function App() {
           >
             Autocompletar feriados
           </button>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => {
+              const next = fillEmptyWeekendsWithLibre(doc)
+              if (next === doc) {
+                flash('No hay sáb/dom vacíos para marcar L')
+                return
+              }
+              patchDoc(next)
+              flash('Fines de semana vacíos marcados con L')
+            }}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
+          >
+            Llenar sáb/dom con L
+          </button>
+          <button
+            type="button"
+            disabled={undoCount === 0}
+            onClick={undoLast}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-sm hover:bg-sand disabled:opacity-50"
+            title="Ctrl+Z"
+          >
+            Deshacer ({undoCount})
+          </button>
         </section>
+
+        <MonthSummary doc={doc} />
+
+        <AlertsBanner
+          doc={doc}
+          onGoDistribution={() => setTab('distribucion')}
+          onGoContingency={() => setTab('contingencia')}
+        />
 
         <SchedulesHome
           items={saved}

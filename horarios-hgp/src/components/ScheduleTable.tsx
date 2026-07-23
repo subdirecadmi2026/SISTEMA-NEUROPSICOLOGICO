@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { ScheduleDoc, StaffMember } from '../types'
 import { MONTHS_ES } from '../types'
 import { shiftMeta } from '../data/templates'
@@ -11,7 +12,8 @@ import {
   totalPaidHours,
   weekdayLetter,
 } from '../lib/calendar'
-import { formatHolidaysLabel } from '../lib/holidays'
+import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
+import { fillStaffEmptyDays } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -36,6 +38,41 @@ export function ScheduleTable({
   const isEnf = doc.serviceType === 'enfermeria'
   const summaryCols = isEnf ? 8 : 2
   const staffSorted = [...doc.staff].sort((a, b) => a.order - b.order)
+  const holidays = holidayDatesInMonth(doc.year, doc.month)
+  const dragging = useRef(false)
+  const dragMode = useRef<'paint' | 'erase'>('paint')
+  const docRef = useRef(doc)
+  docRef.current = doc
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  const paintBuffer = useRef<Record<string, string> | null>(null)
+  const [previewCells, setPreviewCells] = useState<Record<
+    string,
+    string
+  > | null>(null)
+
+  useEffect(() => {
+    const stop = () => {
+      if (!dragging.current) return
+      dragging.current = false
+      if (paintBuffer.current) {
+        const current = docRef.current
+        const next = { ...current, cells: paintBuffer.current }
+        docRef.current = next
+        onChangeRef.current(next)
+        paintBuffer.current = null
+      }
+      setPreviewCells(null)
+    }
+    window.addEventListener('mouseup', stop)
+    window.addEventListener('touchend', stop)
+    return () => {
+      window.removeEventListener('mouseup', stop)
+      window.removeEventListener('touchend', stop)
+    }
+  }, [])
+
+  const liveCells = previewCells ?? doc.cells
 
   const sections = (() => {
     const map = new Map<string, StaffMember[]>()
@@ -47,41 +84,71 @@ export function ScheduleTable({
     return [...map.entries()]
   })()
 
-  function updateStaff(id: string, patch: Partial<StaffMember>) {
-    onChange({
-      ...doc,
-      staff: doc.staff.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-    })
+  function commit(next: ScheduleDoc) {
+    docRef.current = next
+    onChangeRef.current(next)
   }
 
-  function setCell(staffId: string, day: number, code: string) {
-    onChange({
-      ...doc,
-      cells: { ...doc.cells, [cellKey(staffId, day)]: code },
+  function updateStaff(id: string, patch: Partial<StaffMember>) {
+    const current = docRef.current
+    commit({
+      ...current,
+      staff: current.staff.map((s) => (s.id === id ? { ...s, ...patch } : s)),
     })
   }
 
   function clearCell(staffId: string, day: number) {
-    const cells = { ...doc.cells }
+    const current = docRef.current
+    const cells = { ...current.cells }
     delete cells[cellKey(staffId, day)]
-    onChange({ ...doc, cells })
+    commit({ ...current, cells })
   }
 
-  function handleCellClick(staffId: string, day: number) {
-    if (readOnly || !paintMode) return
+  function paintIntoBuffer(
+    staffId: string,
+    day: number,
+    mode: 'paint' | 'erase',
+  ) {
+    if (!paintBuffer.current) {
+      paintBuffer.current = { ...docRef.current.cells }
+    }
     const key = cellKey(staffId, day)
-    if (doc.cells[key] === activeCode) clearCell(staffId, day)
-    else setCell(staffId, day, activeCode)
+    if (mode === 'erase') {
+      delete paintBuffer.current[key]
+    } else {
+      paintBuffer.current[key] = activeCode
+    }
+    setPreviewCells({ ...paintBuffer.current })
+  }
+
+  function applyPaint(staffId: string, day: number, mode: 'paint' | 'erase') {
+    if (readOnly || !paintMode) return
+    if (dragging.current) {
+      paintIntoBuffer(staffId, day, mode)
+      return
+    }
+    if (mode === 'erase') {
+      clearCell(staffId, day)
+      return
+    }
+    const current = docRef.current
+    const key = cellKey(staffId, day)
+    if (current.cells[key] === activeCode) return
+    commit({
+      ...current,
+      cells: { ...current.cells, [key]: activeCode },
+    })
   }
 
   function removeStaff(id: string) {
-    const cells = { ...doc.cells }
+    const current = docRef.current
+    const cells = { ...current.cells }
     Object.keys(cells).forEach((k) => {
       if (k.startsWith(`${id}:`)) delete cells[k]
     })
-    onChange({
-      ...doc,
-      staff: doc.staff
+    commit({
+      ...current,
+      staff: current.staff
         .filter((s) => s.id !== id)
         .map((s, i) => ({ ...s, order: i + 1 })),
       cells,
@@ -137,11 +204,17 @@ export function ScheduleTable({
               {Array.from({ length: days }, (_, i) => {
                 const d = i + 1
                 const weekend = isWeekend(doc.year, doc.month, d)
+                const holiday = holidays.has(d)
                 return (
                   <th
                     key={d}
+                    title={holiday ? 'Feriado' : weekend ? 'Fin de semana' : ''}
                     className={`min-w-[30px] border border-line px-0 py-1 text-center ${
-                      weekend ? 'bg-teal/10' : ''
+                      holiday
+                        ? 'bg-amber-200/80'
+                        : weekend
+                          ? 'bg-teal/10'
+                          : ''
                     }`}
                   >
                     <div className="text-[9px] font-normal text-muted">
@@ -189,7 +262,7 @@ export function ScheduleTable({
                 </>
               )}
               {!readOnly && (
-                <th className="no-print min-w-[50px] border border-line px-1 py-2">
+                <th className="no-print min-w-[70px] border border-line px-1 py-2">
                   —
                 </th>
               )}
@@ -268,22 +341,43 @@ export function ScheduleTable({
                     </td>
                     {Array.from({ length: days }, (_, i) => {
                       const d = i + 1
-                      const code = doc.cells[cellKey(s.id, d)] ?? ''
+                      const code = liveCells[cellKey(s.id, d)] ?? ''
                       const meta = code
                         ? shiftMeta(doc.serviceType, code)
                         : undefined
                       const weekend = isWeekend(doc.year, doc.month, d)
+                      const holiday = holidays.has(d)
                       return (
                         <td
                           key={d}
-                          onClick={() => handleCellClick(s.id, d)}
+                          onMouseDown={(e) => {
+                            if (readOnly || !paintMode || e.button !== 0) return
+                            e.preventDefault()
+                            dragging.current = true
+                            const key = cellKey(s.id, d)
+                            dragMode.current =
+                              (liveCells[key] ?? '') === activeCode
+                                ? 'erase'
+                                : 'paint'
+                            applyPaint(s.id, d, dragMode.current)
+                          }}
+                          onMouseEnter={() => {
+                            if (!dragging.current) return
+                            applyPaint(s.id, d, dragMode.current)
+                          }}
                           onContextMenu={(e) => {
                             e.preventDefault()
                             if (!readOnly) clearCell(s.id, d)
                           }}
                           className={`border border-line px-0 py-0 text-center select-none ${
                             readOnly ? '' : 'cursor-pointer'
-                          } ${weekend && !code ? 'bg-teal/5' : ''}`}
+                          } ${
+                            !code && holiday
+                              ? 'bg-amber-50'
+                              : !code && weekend
+                                ? 'bg-teal/5'
+                                : ''
+                          }`}
                           style={
                             meta
                               ? { background: meta.color, color: meta.text }
@@ -292,7 +386,9 @@ export function ScheduleTable({
                           title={
                             meta
                               ? `${meta.code} — ${meta.label}${meta.timeRange ? ` (${meta.timeRange})` : ''}`
-                              : 'Vacío'
+                              : holiday
+                                ? 'Feriado (vacío)'
+                                : 'Vacío · arrastre para pintar'
                           }
                         >
                           <div className="grid h-7 place-items-center text-[10px] font-bold">
@@ -360,13 +456,33 @@ export function ScheduleTable({
                     )}
                     {!readOnly && (
                       <td className="no-print border border-line px-1 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeStaff(s.id)}
-                          className="rounded px-1 py-1 text-[11px] text-red-700 hover:bg-red-50"
-                        >
-                          Quitar
-                        </button>
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            title={`Llenar vacíos con ${activeCode || 'clave'}`}
+                            disabled={!activeCode}
+                            onClick={() => {
+                              if (!activeCode) return
+                              onChange(
+                                fillStaffEmptyDays(
+                                  docRef.current,
+                                  s.id,
+                                  activeCode,
+                                ),
+                              )
+                            }}
+                            className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand disabled:opacity-40"
+                          >
+                            Fila
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeStaff(s.id)}
+                            className="rounded px-1 py-0.5 text-[10px] text-red-700 hover:bg-red-50"
+                          >
+                            Quitar
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>,
@@ -394,50 +510,15 @@ export function ScheduleTable({
           >
             Nuevo ejemplo
           </button>
+          <p className="text-xs text-muted">
+            Tip: mantenga pulsado y arrastre para pintar varias celdas. Clic
+            derecho borra. «Fila» llena vacíos con la clave activa.
+          </p>
         </div>
       )}
 
-      <div className="grid gap-4 border-t border-line p-4 lg:grid-cols-2">
-        <div className="space-y-3">
-          <label className="block text-xs text-muted">
-            Observaciones generales
-            <textarea
-              disabled={readOnly}
-              className="mt-1 w-full rounded-lg border border-line px-3 py-2 text-sm disabled:bg-sand/40"
-              rows={2}
-              value={doc.notes}
-              onChange={(e) => onChange({ ...doc, notes: e.target.value })}
-            />
-          </label>
-          <div className="rounded-lg border border-line bg-sand/40 p-3 text-xs text-muted">
-            <p className="mb-1 font-semibold text-navy">
-              Feriados {doc.year}
-            </p>
-            <p>{formatHolidaysLabel(doc.year)}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {(
-            [
-              ['elaboradoPor', 'Elaborado por'],
-              ['revisadoPor', 'Revisado por'],
-              ['aprobadoPor', 'Aprobado por'],
-              ['talentoHumano', 'Talento Humano'],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} className="text-xs text-muted">
-              {label}
-              <input
-                disabled={readOnly}
-                className="mt-1 w-full rounded-lg border border-line px-2 py-2 text-sm disabled:bg-sand/40"
-                value={doc[key]}
-                onChange={(e) =>
-                  onChange({ ...doc, [key]: e.target.value })
-                }
-              />
-            </label>
-          ))}
-        </div>
+      <div className="border-t border-line bg-sand/40 px-4 py-2 text-[11px] text-muted">
+        Feriados {doc.year}: {formatHolidaysLabel(doc.year)}
       </div>
     </section>
   )

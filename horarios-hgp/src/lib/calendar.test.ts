@@ -155,6 +155,49 @@ describe('cobertura y validaciones', () => {
   })
 })
 
+describe('operaciones de mes', () => {
+  it('llena fines de semana vacíos con L', async () => {
+    const { fillEmptyWeekendsWithLibre } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'm1',
+        name: 'Dra. Test',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    const next = fillEmptyWeekendsWithLibre(doc)
+    // 4 y 5 de julio 2026 son sábado y domingo
+    expect(next.cells[cellKey('m1', 4)]).toBe('L')
+    expect(next.cells[cellKey('m1', 5)]).toBe('L')
+    expect(next.cells[cellKey('m1', 6)]).toBeUndefined()
+  })
+
+  it('no pisa celdas existentes al llenar fines de semana', async () => {
+    const { fillEmptyWeekendsWithLibre } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'm1',
+        name: 'Dra. Test',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('m1', 4)]: 'X' }
+    const next = fillEmptyWeekendsWithLibre(doc)
+    expect(next.cells[cellKey('m1', 4)]).toBe('X')
+    expect(next.cells[cellKey('m1', 5)]).toBe('L')
+  })
+})
+
 describe('feriados Ecuador', () => {
   it('incluye Año Nuevo y Navidad', () => {
     const list = ecuadorHolidays(2026)

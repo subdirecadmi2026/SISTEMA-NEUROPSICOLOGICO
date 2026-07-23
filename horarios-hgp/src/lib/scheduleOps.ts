@@ -1,6 +1,6 @@
 import type { ScheduleDoc, ScheduleCell, StaffMember } from '../types'
 import { uid } from '../types'
-import { daysInMonth } from './calendar'
+import { daysInMonth, isWeekend } from './calendar'
 import { holidayDatesInMonth } from './holidays'
 import { loadSchedule, listSavedSchedules } from './storage'
 import { isRemoteEnabled, listRemoteSchedules, fetchRemoteSchedule } from './api'
@@ -195,6 +195,78 @@ export function applyHolidaysToEmptyCells(
         userName: 'Usuario',
         action: 'aplicar_feriados',
         detail: `${holidays.size} días feriado marcados`,
+      },
+    ],
+  }
+}
+
+/**
+ * Marca sábados y domingos vacíos con clave L (libre).
+ * No pisa celdas ya pintadas ni feriados ya marcados.
+ */
+export function fillEmptyWeekendsWithLibre(doc: ScheduleDoc): ScheduleDoc {
+  const days = daysInMonth(doc.year, doc.month)
+  const cells = { ...doc.cells }
+  let painted = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    for (let d = 1; d <= days; d++) {
+      if (!isWeekend(doc.year, doc.month, d)) continue
+      const key = `${s.id}:${d}`
+      if (cells[key]) continue
+      cells[key] = 'L'
+      painted += 1
+    }
+  }
+  if (painted === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'llenar_fines_semana',
+        detail: `${painted} celdas L en sáb/dom`,
+      },
+    ],
+  }
+}
+
+/** Rellena una fila completa (celdas vacías) con un código. */
+export function fillStaffEmptyDays(
+  doc: ScheduleDoc,
+  staffId: string,
+  code: string,
+): ScheduleDoc {
+  if (!code.trim()) return doc
+  const days = daysInMonth(doc.year, doc.month)
+  const cells = { ...doc.cells }
+  let painted = 0
+  for (let d = 1; d <= days; d++) {
+    const key = `${staffId}:${d}`
+    if (cells[key]) continue
+    cells[key] = code
+    painted += 1
+  }
+  if (painted === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'llenar_fila',
+        detail: `staff=${staffId} code=${code} celdas=${painted}`,
       },
     ],
   }
