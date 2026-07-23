@@ -832,6 +832,13 @@ export default function App() {
 
         {!readOnly && (
           <ToolsToolbar
+            statusHint={
+              dirty
+                ? 'Sin guardar (auto 12s)'
+                : autoSavedAt
+                  ? `Autoguardado ${autoSavedAt}`
+                  : 'Ctrl+S guarda'
+            }
             primary={[
               {
                 id: 'undo',
@@ -860,7 +867,7 @@ export default function App() {
               },
               {
                 id: 'copy-week',
-                label: 'Copiar 1ª semana al mes',
+                label: 'Copiar 1ª semana',
                 disabled: readOnly,
                 emphasis: 'teal',
                 onClick: () => {
@@ -877,7 +884,7 @@ export default function App() {
               },
               {
                 id: 'next-month',
-                label: 'Crear mes siguiente',
+                label: 'Mes siguiente',
                 emphasis: 'navy',
                 onClick: () => {
                   const next = createNextMonthDraft(doc)
@@ -1035,23 +1042,25 @@ export default function App() {
             ]}
             extras={
               <>
-                <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-sand/40 px-3.5 py-2.5 text-sm font-medium text-navy hover:bg-sand">
                   <input
                     type="checkbox"
                     checked={highlightEmpty}
                     onChange={(e) => setHighlightEmpty(e.target.checked)}
+                    className="accent-teal"
                   />
                   Resaltar vacíos
                 </label>
-                <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-sand/40 px-3.5 py-2.5 text-sm font-medium text-navy hover:bg-sand">
                   <input
                     type="checkbox"
                     checked={compactTable}
                     onChange={(e) => setCompactTable(e.target.checked)}
+                    className="accent-teal"
                   />
-                  Compacto
+                  Vista compacta
                 </label>
-                <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                <div className="flex items-center gap-2 rounded-xl border border-line bg-sand/40 px-3.5 py-2 text-sm font-medium text-navy">
                   Ir al día
                   <input
                     type="number"
@@ -1059,7 +1068,7 @@ export default function App() {
                     max={daysInMonth(doc.year, doc.month)}
                     value={jumpDay}
                     onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
-                    className="w-14 rounded border border-line px-1 py-1 text-sm"
+                    className="w-14 rounded-lg border border-line bg-white px-2 py-1 text-sm"
                   />
                   <button
                     type="button"
@@ -1070,22 +1079,14 @@ export default function App() {
                       setTab('horario')
                       flash(`Enfocado día ${d}`)
                     }}
-                    className="rounded bg-navy px-2 py-1 text-xs font-semibold text-white"
+                    className="rounded-lg bg-navy px-3 py-1 text-xs font-semibold text-white"
                   >
                     Ir
                   </button>
-                </label>
-                <span className="self-center text-xs text-muted">
-                  {dirty
-                    ? 'Cambios sin guardar… (auto en 12s)'
-                    : autoSavedAt
-                      ? `Autoguardado ${autoSavedAt}`
-                      : 'Ctrl+S guarda'}
-                </span>
+                </div>
               </>
             }
           />
-
         )}
 
         <MonthSummary doc={doc} />
