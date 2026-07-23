@@ -12,7 +12,7 @@ import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/
 import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
 import { InstitutionalPreview } from './InstitutionalPreview'
-import { runAllValidations } from '../lib/validation'
+import { runAllValidations, blockingValidationErrors } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
 import { SignatureGate } from './SignatureGate'
 import { slotForStatus } from '../lib/firmaEc'
@@ -265,7 +265,16 @@ export function ReviewCardsModule({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setSignNext('APROBADO')}
+                onClick={() => {
+                  const blockers = blockingValidationErrors(detail)
+                  if (blockers.length > 0) {
+                    onFlash(
+                      `No se puede aprobar: ${blockers[0].message}`,
+                    )
+                    return
+                  }
+                  setSignNext('APROBADO')
+                }}
                 className="rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-deep"
               >
                 Firmar y aprobar

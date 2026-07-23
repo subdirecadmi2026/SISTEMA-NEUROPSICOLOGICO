@@ -588,6 +588,7 @@ export default function App() {
           loading={listLoading}
           remote={isRemoteEnabled()}
           onFlash={flash}
+          onNotify={bumpNotifications}
           onRefresh={() => void refreshList()}
           onCreateSchedule={() => {
             setAdminEditorOpen(true)

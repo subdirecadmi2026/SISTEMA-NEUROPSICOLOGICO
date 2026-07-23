@@ -123,6 +123,20 @@ export function ApprovalPanel({
       onFlash('Seleccione un usuario arriba (Entrar como) para el flujo')
       return
     }
+    if (next === 'APROBADO' || next === 'ARCHIVADO') {
+      const leaveErrors = errors.filter(
+        (a) =>
+          a.code === 'permiso_conflicto_turno' ||
+          a.code === 'permiso_exceso_horas',
+      )
+      if (leaveErrors.length > 0) {
+        onFlash(
+          `No se puede ${next === 'APROBADO' ? 'aprobar' : 'validar'}: ${leaveErrors[0].message}`,
+        )
+        setSignIntent(null)
+        return
+      }
+    }
     const res = transitionStatus(doc, next, user, opts)
     if (!res.ok) {
       onFlash(res.error)

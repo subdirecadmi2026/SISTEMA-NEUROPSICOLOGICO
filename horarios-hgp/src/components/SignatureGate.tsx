@@ -69,6 +69,9 @@ export function SignatureGate({
   const [certCn, setCertCn] = useState('')
   const [apiReady, setApiReady] = useState(false)
   const [apiLabel, setApiLabel] = useState('')
+  const [pendingApp, setPendingApp] = useState<SignatureConfirmResult | null>(
+    null,
+  )
 
   useEffect(() => {
     if (!open) return
@@ -76,6 +79,7 @@ export function SignatureGate({
     setAck(false)
     setError('')
     setBusy(false)
+    setPendingApp(null)
     const uid = user?.id
     const ready = !!uid && hasStoredCertificate(uid)
     const img = !!uid && !!getSignatureImage(uid)
@@ -214,12 +218,13 @@ export function SignatureGate({
         stampText,
         imageDataUrl: getSignatureImage(user.id) ?? undefined,
       })
-      // Si el navegador no abrió el esquema, avisar
       if (!protocolUrl.startsWith('firmaec://')) {
         setError('No se pudo armar el enlace FirmaEC')
         return
       }
-      onConfirm({ signedName: subjectCn, electronic })
+      // No archiva/aprueba aún: el usuario debe confirmar tras firmar en la app
+      setPendingApp({ signedName: subjectCn, electronic })
+      setError('')
     } catch (e) {
       setError(
         e instanceof Error
@@ -384,6 +389,35 @@ export function SignatureGate({
           </p>
         )}
 
+        {pendingApp ? (
+          <div className="mt-4 rounded-xl border border-teal/40 bg-teal/5 px-3 py-3 text-sm">
+            <p className="font-semibold text-navy">App FirmaEC abierta</p>
+            <p className="mt-1 text-xs text-muted">
+              Complete la firma en la aplicación de escritorio. Cuando termine,
+              confirme aquí para estampar el sello en el horario.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onConfirm(pendingApp)
+                  setPendingApp(null)
+                }}
+                className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+              >
+                Ya firmé en FirmaEC · confirmar
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingApp(null)}
+                className="rounded-xl border border-line px-3 py-2 text-sm font-semibold"
+              >
+                Volver
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button
             type="button"
@@ -394,7 +428,7 @@ export function SignatureGate({
           </button>
           <button
             type="button"
-            disabled={busy || !canSubmit}
+            disabled={busy || !canSubmit || !!pendingApp}
             onClick={() =>
               void (mode === 'certificado'
                 ? submitCertificado()
@@ -409,7 +443,7 @@ export function SignatureGate({
                 ? 'Conectando FirmaEC…'
                 : 'Firmando…'
               : mode === 'app_firmaec'
-                ? 'Abrir FirmaEC y firmar'
+                ? 'Abrir app FirmaEC'
                 : confirmLabel}
           </button>
         </div>

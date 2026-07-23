@@ -105,21 +105,22 @@ export const LEAVE_STATUS_LABEL: Record<LeaveUsageStatus, string> = {
 }
 
 /**
- * Mapa staffId → Set de días del mes con permiso activo.
- * Para resaltar celdas en la planilla.
+ * Mapa staffId → (día → clave de ausencia esperada).
+ * Si hay varios permisos, cada día conserva su código.
  */
 export function leaveDayMapForDoc(
   doc: ScheduleDoc,
-): Map<string, { days: Set<number>; code: string }> {
-  const map = new Map<string, { days: Set<number>; code: string }>()
+): Map<string, Map<number, string>> {
+  const map = new Map<string, Map<number, string>>()
   for (const u of listLeaveUsagesForDoc(doc)) {
-    const cur = map.get(u.leave.staffId) ?? {
-      days: new Set<number>(),
-      code: u.leave.absenceCode,
+    let days = map.get(u.leave.staffId)
+    if (!days) {
+      days = new Map()
+      map.set(u.leave.staffId, days)
     }
-    for (const d of u.daysInMonth) cur.days.add(d)
-    cur.code = u.leave.absenceCode
-    map.set(u.leave.staffId, cur)
+    for (const d of u.daysInMonth) {
+      if (!days.has(d)) days.set(d, u.leave.absenceCode)
+    }
   }
   return map
 }
@@ -133,13 +134,28 @@ export function leaveConflictIfPaint(
 ): string | null {
   const map = leaveDayMapForDoc(doc)
   const entry = map.get(staffId)
-  if (!entry || !entry.days.has(day)) return null
+  const expected = entry?.get(day)
+  if (!expected) return null
   const meta = shiftMeta(doc.serviceType, code)
   const productive =
     hoursForCode(doc.serviceType, code) > 0 && meta?.group !== 'ausencia'
   if (!productive) return null
-  if (code.toUpperCase() === entry.code.toUpperCase()) return null
-  return `Día ${day}: hay permiso/vacaciones (use ${entry.code}, no ${code})`
+  if (code.toUpperCase() === expected.toUpperCase()) return null
+  return `Día ${day}: hay permiso/vacaciones (use ${expected}, no ${code})`
+}
+
+/** Cuántas personas del horario chocan si se pinta `code` ese día. */
+export function countLeaveConflictsForDay(
+  doc: ScheduleDoc,
+  day: number,
+  code: string,
+): number {
+  let n = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    if (leaveConflictIfPaint(doc, s.id, day, code)) n += 1
+  }
+  return n
 }
 
 export function listLeaveUsagesForDoc(doc: ScheduleDoc): LeaveUsage[] {

@@ -99,8 +99,18 @@ export function inclusiveDayCount(startDate: string, endDate: string): number {
 export function parseYmd(ymd: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim())
   if (!m) return null
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-  if (Number.isNaN(d.getTime())) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const day = Number(m[3])
+  const d = new Date(y, mo - 1, day)
+  // Evita rollover JS (ej. 2026-02-31 → marzo)
+  if (
+    d.getFullYear() !== y ||
+    d.getMonth() !== mo - 1 ||
+    d.getDate() !== day
+  ) {
+    return null
+  }
   return d
 }
 

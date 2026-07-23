@@ -3,10 +3,13 @@ import type { AppUser } from '../types'
 import {
   DEMO_PASSWORD,
   authenticateDemo,
+  isRevisorRole,
+  isValidadorRole,
   primaryDemoUsers,
   roleLabel,
   roleMission,
 } from '../lib/auth'
+import type { UserRole } from '../types'
 
 type Props = {
   onLogin: (user: AppUser) => void
@@ -156,18 +159,33 @@ export function LoginScreen({ onLogin }: Props) {
     setPassword('')
   }
 
+  function roleFitsCard(role: UserRole, cardId: string): boolean {
+    if (cardId === 'u-admin') return role === 'admin'
+    if (cardId === 'u-jefe') return role === 'lider_servicio'
+    if (cardId === 'u-revisor') return isRevisorRole(role) && role !== 'admin'
+    if (cardId === 'u-validador')
+      return isValidadorRole(role) && role !== 'admin'
+    // fallback: same id as demo seed
+    return false
+  }
+
   function submitForm(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedUser) {
+    if (!selectedId) {
       setError('Seleccione primero qué va a hacer (su perfil)')
       setStep('elige')
       return
     }
-    const result = authenticateDemo(usuario, password, {
-      expectedUserId: selectedUser.id,
-    })
+    // Autentica cualquier usuario gestionado (demo o creado por admin)
+    const result = authenticateDemo(usuario, password)
     if (!result.ok) {
       setError(result.error)
+      return
+    }
+    if (!roleFitsCard(result.user.role, selectedId)) {
+      setError(
+        `El usuario «${result.user.email}» no corresponde al perfil «${visual?.title ?? 'seleccionado'}». Elija la imagen correcta.`,
+      )
       return
     }
     setError('')

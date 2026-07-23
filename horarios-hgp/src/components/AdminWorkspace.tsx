@@ -55,6 +55,7 @@ type Props = {
   loading?: boolean
   remote: boolean
   onFlash: (msg: string) => void
+  onNotify?: () => void
   onRefresh: () => void
   onOpenSchedule: (id: string) => void
   onDeleteSchedule: (id: string) => void | Promise<void>
@@ -92,6 +93,7 @@ export function AdminWorkspace({
   loading,
   remote,
   onFlash,
+  onNotify,
   onRefresh,
   onOpenSchedule,
   onDeleteSchedule,
@@ -784,7 +786,11 @@ export function AdminWorkspace({
       )}
 
       {tab === 'permisos' && (
-        <PermisosVacacionesPanel user={user} onFlash={onFlash} />
+        <PermisosVacacionesPanel
+          user={user}
+          onFlash={onFlash}
+          onNotify={onNotify}
+        />
       )}
 
       {tab === 'feriados' && (

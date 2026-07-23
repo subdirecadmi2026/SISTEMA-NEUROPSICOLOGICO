@@ -200,4 +200,10 @@ describe('permisos / vacaciones', () => {
     })
     expect(overlap.length).toBe(1)
   })
+
+  it('rechaza fechas inválidas (sin rollover)', async () => {
+    const { parseYmd } = await import('./leavesStore')
+    expect(parseYmd('2026-02-31')).toBeNull()
+    expect(parseYmd('2026-02-28')).not.toBeNull()
+  })
 })

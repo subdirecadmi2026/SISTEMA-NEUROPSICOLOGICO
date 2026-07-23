@@ -18,7 +18,7 @@ import {
   listLeaves,
   upsertLeave,
 } from '../lib/leavesStore'
-import { notifyJefeLeaveRegistered } from '../lib/notifications'
+import { notifyJefeLeaveRegistered, notifyJefeLeaveChanged } from '../lib/notifications'
 
 type Props = {
   user: AppUser
@@ -283,6 +283,16 @@ export function PermisosVacacionesPanel({
           ? 'Permiso actualizado'
           : `${LEAVE_KIND_LABEL[saved.kind]} registradas · aviso al jefe`,
       )
+      if (form.id) {
+        notifyJefeLeaveChanged({
+          unitName: saved.unitName,
+          staffName: saved.staffName,
+          kindLabel: LEAVE_KIND_LABEL[saved.kind],
+          action: 'actualizado',
+          by: user.name,
+        })
+        onNotify?.()
+      }
       startCreate()
       refresh()
     } catch (e) {
@@ -294,15 +304,31 @@ export function PermisosVacacionesPanel({
     if (!window.confirm(`¿Eliminar ${LEAVE_KIND_LABEL[l.kind]} de ${l.staffName}?`))
       return
     deleteLeave(l.id)
+    notifyJefeLeaveChanged({
+      unitName: l.unitName,
+      staffName: l.staffName,
+      kindLabel: LEAVE_KIND_LABEL[l.kind],
+      action: 'eliminado',
+      by: user.name,
+    })
+    onNotify?.()
     if (form.id === l.id) startCreate()
     refresh()
-    onFlash('Registro eliminado')
+    onFlash('Registro eliminado · aviso al jefe')
   }
 
   function softCancel(l: StaffLeave) {
     cancelLeave(l.id)
+    notifyJefeLeaveChanged({
+      unitName: l.unitName,
+      staffName: l.staffName,
+      kindLabel: LEAVE_KIND_LABEL[l.kind],
+      action: 'cancelado',
+      by: user.name,
+    })
+    onNotify?.()
     refresh()
-    onFlash('Permiso cancelado')
+    onFlash('Permiso cancelado · aviso al jefe')
   }
 
   const days = inclusiveDayCount(form.startDate, form.endDate)

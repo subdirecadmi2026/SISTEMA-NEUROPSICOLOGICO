@@ -4,6 +4,7 @@ import { MONTHS_ES, STATUS_LABEL } from '../types'
 import { roleLabel, transitionStatus } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
 import { notifyJefeScheduleValidated } from '../lib/notifications'
+import { blockingValidationErrors } from '../lib/validation'
 import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
 import { SERVICE_LABEL } from '../data/templates'
@@ -325,7 +326,14 @@ export function ValidadorWorkspace({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => setSignOpen(true)}
+                onClick={() => {
+                  const blockers = blockingValidationErrors(detail)
+                  if (blockers.length > 0) {
+                    onFlash(`No se puede validar: ${blockers[0].message}`)
+                    return
+                  }
+                  setSignOpen(true)
+                }}
                 className="rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
               >
                 {busy ? 'Procesando…' : 'Firmar y validar · PDF'}

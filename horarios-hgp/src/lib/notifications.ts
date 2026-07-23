@@ -118,6 +118,24 @@ export function notifyJefeLeaveScheduleAlert(opts: {
   })
 }
 
+/** Aviso al jefe: permiso cancelado o eliminado. */
+export function notifyJefeLeaveChanged(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  action: 'cancelado' | 'eliminado' | 'actualizado'
+  by: string
+}): HgpNotification {
+  return addNotification({
+    toRole: 'lider_servicio',
+    unitName: opts.unitName,
+    scheduleId: `leave:${opts.unitName}`,
+    title: `Permiso ${opts.action}`,
+    body: `${opts.kindLabel} de ${opts.staffName} (${opts.unitName}) fue ${opts.action} por ${opts.by}.`,
+    kind: 'permiso',
+  })
+}
+
 export function listNotificationsFor(user: AppUser | null): HgpNotification[] {
   if (!user) return []
   if (!isJefeRole(user.role) && user.role !== 'admin') return []

@@ -14,7 +14,7 @@ import {
 } from '../lib/calendar'
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
 import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, clearStaffRowCells, copyCellsBetweenStaff } from '../lib/scheduleOps'
-import { leaveConflictIfPaint, leaveDayMapForDoc } from '../lib/leaveValidation'
+import { leaveConflictIfPaint, leaveDayMapForDoc, countLeaveConflictsForDay } from '../lib/leaveValidation'
 
 type Props = {
   doc: ScheduleDoc
@@ -54,6 +54,7 @@ export function ScheduleTable({
   const leaveMap = leaveDayMapForDoc(doc)
   const dragging = useRef(false)
   const dragMode = useRef<'paint' | 'erase'>('paint')
+  const dragWarned = useRef(false)
   const docRef = useRef(doc)
   docRef.current = doc
   const onChangeRef = useRef(onChange)
@@ -76,6 +77,7 @@ export function ScheduleTable({
     const stop = () => {
       if (!dragging.current) return
       dragging.current = false
+      dragWarned.current = false
       if (paintBuffer.current) {
         const current = docRef.current
         const next = { ...current, cells: paintBuffer.current }
@@ -153,6 +155,18 @@ export function ScheduleTable({
 
   function applyPaint(staffId: string, day: number, mode: 'paint' | 'erase') {
     if (readOnly || !paintMode) return
+    if (mode === 'paint') {
+      const warn = leaveConflictIfPaint(
+        docRef.current,
+        staffId,
+        day,
+        activeCode,
+      )
+      if (warn && !dragWarned.current) {
+        onFlash?.(warn)
+        dragWarned.current = true
+      }
+    }
     if (dragging.current) {
       paintIntoBuffer(staffId, day, mode)
       return
@@ -161,8 +175,6 @@ export function ScheduleTable({
       clearCell(staffId, day)
       return
     }
-    const warn = leaveConflictIfPaint(docRef.current, staffId, day, activeCode)
-    if (warn) onFlash?.(warn)
     const current = docRef.current
     const key = cellKey(staffId, day)
     if (current.cells[key] === activeCode) return
@@ -288,6 +300,16 @@ export function ScheduleTable({
                     }
                     onClick={() => {
                       if (readOnly || !paintMode || !activeCode) return
+                      const conflicts = countLeaveConflictsForDay(
+                        docRef.current,
+                        d,
+                        activeCode,
+                      )
+                      if (conflicts > 0) {
+                        onFlash?.(
+                          `Día ${d}: ${conflicts} persona(s) con permiso/vacaciones — no use turno productivo`,
+                        )
+                      }
                       onChange(paintDayColumn(docRef.current, d, activeCode))
                     }}
                     onContextMenu={(e) => {
@@ -448,7 +470,8 @@ export function ScheduleTable({
                       const weekend = isWeekend(doc.year, doc.month, d)
                       const holiday = holidays.has(d)
                       const leaveInfo = leaveMap.get(s.id)
-                      const onLeave = leaveInfo?.days.has(d) ?? false
+                      const leaveCode = leaveInfo?.get(d)
+                      const onLeave = !!leaveCode
                       return (
                         <td
                           key={d}
@@ -456,6 +479,7 @@ export function ScheduleTable({
                             if (readOnly || !paintMode || e.button !== 0) return
                             e.preventDefault()
                             dragging.current = true
+                            dragWarned.current = false
                             const key = cellKey(s.id, d)
                             dragMode.current =
                               (liveCells[key] ?? '') === activeCode
@@ -494,8 +518,8 @@ export function ScheduleTable({
                           title={
                             onLeave
                               ? meta
-                                ? `${meta.code} — ${meta.label} · permiso/vacaciones (clave ${leaveInfo?.code})`
-                                : `Permiso/vacaciones · marque ${leaveInfo?.code}`
+                                ? `${meta.code} — ${meta.label} · permiso/vacaciones (clave ${leaveCode})`
+                                : `Permiso/vacaciones · marque ${leaveCode}`
                               : meta
                                 ? `${meta.code} — ${meta.label}${meta.timeRange ? ` (${meta.timeRange})` : ''}`
                                 : holiday
