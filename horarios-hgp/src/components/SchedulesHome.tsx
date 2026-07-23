@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { SavedIndexItem, ScheduleStatus, ServiceType } from '../types'
 import { MONTHS_ES, STATUS_LABEL } from '../types'
 
@@ -6,6 +6,10 @@ type Props = {
   items: SavedIndexItem[]
   remote: boolean
   loading?: boolean
+  canCreate?: boolean
+  canDelete?: boolean
+  defaultStatus?: 'all' | ScheduleStatus
+  title?: string
   onOpen: (id: string) => void
   onDelete: (id: string) => void | Promise<void>
   onCreate: () => void
@@ -16,14 +20,22 @@ export function SchedulesHome({
   items,
   remote,
   loading,
+  canCreate = true,
+  canDelete = true,
+  defaultStatus = 'all',
+  title = 'Mis horarios',
   onOpen,
   onDelete,
   onCreate,
   onRefresh,
 }: Props) {
   const [q, setQ] = useState('')
-  const [status, setStatus] = useState<'all' | ScheduleStatus>('all')
+  const [status, setStatus] = useState<'all' | ScheduleStatus>(defaultStatus)
   const [tipo, setTipo] = useState<'all' | ServiceType>('all')
+
+  useEffect(() => {
+    setStatus(defaultStatus)
+  }, [defaultStatus])
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -40,7 +52,7 @@ export function SchedulesHome({
     <section className="no-print mb-4 rounded-2xl border border-line bg-white/90 p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="font-display text-xl text-navy">Mis horarios</h2>
+          <h2 className="font-display text-xl text-navy">{title}</h2>
           <p className="text-sm text-muted">
             {remote
               ? 'Guardados en servidor (Supabase) y en este navegador'
@@ -59,13 +71,15 @@ export function SchedulesHome({
           >
             Actualizar lista
           </button>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white hover:brightness-110"
-          >
-            + Crear horario
-          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white hover:brightness-110"
+            >
+              + Crear horario
+            </button>
+          )}
         </div>
       </div>
 
@@ -97,7 +111,7 @@ export function SchedulesHome({
             <option value="BORRADOR">Borrador</option>
             <option value="EN_REVISION">En revisión</option>
             <option value="APROBADO">Aprobado</option>
-            <option value="ARCHIVADO">Archivado</option>
+            <option value="ARCHIVADO">Validado</option>
           </select>
         </div>
       )}
@@ -105,16 +119,19 @@ export function SchedulesHome({
       {items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-line bg-sand/40 px-4 py-8 text-center">
           <p className="mb-3 text-sm text-muted">
-            Aún no hay horarios. Cree uno, elija la especialidad y escriba los
-            nombres de los médicos.
+            {canCreate
+              ? 'Aún no hay horarios. Cree uno, elija la especialidad y escriba los nombres.'
+              : 'Aún no hay horarios en la lista. Espere a que el jefe envíe uno.'}
           </p>
-          <button
-            type="button"
-            onClick={onCreate}
-            className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white"
-          >
-            Crear primer horario
-          </button>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white"
+            >
+              Crear primer horario
+            </button>
+          )}
         </div>
       ) : filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line bg-sand/30 px-4 py-6 text-center text-sm text-muted">
@@ -169,13 +186,15 @@ export function SchedulesHome({
                     >
                       Abrir
                     </button>
-                    <button
-                      type="button"
-                      className="text-sm text-red-700"
-                      onClick={() => onDelete(s.id)}
-                    >
-                      ×
-                    </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className="text-sm text-red-700"
+                        onClick={() => onDelete(s.id)}
+                      >
+                        ×
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

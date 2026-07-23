@@ -32,7 +32,7 @@ import {
   swapCodesInSchedule,
   duplicateScheduleAsNew,
 } from './lib/scheduleOps'
-import { assertEditable, loadSession, logout } from './lib/auth'
+import { assertEditable, loadSession, logout, isJefeRole, isRevisorRole, isValidadorRole } from './lib/auth'
 import {
   persistSchedule,
   isRemoteEnabled,
@@ -64,6 +64,7 @@ import { ReplaceCodePanel } from './components/ReplaceCodePanel'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { ToolsToolbar } from './components/ToolsToolbar'
 import { SubmissionChecklist } from './components/SubmissionChecklist'
+import { RoleModeBanner } from './components/RoleModeBanner'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
 import { shiftMeta } from './data/templates'
@@ -96,7 +97,10 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [user, setUser] = useState<AppUser | null>(() => loadSession())
   const [saving, setSaving] = useState(false)
-  const [showCreate, setShowCreate] = useState(true)
+  const [showCreate, setShowCreate] = useState(() => {
+    const u = loadSession()
+    return !!u && isJefeRole(u.role)
+  })
   const [highlightNames, setHighlightNames] = useState(false)
   const [listLoading, setListLoading] = useState(false)
   const undoStack = useRef<ScheduleDoc[]>([])
@@ -123,6 +127,19 @@ export default function App() {
   const units =
     doc.serviceType === 'enfermeria' ? UNITS_ENFERMERIA : UNITS_MEDICO
   const readOnly = !assertEditable(doc, user)
+  const canCreate = !!user && isJefeRole(user.role)
+  const canDeleteSaved = !!user && (isJefeRole(user.role) || user.role === 'admin')
+  const listDefaultStatus: 'all' | ScheduleDoc['status'] =
+    user && isRevisorRole(user.role) && user.role !== 'admin'
+      ? 'EN_REVISION'
+      : user && isValidadorRole(user.role) && user.role !== 'admin'
+        ? 'APROBADO'
+        : 'all'
+  const visibleSaved = (() => {
+    if (!user || user.role === 'admin' || !isJefeRole(user.role)) return saved
+    if (user.serviceUnits.length === 0) return saved
+    return saved.filter((s) => user.serviceUnits.includes(s.unitName))
+  })()
   const namedStaff = doc.staff.filter((s) => s.name.trim().length > 0).length
   const emptySlots = doc.staff.length - namedStaff
   const staffOk = namedStaff >= 1
@@ -155,7 +172,11 @@ export default function App() {
 
   function patchDoc(next: ScheduleDoc) {
     if (readOnly) {
-      flash('Horario bloqueado (aprobado). Solo admin puede editar.')
+      flash(
+        user && !isJefeRole(user.role)
+          ? 'Modo visualización: no puede editar turnos con este rol'
+          : 'Horario bloqueado. Solo el jefe en borrador (o admin) puede editar.',
+      )
       return
     }
     undoStack.current = [...undoStack.current.slice(-29), doc]
@@ -423,29 +444,35 @@ export default function App() {
               user={user}
               onLogin={(u) => {
                 setUser(u)
+                setShowCreate(isJefeRole(u.role) && saved.length === 0)
                 flash(`Sesión: ${u.name}`)
               }}
               onLogout={() => {
                 logout()
                 setUser(null)
+                setShowCreate(false)
                 flash('Sesión cerrada')
               }}
             />
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="rounded-lg bg-teal-soft px-3 py-2 text-sm font-bold text-navy-deep hover:brightness-105"
-            >
-              + Crear horario
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void handleSave()}
-              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
-            >
-              {saving ? 'Guardando…' : 'Guardar'}
-            </button>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="rounded-lg bg-teal-soft px-3 py-2 text-sm font-bold text-navy-deep hover:brightness-105"
+              >
+                + Crear horario
+              </button>
+            )}
+            {(!user || isJefeRole(user.role)) && (
+              <button
+                type="button"
+                disabled={saving || readOnly}
+                onClick={() => void handleSave()}
+                className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10 disabled:opacity-50"
+              >
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -481,13 +508,7 @@ export default function App() {
         </div>
       )}
 
-      {readOnly && (
-        <div className="no-print border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">
-          Horario en estado <strong>{STATUS_LABEL[doc.status]}</strong> — edición
-          bloqueada
-          {user?.role === 'admin' ? ' (admin puede reabrir)' : ''}.
-        </div>
-      )}
+      <RoleModeBanner user={user} doc={doc} canEdit={!readOnly} />
 
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
         {/* Checklist operativo */}
@@ -539,25 +560,29 @@ export default function App() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-deep"
-            >
-              + Crear horario nuevo
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTab('horario')
-                setHighlightNames(true)
-                flash('Escriba los nombres en la lista de abajo')
-                window.setTimeout(() => setHighlightNames(false), 5000)
-              }}
-              className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
-            >
-              Editar nombres
-            </button>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-deep"
+              >
+                + Crear horario nuevo
+              </button>
+            )}
+            {canCreate && !readOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab('horario')
+                  setHighlightNames(true)
+                  flash('Escriba los nombres en la lista de abajo')
+                  window.setTimeout(() => setHighlightNames(false), 5000)
+                }}
+                className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+              >
+                Editar nombres
+              </button>
+            )}
             {!readOnly && (
               <>
                 <button
@@ -740,260 +765,263 @@ export default function App() {
           </div>
         </section>
 
-        <ToolsToolbar
-          primary={[
-            {
-              id: 'undo',
-              label: `Deshacer (${undoCount})`,
-              disabled: undoCount === 0,
-              title: 'Ctrl+Z',
-              onClick: undoLast,
-            },
-            {
-              id: 'dup-prev',
-              label: 'Duplicar mes anterior',
-              disabled: readOnly,
-              onClick: () => {
-                void (async () => {
-                  const next = await duplicatePreviousMonth(doc)
-                  patchDoc(next)
-                  const failed =
-                    next.audit.at(-1)?.action === 'duplicar_mes_fallido'
-                  flash(
-                    failed
-                      ? 'No hay mes anterior guardado para este servicio'
-                      : 'Mes anterior duplicado (personal y turnos)',
-                  )
-                })()
+        {!readOnly && (
+          <ToolsToolbar
+            primary={[
+              {
+                id: 'undo',
+                label: `Deshacer (${undoCount})`,
+                disabled: undoCount === 0,
+                title: 'Ctrl+Z',
+                onClick: undoLast,
               },
-            },
-            {
-              id: 'copy-week',
-              label: 'Copiar 1ª semana al mes',
-              disabled: readOnly,
-              emphasis: 'teal',
-              onClick: () => {
-                const next = copyFirstWeekPattern(doc)
-                if (next === doc) {
-                  flash(
-                    'Pinte primero la semana 1 (días 1–7); no hay vacíos que completar',
-                  )
-                  return
-                }
-                patchDoc(next)
-                flash('Patrón de la 1ª semana copiado al resto del mes')
-              },
-            },
-            {
-              id: 'next-month',
-              label: 'Crear mes siguiente',
-              emphasis: 'navy',
-              onClick: () => {
-                const next = createNextMonthDraft(doc)
-                undoStack.current = []
-                setUndoCount(0)
-                setDoc(next)
-                setDirty(true)
-                setTab('horario')
-                flash(
-                  `Borrador ${next.month}/${next.year} creado con el mismo personal`,
-                )
-              },
-            },
-          ]}
-          groups={[
-            {
-              title: 'Completar celdas',
-              items: [
-                {
-                  id: 'clear',
-                  label: 'Limpiar mes',
-                  disabled: readOnly,
-                  onClick: () => {
-                    if (
-                      window.confirm(
-                        '¿Limpiar todas las celdas del mes? Se mantiene el personal.',
-                      )
-                    ) {
-                      patchDoc(clearMonthCells(doc))
-                      flash('Mes limpiado')
-                    }
-                  },
-                },
-                {
-                  id: 'holidays',
-                  label: 'Autocompletar feriados',
-                  disabled: readOnly,
-                  onClick: () => {
-                    patchDoc(applyHolidaysToEmptyCells(doc))
-                    flash('Feriados aplicados en celdas vacías')
-                  },
-                },
-                {
-                  id: 'weekends',
-                  label: 'Llenar sáb/dom con L',
-                  disabled: readOnly,
-                  onClick: () => {
-                    const next = fillEmptyWeekendsWithLibre(doc)
-                    if (next === doc) {
-                      flash('No hay sáb/dom vacíos para marcar L')
-                      return
-                    }
+              {
+                id: 'dup-prev',
+                label: 'Duplicar mes anterior',
+                disabled: readOnly,
+                onClick: () => {
+                  void (async () => {
+                    const next = await duplicatePreviousMonth(doc)
                     patchDoc(next)
-                    flash('Fines de semana vacíos marcados con L')
-                  },
-                },
-                {
-                  id: 'habitual',
-                  label: 'Código habitual (lun–vie)',
-                  disabled: readOnly,
-                  onClick: () => {
-                    const next = applyHabitualCodesToEmpty(doc)
-                    if (next === doc) {
-                      flash(
-                        'Nada que completar (revise códigos habituales o ya está lleno)',
-                      )
-                      return
-                    }
-                    patchDoc(next)
+                    const failed =
+                      next.audit.at(-1)?.action === 'duplicar_mes_fallido'
                     flash(
-                      'Vacíos de lun–vie completados con código habitual',
+                      failed
+                        ? 'No hay mes anterior guardado para este servicio'
+                        : 'Mes anterior duplicado (personal y turnos)',
                     )
-                  },
+                  })()
                 },
-                ...(doc.serviceType === 'medico'
-                  ? [
-                      {
-                        id: 'post-guard',
-                        label: 'L tras guardia',
-                        disabled: readOnly,
-                        onClick: () => {
-                          const next = applyPostGuardLibre(doc)
-                          if (next === doc) {
-                            flash('No hay días vacíos tras guardia X/PT2/GD')
-                            return
-                          }
-                          patchDoc(next)
-                          flash('L aplicado tras guardias (celdas vacías)')
-                        },
-                      },
-                    ]
-                  : []),
-                ...(doc.serviceType === 'enfermeria'
-                  ? [
-                      {
-                        id: 'swap-dn',
-                        label: 'Intercambiar D1 ↔ N1',
-                        disabled: readOnly,
-                        onClick: () => {
-                          if (
-                            !window.confirm(
-                              '¿Intercambiar todas las claves D1 ↔ N1 del mes?',
-                            )
-                          )
-                            return
-                          const next = swapCodesInSchedule(doc, 'D1', 'N1')
-                          if (next === doc) {
-                            flash('No hay D1/N1 para intercambiar')
-                            return
-                          }
-                          patchDoc(next)
-                          flash('D1 ↔ N1 intercambiados')
-                        },
-                      },
-                    ]
-                  : []),
-              ],
-            },
-            {
-              title: 'Personal y copias',
-              items: [
-                {
-                  id: 'copy-names',
-                  label: 'Copiar nombres del mes anterior',
-                  disabled: readOnly,
-                  onClick: () => {
-                    void (async () => {
-                      const res = await copyStaffFromPreviousMonth(doc)
-                      if (!res.ok) {
-                        flash(res.error)
+              },
+              {
+                id: 'copy-week',
+                label: 'Copiar 1ª semana al mes',
+                disabled: readOnly,
+                emphasis: 'teal',
+                onClick: () => {
+                  const next = copyFirstWeekPattern(doc)
+                  if (next === doc) {
+                    flash(
+                      'Pinte primero la semana 1 (días 1–7); no hay vacíos que completar',
+                    )
+                    return
+                  }
+                  patchDoc(next)
+                  flash('Patrón de la 1ª semana copiado al resto del mes')
+                },
+              },
+              {
+                id: 'next-month',
+                label: 'Crear mes siguiente',
+                emphasis: 'navy',
+                onClick: () => {
+                  const next = createNextMonthDraft(doc)
+                  undoStack.current = []
+                  setUndoCount(0)
+                  setDoc(next)
+                  setDirty(true)
+                  setTab('horario')
+                  flash(
+                    `Borrador ${next.month}/${next.year} creado con el mismo personal`,
+                  )
+                },
+              },
+            ]}
+            groups={[
+              {
+                title: 'Completar celdas',
+                items: [
+                  {
+                    id: 'clear',
+                    label: 'Limpiar mes',
+                    disabled: readOnly,
+                    onClick: () => {
+                      if (
+                        window.confirm(
+                          '¿Limpiar todas las celdas del mes? Se mantiene el personal.',
+                        )
+                      ) {
+                        patchDoc(clearMonthCells(doc))
+                        flash('Mes limpiado')
+                      }
+                    },
+                  },
+                  {
+                    id: 'holidays',
+                    label: 'Autocompletar feriados',
+                    disabled: readOnly,
+                    onClick: () => {
+                      patchDoc(applyHolidaysToEmptyCells(doc))
+                      flash('Feriados aplicados en celdas vacías')
+                    },
+                  },
+                  {
+                    id: 'weekends',
+                    label: 'Llenar sáb/dom con L',
+                    disabled: readOnly,
+                    onClick: () => {
+                      const next = fillEmptyWeekendsWithLibre(doc)
+                      if (next === doc) {
+                        flash('No hay sáb/dom vacíos para marcar L')
                         return
                       }
-                      patchDoc({ ...doc, staff: res.staff, cells: {} })
-                      setHighlightNames(true)
+                      patchDoc(next)
+                      flash('Fines de semana vacíos marcados con L')
+                    },
+                  },
+                  {
+                    id: 'habitual',
+                    label: 'Código habitual (lun–vie)',
+                    disabled: readOnly,
+                    onClick: () => {
+                      const next = applyHabitualCodesToEmpty(doc)
+                      if (next === doc) {
+                        flash(
+                          'Nada que completar (revise códigos habituales o ya está lleno)',
+                        )
+                        return
+                      }
+                      patchDoc(next)
                       flash(
-                        `Copiados ${res.staff.length} nombres del mes anterior. Ajuste turnos.`,
+                        'Vacíos de lun–vie completados con código habitual',
                       )
-                    })()
+                    },
                   },
-                },
-                {
-                  id: 'dup-new',
-                  label: 'Duplicar como nuevo',
-                  onClick: () => {
-                    const next = duplicateScheduleAsNew(doc)
-                    undoStack.current = []
-                    setUndoCount(0)
-                    setDoc(next)
-                    setDirty(true)
-                    flash('Copia del horario creada como borrador nuevo')
+                  ...(doc.serviceType === 'medico'
+                    ? [
+                        {
+                          id: 'post-guard',
+                          label: 'L tras guardia',
+                          disabled: readOnly,
+                          onClick: () => {
+                            const next = applyPostGuardLibre(doc)
+                            if (next === doc) {
+                              flash('No hay días vacíos tras guardia X/PT2/GD')
+                              return
+                            }
+                            patchDoc(next)
+                            flash('L aplicado tras guardias (celdas vacías)')
+                          },
+                        },
+                      ]
+                    : []),
+                  ...(doc.serviceType === 'enfermeria'
+                    ? [
+                        {
+                          id: 'swap-dn',
+                          label: 'Intercambiar D1 ↔ N1',
+                          disabled: readOnly,
+                          onClick: () => {
+                            if (
+                              !window.confirm(
+                                '¿Intercambiar todas las claves D1 ↔ N1 del mes?',
+                              )
+                            )
+                              return
+                            const next = swapCodesInSchedule(doc, 'D1', 'N1')
+                            if (next === doc) {
+                              flash('No hay D1/N1 para intercambiar')
+                              return
+                            }
+                            patchDoc(next)
+                            flash('D1 ↔ N1 intercambiados')
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              },
+              {
+                title: 'Personal y copias',
+                items: [
+                  {
+                    id: 'copy-names',
+                    label: 'Copiar nombres del mes anterior',
+                    disabled: readOnly,
+                    onClick: () => {
+                      void (async () => {
+                        const res = await copyStaffFromPreviousMonth(doc)
+                        if (!res.ok) {
+                          flash(res.error)
+                          return
+                        }
+                        patchDoc({ ...doc, staff: res.staff, cells: {} })
+                        setHighlightNames(true)
+                        flash(
+                          `Copiados ${res.staff.length} nombres del mes anterior. Ajuste turnos.`,
+                        )
+                      })()
+                    },
                   },
-                },
-              ],
-            },
-          ]}
-          extras={
-            <>
-              <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={highlightEmpty}
-                  onChange={(e) => setHighlightEmpty(e.target.checked)}
-                />
-                Resaltar vacíos
-              </label>
-              <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={compactTable}
-                  onChange={(e) => setCompactTable(e.target.checked)}
-                />
-                Compacto
-              </label>
-              <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
-                Ir al día
-                <input
-                  type="number"
-                  min={1}
-                  max={daysInMonth(doc.year, doc.month)}
-                  value={jumpDay}
-                  onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
-                  className="w-14 rounded border border-line px-1 py-1 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const max = daysInMonth(doc.year, doc.month)
-                    const d = Math.min(Math.max(1, jumpDay), max)
-                    setFocusDay(d)
-                    setTab('horario')
-                    flash(`Enfocado día ${d}`)
-                  }}
-                  className="rounded bg-navy px-2 py-1 text-xs font-semibold text-white"
-                >
-                  Ir
-                </button>
-              </label>
-              <span className="self-center text-xs text-muted">
-                {dirty
-                  ? 'Cambios sin guardar… (auto en 12s)'
-                  : autoSavedAt
-                    ? `Autoguardado ${autoSavedAt}`
-                    : 'Ctrl+S guarda'}
-              </span>
-            </>
-          }
-        />
+                  {
+                    id: 'dup-new',
+                    label: 'Duplicar como nuevo',
+                    onClick: () => {
+                      const next = duplicateScheduleAsNew(doc)
+                      undoStack.current = []
+                      setUndoCount(0)
+                      setDoc(next)
+                      setDirty(true)
+                      flash('Copia del horario creada como borrador nuevo')
+                    },
+                  },
+                ],
+              },
+            ]}
+            extras={
+              <>
+                <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={highlightEmpty}
+                    onChange={(e) => setHighlightEmpty(e.target.checked)}
+                  />
+                  Resaltar vacíos
+                </label>
+                <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={compactTable}
+                    onChange={(e) => setCompactTable(e.target.checked)}
+                  />
+                  Compacto
+                </label>
+                <label className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
+                  Ir al día
+                  <input
+                    type="number"
+                    min={1}
+                    max={daysInMonth(doc.year, doc.month)}
+                    value={jumpDay}
+                    onChange={(e) => setJumpDay(Number(e.target.value) || 1)}
+                    className="w-14 rounded border border-line px-1 py-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const max = daysInMonth(doc.year, doc.month)
+                      const d = Math.min(Math.max(1, jumpDay), max)
+                      setFocusDay(d)
+                      setTab('horario')
+                      flash(`Enfocado día ${d}`)
+                    }}
+                    className="rounded bg-navy px-2 py-1 text-xs font-semibold text-white"
+                  >
+                    Ir
+                  </button>
+                </label>
+                <span className="self-center text-xs text-muted">
+                  {dirty
+                    ? 'Cambios sin guardar… (auto en 12s)'
+                    : autoSavedAt
+                      ? `Autoguardado ${autoSavedAt}`
+                      : 'Ctrl+S guarda'}
+                </span>
+              </>
+            }
+          />
+
+        )}
 
         <MonthSummary doc={doc} />
 
@@ -1036,9 +1064,19 @@ export default function App() {
         )}
 
         <SchedulesHome
-          items={saved}
+          items={visibleSaved}
           remote={isRemoteEnabled()}
           loading={listLoading}
+          canCreate={canCreate}
+          canDelete={canDeleteSaved}
+          defaultStatus={listDefaultStatus}
+          title={
+            user && isRevisorRole(user.role) && user.role !== 'admin'
+              ? 'Horarios por revisar'
+              : user && isValidadorRole(user.role) && user.role !== 'admin'
+                ? 'Horarios por validar'
+                : 'Mis horarios'
+          }
           onCreate={() => setShowCreate(true)}
           onRefresh={() => void refreshList()}
           onOpen={(id) => void handleLoad(id)}
@@ -1060,15 +1098,17 @@ export default function App() {
           onFlash={flash}
         />
 
-        <SubmissionChecklist
-          doc={doc}
-          onGoFix={(hint) => {
-            if (hint === 'personal') setTab('personal')
-            else if (hint === 'contingencia') setTab('contingencia')
-            else if (hint === 'distribucion') setTab('distribucion')
-            else setTab('horario')
-          }}
-        />
+        {(!user || isJefeRole(user.role)) && doc.status === 'BORRADOR' && (
+          <SubmissionChecklist
+            doc={doc}
+            onGoFix={(hint) => {
+              if (hint === 'personal') setTab('personal')
+              else if (hint === 'contingencia') setTab('contingencia')
+              else if (hint === 'distribucion') setTab('distribucion')
+              else setTab('horario')
+            }}
+          />
+        )}
 
         <AuditTrail doc={doc} />
 
@@ -1281,7 +1321,7 @@ export default function App() {
       </main>
 
       <CreateScheduleWizard
-        open={showCreate}
+        open={showCreate && canCreate}
         defaultMonth={doc.month}
         defaultYear={doc.year}
         onClose={() => setShowCreate(false)}
