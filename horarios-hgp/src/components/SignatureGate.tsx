@@ -3,6 +3,7 @@ import type { AppUser, ElectronicSignRecord } from '../types'
 import {
   formatElectronicStamp,
   getSessionPassword,
+  getSignatureImage,
   getStoredCertMeta,
   hasStoredCertificate,
   signWithStoredCertificate,
@@ -50,6 +51,7 @@ export function SignatureGate({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [hasCert, setHasCert] = useState(false)
+  const [hasImage, setHasImage] = useState(false)
   const [certCn, setCertCn] = useState('')
 
   useEffect(() => {
@@ -60,11 +62,17 @@ export function SignatureGate({
     setBusy(false)
     const uid = user?.id
     const ready = !!uid && hasStoredCertificate(uid)
+    const img = !!uid && !!getSignatureImage(uid)
     setHasCert(ready)
+    setHasImage(img)
     if (ready && uid) {
       const meta = getStoredCertMeta(uid)
       setCertCn(meta?.subjectCn ?? '')
       setPassword(getSessionPassword(uid))
+      setUseElectronic(true)
+    } else if (img) {
+      setCertCn('')
+      setPassword('')
       setUseElectronic(true)
     } else {
       setCertCn('')
@@ -76,19 +84,18 @@ export function SignatureGate({
   if (!open) return null
 
   const canSimple = name.trim().length >= 3 && ack && !useElectronic
-  const canElectronic =
-    useElectronic && ack && password.length > 0 && hasCert && !!user
+  const canElectronic = useElectronic && ack && !!user && (hasCert || hasImage)
 
   function submitSimple() {
     onConfirm({ signedName: name.trim() })
   }
 
-  function submitElectronic() {
+  async function submitElectronic() {
     if (!user) return
     setBusy(true)
     setError('')
     try {
-      const result: ElectronicSignResult = signWithStoredCertificate(
+      const result: ElectronicSignResult = await signWithStoredCertificate(
         user,
         slot,
         password,
@@ -100,8 +107,9 @@ export function SignatureGate({
         serialNumber: result.serialNumber,
         issuerCn: result.issuerCn,
         signedAt: result.signedAt,
-        method: 'pkcs12_local',
+        method: result.method,
         stampText,
+        imageDataUrl: result.imageDataUrl,
       }
       onConfirm({ signedName: result.subjectCn, electronic })
     } catch (e) {
@@ -136,7 +144,7 @@ export function SignatureGate({
           Casilla: <strong className="text-navy">{slotLabel(slot)}</strong>
         </p>
 
-        {hasCert ? (
+        {hasCert || hasImage ? (
           <div className="mt-4 rounded-xl border border-teal/30 bg-teal/5 p-3">
             <label className="flex items-start gap-2 text-sm text-ink">
               <input
@@ -146,15 +154,17 @@ export function SignatureGate({
                 onChange={(e) => setUseElectronic(e.target.checked)}
               />
               <span>
-                <strong>¿Firmar electrónicamente con FirmaEC?</strong>
+                <strong>¿Firmar electrónicamente?</strong>
                 <br />
                 <span className="text-xs text-muted">
-                  Certificado: {certCn || 'cargado'} · se estampa
-                  automáticamente en la casilla del {slotLabel(slot)}.
+                  {hasCert
+                    ? `Certificado: ${certCn || 'cargado'}`
+                    : 'Imagen de firma cargada'}
+                  {' · '}se estampa en la casilla del {slotLabel(slot)}.
                 </span>
               </span>
             </label>
-            {useElectronic && (
+            {useElectronic && hasCert && (
               <label className="mt-3 block text-xs font-semibold uppercase tracking-wider text-muted">
                 Contraseña del certificado (.p12)
                 <input
@@ -163,15 +173,15 @@ export function SignatureGate({
                   className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm font-medium text-ink"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Contraseña del archivo de firma"
+                  placeholder="Si no tiene, déjela vacía"
                 />
               </label>
             )}
           </div>
         ) : (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            Para firma electrónica, cargue su certificado FirmaEC (.p12) en{' '}
-            <strong>FirmaEC</strong> (botón en la barra superior). Mientras
+            Para firma electrónica, pulse <strong>FirmaEC</strong> arriba y
+            cargue su <strong>.p12</strong> o una imagen de firma. Mientras
             tanto puede firmar con su nombre.
           </p>
         )}
@@ -224,7 +234,7 @@ export function SignatureGate({
               busy || (useElectronic ? !canElectronic : !canSimple)
             }
             onClick={() =>
-              useElectronic ? submitElectronic() : submitSimple()
+              useElectronic ? void submitElectronic() : submitSimple()
             }
             className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-deep disabled:opacity-40"
           >

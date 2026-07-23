@@ -42,17 +42,17 @@ export function InstitutionalPrintBody({ doc }: Props) {
     {
       label: 'Jefe de servicio (Elaborado)',
       value: doc.elaboradoPor,
-      electronic: (doc.electronicSigns ?? []).some((e) => e.slot === 'jefe'),
+      electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'jefe'),
     },
     {
       label: 'Revisor (Aprobado)',
       value: doc.revisadoPor || doc.aprobadoPor,
-      electronic: (doc.electronicSigns ?? []).some((e) => e.slot === 'revisor'),
+      electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'revisor'),
     },
     {
       label: 'Validador (Validado)',
       value: doc.talentoHumano,
-      electronic: (doc.electronicSigns ?? []).some((e) => e.slot === 'validador'),
+      electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'validador'),
     },
   ] as const
 
@@ -215,17 +215,22 @@ export function InstitutionalPrintBody({ doc }: Props) {
           {signatures.map((s) => (
             <div
               key={s.label}
-              className={`print-sign rounded border px-2 py-3 ${
-                s.electronic
-                  ? 'border-teal bg-teal/5'
-                  : 'border-line'
+              className={`print-sign rounded border px-2 py-2 ${
+                s.electronic ? 'border-teal bg-teal/5' : 'border-line'
               }`}
             >
               <p className="text-[9px] uppercase leading-tight text-muted">
                 {s.label}
                 {s.electronic ? ' · FirmaEC' : ''}
               </p>
-              <p className="mt-4 border-t border-line pt-1 text-[10px] font-medium leading-snug whitespace-pre-line">
+              {s.electronic?.imageDataUrl ? (
+                <img
+                  src={s.electronic.imageDataUrl}
+                  alt="Firma"
+                  className="mx-auto mt-2 max-h-10 object-contain"
+                />
+              ) : null}
+              <p className="mt-2 border-t border-line pt-1 text-[10px] font-medium leading-snug whitespace-pre-line">
                 {s.value || '________________'}
               </p>
             </div>

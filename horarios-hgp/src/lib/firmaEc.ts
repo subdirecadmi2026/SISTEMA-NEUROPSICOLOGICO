@@ -1,10 +1,12 @@
 import forge from 'node-forge'
 import type { AppUser } from '../types'
 
-const CERT_PREFIX = 'hgp-firmaec-cert-v1:'
 const META_PREFIX = 'hgp-firmaec-meta-v1:'
-const PASS_PREFIX = 'hgp-firmaec-pass-v1:' // solo sessionStorage
+const PASS_PREFIX = 'hgp-firmaec-pass-v1:'
+const IMG_PREFIX = 'hgp-firmaec-img-v1:'
 const CFG_KEY = 'hgp-firmaec-config-v1'
+const IDB_NAME = 'hgp-firmaec-db-v1'
+const IDB_STORE = 'certs'
 
 export type FirmaEcSlot = 'jefe' | 'revisor' | 'validador'
 
@@ -17,18 +19,14 @@ export type FirmaEcCertMeta = {
   notBefore?: string
   notAfter?: string
   uploadedAt: string
+  hasPrivateKey: boolean
 }
 
 export type FirmaEcConfig = {
-  /** Nombre del sistema registrado en FirmaEC (ej. pruebas / hgp-horarios). */
   sistema: string
-  /** API key del sistema transversal (MINTEL / institucional). */
   apiKey: string
-  /** Ambiente de pruebas o producción. */
   ambiente: 'pruebas' | 'produccion'
-  /** Cédula del firmante (requerida por API FirmaEC). */
   cedula: string
-  /** Si true, tras firmar localmente ofrece abrir protocolo firmaec:// cuando hay JWT. */
   preferProtocol: boolean
 }
 
@@ -39,8 +37,9 @@ export type ParsedPkcs12 = {
   issuerCn?: string
   notBefore?: string
   notAfter?: string
-  privateKeyPem: string
+  privateKeyPem?: string
   certificatePem: string
+  hasPrivateKey: boolean
 }
 
 export type ElectronicSignResult = {
@@ -50,8 +49,9 @@ export type ElectronicSignResult = {
   serialNumber?: string
   issuerCn?: string
   signedAt: string
-  method: 'pkcs12_local'
+  method: 'pkcs12_local' | 'image_stamp'
   fileName?: string
+  imageDataUrl?: string
 }
 
 const DEFAULT_CFG: FirmaEcConfig = {
@@ -62,14 +62,90 @@ const DEFAULT_CFG: FirmaEcConfig = {
   preferProtocol: false,
 }
 
-function certKey(userId: string) {
-  return `${CERT_PREFIX}${userId}`
-}
 function metaKey(userId: string) {
   return `${META_PREFIX}${userId}`
 }
 function passKey(userId: string) {
   return `${PASS_PREFIX}${userId}`
+}
+function imgKey(userId: string) {
+  return `${IMG_PREFIX}${userId}`
+}
+
+function bytesToBinary(u8: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < u8.length; i += chunk) {
+    binary += String.fromCharCode(...u8.subarray(i, i + chunk))
+  }
+  return binary
+}
+
+function binaryToBytes(bin: string): Uint8Array {
+  const out = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
+  return out
+}
+
+function openIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB no disponible'))
+  })
+}
+
+async function idbPutCert(userId: string, bytes: Uint8Array): Promise<void> {
+  const db = await openIdb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).put(bytes, userId)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error ?? new Error('No se pudo guardar el certificado'))
+  })
+  db.close()
+}
+
+async function idbGetCert(userId: string): Promise<Uint8Array | null> {
+  const db = await openIdb()
+  const result = await new Promise<Uint8Array | null>((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly')
+    const req = tx.objectStore(IDB_STORE).get(userId)
+    req.onsuccess = () => {
+      const v = req.result
+      if (!v) {
+        resolve(null)
+        return
+      }
+      if (v instanceof Uint8Array) resolve(v)
+      else if (v instanceof ArrayBuffer) resolve(new Uint8Array(v))
+      else resolve(null)
+    }
+    req.onerror = () => reject(req.error ?? new Error('No se pudo leer el certificado'))
+  })
+  db.close()
+  return result
+}
+
+async function idbDelCert(userId: string): Promise<void> {
+  try {
+    const db = await openIdb()
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite')
+      tx.objectStore(IDB_STORE).delete(userId)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error ?? new Error('No se pudo borrar'))
+    })
+    db.close()
+  } catch {
+    /* ignore */
+  }
 }
 
 export function loadFirmaEcConfig(): FirmaEcConfig {
@@ -103,7 +179,23 @@ export function getStoredCertMeta(userId: string): FirmaEcCertMeta | null {
 }
 
 export function hasStoredCertificate(userId: string): boolean {
-  return !!localStorage.getItem(certKey(userId)) && !!getStoredCertMeta(userId)
+  return !!getStoredCertMeta(userId)
+}
+
+export function getSignatureImage(userId: string): string | null {
+  try {
+    return localStorage.getItem(imgKey(userId))
+  } catch {
+    return null
+  }
+}
+
+export function saveSignatureImage(userId: string, dataUrl: string) {
+  localStorage.setItem(imgKey(userId), dataUrl)
+}
+
+export function clearSignatureImage(userId: string) {
+  localStorage.removeItem(imgKey(userId))
 }
 
 export function getSessionPassword(userId: string): string {
@@ -119,10 +211,13 @@ export function setSessionPassword(userId: string, password: string) {
   else sessionStorage.removeItem(passKey(userId))
 }
 
-export function clearFirmaEcVault(userId: string) {
-  localStorage.removeItem(certKey(userId))
+export async function clearFirmaEcVault(userId: string) {
   localStorage.removeItem(metaKey(userId))
   sessionStorage.removeItem(passKey(userId))
+  clearSignatureImage(userId)
+  await idbDelCert(userId)
+  // legado localStorage
+  localStorage.removeItem(`hgp-firmaec-cert-v1:${userId}`)
 }
 
 function attrValue(
@@ -136,42 +231,123 @@ function attrValue(
       String(a.type) === shortName,
   )
   const v = hit?.value
-  return typeof v === 'string' ? v : undefined
+  return typeof v === 'string' ? v : Array.isArray(v) ? String(v[0]) : undefined
+}
+
+function friendlyForgeError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err)
+  const lower = msg.toLowerCase()
+  if (
+    lower.includes('mac') ||
+    lower.includes('password') ||
+    lower.includes('invalid') ||
+    lower.includes('decrypt') ||
+    lower.includes('pkcs12')
+  ) {
+    return 'No se pudo abrir el .p12. Revise la contraseña o pruebe exportar de nuevo desde FirmaEC (archivo PKCS#12).'
+  }
+  if (lower.includes('asn.1') || lower.includes('too few bytes')) {
+    return 'El archivo no parece un certificado .p12/.pfx válido. Elija el archivo de firma electrónica (no una imagen ni un PDF).'
+  }
+  return msg || 'Error al leer el certificado'
+}
+
+function extractBags(p12: forge.pkcs12.Pkcs12Pfx): {
+  certBags: Array<{ cert?: forge.pki.Certificate }>
+  keyBags: Array<{ key?: forge.pki.PrivateKey }>
+} {
+  const certOid = forge.pki.oids.certBag
+  const shroudedOid = forge.pki.oids.pkcs8ShroudedKeyBag
+  const keyOid = forge.pki.oids.keyBag
+
+  const certMap = p12.getBags({ bagType: certOid }) as Record<
+    string,
+    Array<{ cert?: forge.pki.Certificate }> | undefined
+  >
+  const shroudedMap = p12.getBags({ bagType: shroudedOid }) as Record<
+    string,
+    Array<{ key?: forge.pki.PrivateKey }> | undefined
+  >
+  const keyMap = p12.getBags({ bagType: keyOid }) as Record<
+    string,
+    Array<{ key?: forge.pki.PrivateKey }> | undefined
+  >
+
+  return {
+    certBags: certMap[certOid] ?? [],
+    keyBags: [...(shroudedMap[shroudedOid] ?? []), ...(keyMap[keyOid] ?? [])],
+  }
+}
+
+function pickEndEntity(
+  certBags: Array<{ cert?: forge.pki.Certificate }>,
+  keyBags: Array<{ key?: forge.pki.PrivateKey }>,
+): { cert: forge.pki.Certificate; key?: forge.pki.PrivateKey } {
+  const certs = certBags
+    .map((b) => b.cert)
+    .filter((c): c is forge.pki.Certificate => !!c)
+  if (certs.length === 0) {
+    throw new Error(
+      'El archivo .p12 no contiene un certificado usable. Exporte desde FirmaEC con clave privada.',
+    )
+  }
+
+  const keys = keyBags
+    .map((b) => b.key)
+    .filter((k): k is forge.pki.PrivateKey => !!k)
+
+  // Prefer leaf cert (usually last in export) + first private key
+  return { cert: certs[certs.length - 1], key: keys[0] }
 }
 
 /**
- * Abre un PKCS#12 (.p12 / .pfx) con la contraseña y extrae identidad + clave.
+ * Abre un PKCS#12 (.p12 / .pfx) con la contraseña y extrae identidad.
  */
 export function parsePkcs12(
   bytes: ArrayBuffer | Uint8Array,
   password: string,
 ): ParsedPkcs12 {
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
-  let binary = ''
-  for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i])
-  const asn1 = forge.asn1.fromDer(binary)
-  const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, password)
-
-  const bags =
-    p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] ??
-    []
-  const keyBags =
-    p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[
-      forge.pki.oids.pkcs8ShroudedKeyBag
-    ] ??
-    p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] ??
-    []
-
-  const certBag = bags[0]
-  const keyBag = keyBags[0]
-  if (!certBag?.cert || !keyBag?.key) {
+  if (u8.length < 64) {
     throw new Error(
-      'No se encontró certificado o clave privada en el archivo .p12',
+      'El archivo es demasiado pequeño. Debe ser un certificado .p12 / .pfx de FirmaEC.',
     )
   }
 
-  const cert = certBag.cert
-  const key = keyBag.key as forge.pki.PrivateKey
+  const binary = bytesToBinary(u8)
+  let asn1: forge.asn1.Asn1
+  try {
+    asn1 = forge.asn1.fromDer(binary)
+  } catch (e) {
+    throw new Error(friendlyForgeError(e))
+  }
+
+  const attempts: Array<() => forge.pkcs12.Pkcs12Pfx> = [
+    () => forge.pkcs12.pkcs12FromAsn1(asn1, password),
+    () => forge.pkcs12.pkcs12FromAsn1(asn1, false, password),
+    () => forge.pkcs12.pkcs12FromAsn1(asn1, true, password),
+  ]
+  // Algunas exportaciones Java usan contraseña vacía aunque el usuario cree que tiene clave
+  if (password) {
+    attempts.push(() => forge.pkcs12.pkcs12FromAsn1(asn1, ''))
+    attempts.push(() => forge.pkcs12.pkcs12FromAsn1(asn1, false, ''))
+  }
+
+  let p12: forge.pkcs12.Pkcs12Pfx | null = null
+  let lastErr: unknown
+  for (const tryOpen of attempts) {
+    try {
+      p12 = tryOpen()
+      break
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  if (!p12) throw new Error(friendlyForgeError(lastErr))
+
+  const { certBags, keyBags } = extractBags(p12)
+  const { cert, key } = pickEndEntity(certBags, keyBags)
+
   const subjectCn =
     attrValue(cert.subject.attributes, 'CN') ||
     attrValue(cert.subject.attributes, 'commonName') ||
@@ -190,8 +366,9 @@ export function parsePkcs12(
     issuerCn,
     notBefore: cert.validity.notBefore.toISOString(),
     notAfter: cert.validity.notAfter.toISOString(),
-    privateKeyPem: forge.pki.privateKeyToPem(key),
+    privateKeyPem: key ? forge.pki.privateKeyToPem(key) : undefined,
     certificatePem: forge.pki.certificateToPem(cert),
+    hasPrivateKey: !!key,
   }
 }
 
@@ -200,18 +377,49 @@ export async function saveCertificateForUser(
   file: File,
   password: string,
 ): Promise<FirmaEcCertMeta> {
+  const name = file.name.toLowerCase()
+  if (
+    name &&
+    !name.endsWith('.p12') &&
+    !name.endsWith('.pfx') &&
+    !file.type.includes('pkcs12') &&
+    !file.type.includes('x-pkcs12')
+  ) {
+    // No bloquear: algunos SO no ponen extensión; solo avisar si es imagen/pdf
+    if (
+      file.type.startsWith('image/') ||
+      file.type === 'application/pdf' ||
+      name.endsWith('.png') ||
+      name.endsWith('.jpg') ||
+      name.endsWith('.jpeg') ||
+      name.endsWith('.pdf')
+    ) {
+      throw new Error(
+        'Ese archivo no es un certificado .p12/.pfx. Si tiene una imagen de firma, úsela en la sección «Imagen de firma». Para FirmaEC suba el archivo .p12.',
+      )
+    }
+  }
+
   const buf = await file.arrayBuffer()
   const parsed = parsePkcs12(buf, password)
   const bytes = new Uint8Array(buf)
-  let bin = ''
-  const chunk = 0x8000
-  for (let i = 0; i < bytes.length; i += chunk) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + chunk))
+
+  try {
+    await idbPutCert(user.id, bytes)
+  } catch {
+    // Fallback localStorage (certs pequeños)
+    const encoded = forge.util.encode64(bytesToBinary(bytes))
+    try {
+      localStorage.setItem(`hgp-firmaec-cert-v1:${user.id}`, encoded)
+    } catch {
+      throw new Error(
+        'No hay espacio para guardar el certificado en este navegador. Libere almacenamiento o use otro equipo.',
+      )
+    }
   }
-  const encoded = forge.util.encode64(bin)
 
   const meta: FirmaEcCertMeta = {
-    fileName: file.name,
+    fileName: file.name || 'certificado.p12',
     subjectCn: parsed.subjectCn,
     subjectEmail: parsed.subjectEmail,
     serialNumber: parsed.serialNumber,
@@ -219,38 +427,68 @@ export async function saveCertificateForUser(
     notBefore: parsed.notBefore,
     notAfter: parsed.notAfter,
     uploadedAt: new Date().toISOString(),
+    hasPrivateKey: parsed.hasPrivateKey,
   }
 
-  localStorage.setItem(certKey(user.id), encoded)
   localStorage.setItem(metaKey(user.id), JSON.stringify(meta))
   setSessionPassword(user.id, password)
   return meta
 }
 
-function loadCertBytes(userId: string): Uint8Array | null {
-  const b64 = localStorage.getItem(certKey(userId))
-  if (!b64) return null
-  const bin = forge.util.decode64(b64)
-  const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
+export async function saveSignatureImageFile(
+  user: AppUser,
+  file: File,
+): Promise<string> {
+  if (!file.type.startsWith('image/') && !/\.(png|jpe?g|webp|gif)$/i.test(file.name)) {
+    throw new Error('Seleccione una imagen PNG o JPG de su firma.')
+  }
+  if (file.size > 2_500_000) {
+    throw new Error('La imagen es muy grande (máx. 2.5 MB).')
+  }
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen'))
+    reader.readAsDataURL(file)
+  })
+  saveSignatureImage(user.id, dataUrl)
+  return dataUrl
 }
 
-/**
- * Firma electrónica local: valida el .p12 con la contraseña y genera el
- * resultado de identidad para estampar en la casilla correspondiente.
- * (FirmaEC oficial pide el cert en el cliente; aquí el usuario ya lo cargó.)
- */
-export function signWithStoredCertificate(
+async function loadCertBytes(userId: string): Promise<Uint8Array | null> {
+  const fromIdb = await idbGetCert(userId)
+  if (fromIdb) return fromIdb
+  const b64 = localStorage.getItem(`hgp-firmaec-cert-v1:${userId}`)
+  if (!b64) return null
+  return binaryToBytes(forge.util.decode64(b64))
+}
+
+export async function signWithStoredCertificate(
   user: AppUser,
   slot: FirmaEcSlot,
   password: string,
-): ElectronicSignResult {
-  const bytes = loadCertBytes(user.id)
+): Promise<ElectronicSignResult> {
   const meta = getStoredCertMeta(user.id)
+  const imageDataUrl = getSignatureImage(user.id) ?? undefined
+  const bytes = await loadCertBytes(user.id)
+
   if (!bytes || !meta) {
-    throw new Error('No hay certificado FirmaEC cargado. Súbalo en Ajustes.')
+    if (imageDataUrl) {
+      const signedAt = new Date().toISOString()
+      return {
+        signedName: user.name,
+        slot,
+        subjectCn: user.name,
+        signedAt,
+        method: 'image_stamp',
+        imageDataUrl,
+      }
+    }
+    throw new Error(
+      'No hay certificado ni imagen de firma cargados. Abra FirmaEC y súbalos.',
+    )
   }
+
   const parsed = parsePkcs12(bytes, password)
   setSessionPassword(user.id, password)
   const signedAt = new Date().toISOString()
@@ -263,6 +501,7 @@ export function signWithStoredCertificate(
     signedAt,
     method: 'pkcs12_local',
     fileName: meta.fileName,
+    imageDataUrl,
   }
 }
 
@@ -271,6 +510,9 @@ export function formatElectronicStamp(e: ElectronicSignResult): string {
     dateStyle: 'short',
     timeStyle: 'short',
   })
+  if (e.method === 'image_stamp') {
+    return `${e.subjectCn}\nFirma electrónica (imagen)\n${when}`
+  }
   return `${e.subjectCn}\nFirmado electrónicamente · FirmaEC\n${when}`
 }
 
@@ -288,16 +530,11 @@ export function slotLabel(slot: FirmaEcSlot): string {
   return 'Validador'
 }
 
-/**
- * Construye URL del protocolo FirmaEC (requiere JWT previo del servicio REST).
- * Posiciones aproximadas A4 landscape para casillas de firma.
- */
 export function buildFirmaEcProtocolUrl(
   token: string,
   slot: FirmaEcSlot,
   cfg: FirmaEcConfig,
 ): string {
-  // Coordenadas orientativas (llx/lly) A4 landscape — casillas pie de página
   const pos =
     slot === 'jefe'
       ? { llx: 40, lly: 40 }
@@ -317,10 +554,6 @@ export function buildFirmaEcProtocolUrl(
   return `firmaec://${encodeURIComponent(cfg.sistema)}/firmar?${q.toString()}`
 }
 
-/**
- * Sube PDF a FirmaEC ServicioDocumentos y obtiene JWT.
- * Requiere X-API-KEY institucional registrado en MINTEL.
- */
 export async function requestFirmaEcToken(
   pdfBase64: string,
   fileName: string,
