@@ -294,6 +294,58 @@ export function deleteLeave(id: string) {
   writeAll(readAll().filter((l) => l.id !== id))
 }
 
+/** Detecta solapes de fechas del mismo personal (permisos activos). */
+export function findOverlappingLeaves(
+  input: Pick<
+    LeaveInput,
+    'staffId' | 'staffName' | 'startDate' | 'endDate' | 'unitName'
+  > & { id?: string },
+): StaffLeave[] {
+  const start = parseYmd(input.startDate)
+  const end = parseYmd(input.endDate)
+  if (!start || !end) return []
+  const nameKey = input.staffName.trim().toLowerCase()
+  return readAll().filter((l) => {
+    if (l.status !== 'activo') return false
+    if (input.id && l.id === input.id) return false
+    if (l.unitName !== input.unitName) return false
+    const samePerson =
+      l.staffId === input.staffId ||
+      l.staffName.trim().toLowerCase() === nameKey
+    if (!samePerson) return false
+    const a = parseYmd(l.startDate)
+    const b = parseYmd(l.endDate)
+    if (!a || !b) return false
+    return a.getTime() <= end.getTime() && b.getTime() >= start.getTime()
+  })
+}
+
+export function leavesSummary(opts?: {
+  serviceType?: ServiceType
+  unitName?: string
+  status?: LeaveStatus | 'all'
+}): {
+  total: number
+  activos: number
+  vacaciones: number
+  permisos: number
+  horasAutorizadas: number
+} {
+  const list = listLeaves({
+    serviceType: opts?.serviceType,
+    unitName: opts?.unitName,
+    status: opts?.status ?? 'all',
+  })
+  const activos = list.filter((l) => l.status === 'activo')
+  return {
+    total: list.length,
+    activos: activos.length,
+    vacaciones: activos.filter((l) => l.kind === 'vacaciones').length,
+    permisos: activos.filter((l) => l.kind !== 'vacaciones').length,
+    horasAutorizadas: activos.reduce((s, l) => s + l.authorizedHours, 0),
+  }
+}
+
 /** Días del permiso que caen en un mes concreto (1..31). */
 export function leaveDaysInMonth(
   leave: StaffLeave,

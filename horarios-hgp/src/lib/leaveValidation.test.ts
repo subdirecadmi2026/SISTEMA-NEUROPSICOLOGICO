@@ -177,4 +177,27 @@ describe('permisos / vacaciones', () => {
     expect(next.cells[cellKey('a', 2)]).toBe('V')
     expect(next.cells[cellKey('a', 3)]).toBe('V')
   })
+
+  it('detecta solapes de permisos del mismo personal', async () => {
+    const { findOverlappingLeaves } = await import('./leavesStore')
+    upsertLeave({
+      staffId: 'a',
+      staffName: 'Dr. Sol',
+      serviceType: 'medico',
+      unitName: 'Pediatría',
+      kind: 'vacaciones',
+      startDate: '2026-07-01',
+      endDate: '2026-07-10',
+      authorizedHours: 80,
+      hoursPerDay: 8,
+    })
+    const overlap = findOverlappingLeaves({
+      staffId: 'a',
+      staffName: 'Dr. Sol',
+      unitName: 'Pediatría',
+      startDate: '2026-07-08',
+      endDate: '2026-07-15',
+    })
+    expect(overlap.length).toBe(1)
+  })
 })

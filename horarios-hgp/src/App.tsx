@@ -80,9 +80,6 @@ import { shiftMeta } from './data/templates'
 import { assignmentsOnDay, daysInMonth } from './lib/calendar'
 import { LeaveBalancePanel } from './components/LeaveBalancePanel'
 import { PermisosVacacionesPanel } from './components/PermisosVacacionesPanel'
-import {
-  applyLeaveCodesToEmpty,
-} from './lib/leaveValidation'
 
 const now = new Date()
 
@@ -1076,32 +1073,10 @@ export default function App() {
             <LeaveBalancePanel
               doc={doc}
               onGoHorario={() => setTab('horario')}
+              readOnly={readOnly}
+              onChange={patchDoc}
+              onFlash={flash}
             />
-            {!readOnly && (
-              <div className="rounded-2xl border border-line bg-white px-4 py-3 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const { doc: next, painted } = applyLeaveCodesToEmpty(doc)
-                    if (painted === 0) {
-                      flash('No hay días de permiso vacíos para marcar')
-                      return
-                    }
-                    patchDoc(next)
-                    flash(
-                      `Marcados ${painted} día(s) con clave de permiso/vacaciones`,
-                    )
-                  }}
-                  className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
-                >
-                  Aplicar claves de permisos a días vacíos
-                </button>
-                <p className="mt-2 text-xs text-muted">
-                  Rellena solo celdas vacías en el rango autorizado (no pisa
-                  turnos ya pintados).
-                </p>
-              </div>
-            )}
             <PermisosVacacionesPanel
               user={user}
               onFlash={flash}
@@ -1118,7 +1093,10 @@ export default function App() {
             <LeaveBalancePanel
               doc={doc}
               onGoHorario={() => setTab('permisos')}
-              goLabel="Ver permisos"
+              goLabel="Gestionar permisos"
+              readOnly={readOnly}
+              onChange={patchDoc}
+              onFlash={flash}
             />
             <ScheduleTable
               doc={doc}
@@ -1129,6 +1107,7 @@ export default function App() {
               compact={compactTable}
               focusDay={focusDay}
               onChange={patchDoc}
+              onFlash={flash}
               onAddStaff={addStaff}
               onNewDemo={() =>
                 setDoc(

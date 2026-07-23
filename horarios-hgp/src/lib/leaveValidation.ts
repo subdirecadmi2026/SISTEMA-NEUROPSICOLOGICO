@@ -79,6 +79,69 @@ export function computeLeaveUsage(
   }
 }
 
+export type LeaveUsageStatus =
+  | 'ok'
+  | 'completo'
+  | 'conflicto'
+  | 'exceso'
+  | 'pendiente'
+
+export function leaveUsageStatus(u: LeaveUsage): LeaveUsageStatus {
+  if (u.conflictDays.length > 0) return 'conflicto'
+  if (u.overQuota) return 'exceso'
+  if (u.daysInMonth.length > 0 && u.unmarkedDays.length === 0 && u.markedDays.length > 0)
+    return 'completo'
+  if (u.unmarkedDays.length > 0 && u.markedDays.length === 0) return 'pendiente'
+  if (u.unmarkedDays.length > 0) return 'pendiente'
+  return 'ok'
+}
+
+export const LEAVE_STATUS_LABEL: Record<LeaveUsageStatus, string> = {
+  ok: 'En orden',
+  completo: 'Marcado',
+  conflicto: 'Conflicto',
+  exceso: 'Exceso horas',
+  pendiente: 'Pendiente',
+}
+
+/**
+ * Mapa staffId → Set de días del mes con permiso activo.
+ * Para resaltar celdas en la planilla.
+ */
+export function leaveDayMapForDoc(
+  doc: ScheduleDoc,
+): Map<string, { days: Set<number>; code: string }> {
+  const map = new Map<string, { days: Set<number>; code: string }>()
+  for (const u of listLeaveUsagesForDoc(doc)) {
+    const cur = map.get(u.leave.staffId) ?? {
+      days: new Set<number>(),
+      code: u.leave.absenceCode,
+    }
+    for (const d of u.daysInMonth) cur.days.add(d)
+    cur.code = u.leave.absenceCode
+    map.set(u.leave.staffId, cur)
+  }
+  return map
+}
+
+/** ¿Pintar esta celda choca con un permiso activo? */
+export function leaveConflictIfPaint(
+  doc: ScheduleDoc,
+  staffId: string,
+  day: number,
+  code: string,
+): string | null {
+  const map = leaveDayMapForDoc(doc)
+  const entry = map.get(staffId)
+  if (!entry || !entry.days.has(day)) return null
+  const meta = shiftMeta(doc.serviceType, code)
+  const productive =
+    hoursForCode(doc.serviceType, code) > 0 && meta?.group !== 'ausencia'
+  if (!productive) return null
+  if (code.toUpperCase() === entry.code.toUpperCase()) return null
+  return `Día ${day}: hay permiso/vacaciones (use ${entry.code}, no ${code})`
+}
+
 export function listLeaveUsagesForDoc(doc: ScheduleDoc): LeaveUsage[] {
   const leaves = activeLeavesForSchedule({
     serviceType: doc.serviceType,

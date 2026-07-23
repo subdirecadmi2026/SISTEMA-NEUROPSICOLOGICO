@@ -423,7 +423,7 @@ export function ValidadorWorkspace({
                 : 'text-muted hover:bg-sand'
             }`}
           >
-            2. Archivo validado
+            2. Archivo
             <span className="ml-2 rounded-full bg-white/20 px-1.5 text-xs">
               {archived.length}
             </span>
@@ -437,25 +437,29 @@ export function ValidadorWorkspace({
                 : 'text-muted hover:bg-sand'
             }`}
           >
-            3. Permisos / vacaciones
+            3. Permisos
           </button>
         </div>
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Buscar especialidad o mes…"
-          className="min-w-[180px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm"
-        />
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold hover:bg-sand"
-        >
-          Actualizar
-        </button>
+        {module !== 'permisos' ? (
+          <>
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Buscar especialidad o mes…"
+              className="min-w-[180px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold hover:bg-sand"
+            >
+              Actualizar
+            </button>
+          </>
+        ) : null}
       </div>
 
-      {supportsDirectoryPicker() && (
+      {module !== 'permisos' && supportsDirectoryPicker() && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white/90 px-3 py-2 text-sm">
           <p className="text-muted">
             Carpeta raíz del archivo:{' '}
@@ -486,7 +490,7 @@ export function ValidadorWorkspace({
         </div>
       )}
 
-      {!supportsDirectoryPicker() && (
+      {!supportsDirectoryPicker() && module !== 'permisos' && (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           Su navegador no permite crear carpetas en disco. Al validar se
           descargará un <strong>ZIP</strong> con la carpeta de la especialidad.

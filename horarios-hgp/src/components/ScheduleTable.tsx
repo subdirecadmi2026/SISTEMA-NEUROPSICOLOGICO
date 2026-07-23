@@ -14,6 +14,7 @@ import {
 } from '../lib/calendar'
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
 import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, clearStaffRowCells, copyCellsBetweenStaff } from '../lib/scheduleOps'
+import { leaveConflictIfPaint, leaveDayMapForDoc } from '../lib/leaveValidation'
 
 type Props = {
   doc: ScheduleDoc
@@ -26,6 +27,7 @@ type Props = {
   onChange: (doc: ScheduleDoc) => void
   onAddStaff: () => void
   onNewDemo: () => void
+  onFlash?: (msg: string) => void
 }
 
 export function ScheduleTable({
@@ -39,6 +41,7 @@ export function ScheduleTable({
   onChange,
   onAddStaff,
   onNewDemo,
+  onFlash,
 }: Props) {
   const days = daysInMonth(doc.year, doc.month)
   const isEnf = doc.serviceType === 'enfermeria'
@@ -48,6 +51,7 @@ export function ScheduleTable({
   const summaryCols = isEnf ? 8 : 2
   const staffSorted = [...doc.staff].sort((a, b) => a.order - b.order)
   const holidays = holidayDatesInMonth(doc.year, doc.month)
+  const leaveMap = leaveDayMapForDoc(doc)
   const dragging = useRef(false)
   const dragMode = useRef<'paint' | 'erase'>('paint')
   const docRef = useRef(doc)
@@ -157,6 +161,8 @@ export function ScheduleTable({
       clearCell(staffId, day)
       return
     }
+    const warn = leaveConflictIfPaint(docRef.current, staffId, day, activeCode)
+    if (warn) onFlash?.(warn)
     const current = docRef.current
     const key = cellKey(staffId, day)
     if (current.cells[key] === activeCode) return
@@ -441,6 +447,8 @@ export function ScheduleTable({
                         : undefined
                       const weekend = isWeekend(doc.year, doc.month, d)
                       const holiday = holidays.has(d)
+                      const leaveInfo = leaveMap.get(s.id)
+                      const onLeave = leaveInfo?.days.has(d) ?? false
                       return (
                         <td
                           key={d}
@@ -466,25 +474,33 @@ export function ScheduleTable({
                           className={`border border-line px-0 py-0 text-center select-none ${
                             readOnly ? '' : 'cursor-pointer'
                           } ${
-                            !code && highlightEmpty
-                              ? 'bg-rose-100/80 ring-1 ring-inset ring-rose-300'
-                              : !code && holiday
-                                ? 'bg-amber-50'
-                                : !code && weekend
-                                  ? 'bg-teal/5'
-                                  : ''
+                            onLeave
+                              ? 'ring-1 ring-inset ring-teal/55'
+                              : !code && highlightEmpty
+                                ? 'bg-rose-100/80 ring-1 ring-inset ring-rose-300'
+                                : !code && holiday
+                                  ? 'bg-amber-50'
+                                  : !code && weekend
+                                    ? 'bg-teal/5'
+                                    : ''
                           }`}
                           style={
                             meta
                               ? { background: meta.color, color: meta.text }
-                              : undefined
+                              : onLeave && !code
+                                ? { background: 'rgba(46, 125, 132, 0.08)' }
+                                : undefined
                           }
                           title={
-                            meta
-                              ? `${meta.code} — ${meta.label}${meta.timeRange ? ` (${meta.timeRange})` : ''}`
-                              : holiday
-                                ? 'Feriado (vacío)'
-                                : 'Vacío · arrastre para pintar'
+                            onLeave
+                              ? meta
+                                ? `${meta.code} — ${meta.label} · permiso/vacaciones (clave ${leaveInfo?.code})`
+                                : `Permiso/vacaciones · marque ${leaveInfo?.code}`
+                              : meta
+                                ? `${meta.code} — ${meta.label}${meta.timeRange ? ` (${meta.timeRange})` : ''}`
+                                : holiday
+                                  ? 'Feriado (vacío)'
+                                  : 'Vacío · arrastre para pintar'
                           }
                         >
                           <div
@@ -668,8 +684,8 @@ export function ScheduleTable({
             Nuevo ejemplo
           </button>
           <p className="text-xs text-muted">
-            Tip: mantenga pulsado y arrastre para pintar varias celdas. Clic
-            derecho borra. «Fila» llena vacíos con la clave activa.
+            Contorno teal = día con permiso/vacaciones. Arrastre para pintar ·
+            clic derecho borra · «Fila» llena vacíos.
           </p>
         </div>
       )}

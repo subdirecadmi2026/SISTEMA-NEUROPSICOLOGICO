@@ -12,7 +12,9 @@ import {
   defaultAbsenceCode,
   deleteLeave,
   estimateAuthorizedHours,
+  findOverlappingLeaves,
   inclusiveDayCount,
+  leavesSummary,
   listLeaves,
   upsertLeave,
 } from '../lib/leavesStore'
@@ -127,6 +129,38 @@ export function PermisosVacacionesPanel({
     })
   }, [form.serviceType, form.unitName, statusFilter, tick])
 
+  const summary = useMemo(() => {
+    void tick
+    return leavesSummary({
+      serviceType: form.serviceType,
+      unitName: form.unitName || undefined,
+      status: 'all',
+    })
+  }, [form.serviceType, form.unitName, tick])
+
+  const overlaps = useMemo(
+    () =>
+      form.staffId || form.staffName.trim()
+        ? findOverlappingLeaves({
+            id: form.id,
+            staffId: form.staffId,
+            staffName: form.staffName,
+            unitName: form.unitName,
+            startDate: form.startDate,
+            endDate: form.endDate,
+          })
+        : [],
+    [
+      form.id,
+      form.staffId,
+      form.staffName,
+      form.unitName,
+      form.startDate,
+      form.endDate,
+      tick,
+    ],
+  )
+
   const visible = leaves.filter((l) => {
     const q = filter.trim().toLowerCase()
     if (!q) return true
@@ -198,6 +232,21 @@ export function PermisosVacacionesPanel({
 
   function save() {
     try {
+      if (overlaps.length > 0) {
+        const tip = overlaps
+          .map(
+            (o) =>
+              `${o.staffName} ${o.startDate}→${o.endDate} (${LEAVE_KIND_LABEL[o.kind]})`,
+          )
+          .join('; ')
+        if (
+          !window.confirm(
+            `Hay solape con permiso(s) activo(s):\n${tip}\n\n¿Registrar de todos modos?`,
+          )
+        ) {
+          return
+        }
+      }
       const saved = upsertLeave(
         {
           id: form.id,
@@ -259,6 +308,29 @@ export function PermisosVacacionesPanel({
   const days = inclusiveDayCount(form.startDate, form.endDate)
 
   return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          { label: 'Activos', value: String(summary.activos) },
+          { label: 'Vacaciones', value: String(summary.vacaciones) },
+          { label: 'Permisos', value: String(summary.permisos) },
+          {
+            label: 'Horas autorizadas',
+            value: `${summary.horasAutorizadas} h`,
+          },
+        ].map((k) => (
+          <div
+            key={k.label}
+            className="rounded-xl border border-line bg-gradient-to-b from-white to-sand/30 px-3 py-2.5 shadow-sm"
+          >
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              {k.label}
+            </p>
+            <p className="font-display text-2xl text-navy">{k.value}</p>
+          </div>
+        ))}
+      </div>
+
     <section
       className={`grid gap-4 ${compact ? '' : 'lg:grid-cols-[1fr_1.15fr]'}`}
     >
@@ -494,6 +566,14 @@ export function PermisosVacacionesPanel({
             Limpiar
           </button>
         </div>
+        {overlaps.length > 0 ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            Solape con {overlaps.length} permiso(s) activo(s) del mismo
+            personal ({overlaps[0].startDate} → {overlaps[0].endDate}
+            {overlaps.length > 1 ? '…' : ''}). Al guardar se pedirá
+            confirmación.
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
@@ -580,5 +660,6 @@ export function PermisosVacacionesPanel({
         </ul>
       </div>
     </section>
+    </div>
   )
 }
