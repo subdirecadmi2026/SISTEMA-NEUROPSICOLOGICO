@@ -27,11 +27,15 @@ export function validateCoverage(doc: ScheduleDoc): ValidationAlert[] {
   const alerts: ValidationAlert[] = []
   const cov = coverageByDay(doc)
   for (const c of cov) {
+    // Días sin nadie pintado: normales en turnos rotativos / 24 h — no alertar
+    if (c.count === 0 && c.hours === 0) continue
+
+    // Solo aviso si el día ya tiene actividad pero queda bajo el umbral
     if (c.count < doc.coverageRule.minStaffPerDay) {
       alerts.push({
-        level: c.count === 0 ? 'error' : 'warning',
+        level: 'warning',
         code: 'cobertura_baja',
-        message: `Día ${c.day}: cobertura ${c.count} (mín. ${doc.coverageRule.minStaffPerDay})`,
+        message: `Día ${c.day}: cobertura ${c.count} (mín. sugerido ${doc.coverageRule.minStaffPerDay})`,
         day: c.day,
       })
     }
@@ -39,7 +43,7 @@ export function validateCoverage(doc: ScheduleDoc): ValidationAlert[] {
       alerts.push({
         level: 'warning',
         code: 'horas_bajas',
-        message: `Día ${c.day}: ${c.hours} h cubiertas (mín. ${doc.coverageRule.minHoursPerDay} h)`,
+        message: `Día ${c.day}: ${c.hours} h cubiertas (mín. sugerido ${doc.coverageRule.minHoursPerDay} h)`,
         day: c.day,
       })
     }
@@ -113,14 +117,22 @@ export function validateContingency(doc: ScheduleDoc): ValidationAlert[] {
     !doc.contingencyPlan.trim() &&
     doc.serviceType === 'medico'
   ) {
+    // Aviso, no bloquea envío: el revisor puede pedirlo si falta
     alerts.push({
-      level: 'error',
+      level: 'warning',
       code: 'contingencia_requerida',
       message:
-        'Hay vacaciones/permisos: el plan de contingencia es obligatorio (plantilla médica).',
+        'Hay vacaciones/permisos: se recomienda completar el plan de contingencia.',
     })
   }
   return alerts
+}
+
+/** Errores que sí bloquean el envío (hoy: ninguno de cobertura). */
+export function blockingValidationErrors(
+  doc: ScheduleDoc,
+): ValidationAlert[] {
+  return runAllValidations(doc).filter((a) => a.level === 'error')
 }
 
 export function runAllValidations(doc: ScheduleDoc): ValidationAlert[] {
@@ -139,7 +151,9 @@ export type ChecklistItem = {
   message: string
 }
 
-/** Checklist previo a enviar a revisión. */
+/** Checklist previo a enviar a revisión.
+ * Suficiente con nombres + jefe + algo pintado (turnos rotativos / 24 h no exigen mes lleno).
+ */
 export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
   const named = doc.staff.filter((s) => s.name.trim())
   const days = daysInMonth(doc.year, doc.month)
@@ -150,7 +164,6 @@ export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
     }
   }
   const alerts = runAllValidations(doc)
-  const errors = alerts.filter((a) => a.level === 'error')
   const warnings = alerts.filter((a) => a.level === 'warning')
   const painted = Object.keys(doc.cells).length
 
@@ -178,7 +191,7 @@ export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
       level: 'required',
       message:
         painted > 0
-          ? `${painted} celdas con clave`
+          ? `${painted} celda(s) con clave — listo para enviar`
           : 'Aún no hay turnos pintados',
     },
     {
@@ -188,16 +201,7 @@ export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
       message:
         empty === 0 && named.length > 0
           ? 'Mes completo (sin celdas vacías)'
-          : `${empty} celdas vacías en personal con nombre`,
-    },
-    {
-      id: 'errores',
-      ok: errors.length === 0,
-      level: 'required',
-      message:
-        errors.length === 0
-          ? 'Sin errores de validación'
-          : `${errors.length} error(es) por corregir antes de enviar`,
+          : `${empty} celdas vacías (normal en turnos rotativos / 24 h)`,
     },
     {
       id: 'avisos',
@@ -206,7 +210,7 @@ export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
       message:
         warnings.length === 0
           ? 'Sin avisos de cobertura/descansos'
-          : `${warnings.length} aviso(s) (puede enviar, pero revise)`,
+          : `${warnings.length} aviso(s) informativos (no bloquean el envío)`,
     },
   ]
 }

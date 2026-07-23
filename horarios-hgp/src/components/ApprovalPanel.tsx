@@ -51,8 +51,12 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
         onFlash('Debe registrar al menos 1 nombre de personal/médico')
         return
       }
-      if (errors.length > 0) {
-        onFlash('Corrija errores (cobertura/contingencia) antes de enviar')
+      if (Object.keys(doc.cells).length === 0) {
+        onFlash('Pinte al menos una clave antes de enviar a revisión')
+        return
+      }
+      if (!doc.jefeServicio.trim()) {
+        onFlash('Indique el jefe / líder de servicio antes de enviar')
         return
       }
     }
@@ -261,7 +265,7 @@ export function ApprovalPanel({ doc, user, onChange, onFlash }: Props) {
       {alerts.length > 0 && (
         <details className="mt-3 rounded-lg border border-line">
           <summary className="cursor-pointer bg-sand/50 px-3 py-2 text-xs font-semibold text-navy">
-            Alertas de validación ({alerts.length}) — {errors.length} error(es)
+            Alertas informativas ({alerts.length}) — {errors.length} crítico(s) · no bloquean el envío
           </summary>
           <div className="max-h-40 overflow-y-auto">
             {alerts.slice(0, 40).map((a, i) => (

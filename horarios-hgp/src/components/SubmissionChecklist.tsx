@@ -70,7 +70,7 @@ export function SubmissionChecklist({ doc, onGoFix }: Props) {
             </button>
           )}
           {requiredFail.some((i) =>
-            ['pintado', 'vacios', 'jefe', 'errores', 'avisos'].includes(i.id),
+            ['pintado', 'vacios', 'jefe', 'avisos'].includes(i.id),
           ) && (
             <button
               type="button"
@@ -80,7 +80,7 @@ export function SubmissionChecklist({ doc, onGoFix }: Props) {
               Ir a horario
             </button>
           )}
-          {requiredFail.some((i) => i.id === 'errores') && (
+          {requiredFail.some((i) => i.id === 'avisos') && (
             <button
               type="button"
               className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-semibold"

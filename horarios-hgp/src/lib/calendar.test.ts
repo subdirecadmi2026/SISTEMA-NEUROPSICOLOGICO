@@ -85,7 +85,7 @@ describe('totales de horario', () => {
 })
 
 describe('cobertura y validaciones', () => {
-  it('detecta cobertura baja', () => {
+  it('detecta cobertura baja solo si el día ya tiene actividad', () => {
     const doc = createBlankSchedule('enfermeria', 2026, 7, { withDemo: false })
     doc.staff = [
       {
@@ -106,6 +106,35 @@ describe('cobertura y validaciones', () => {
     const alerts = validateCoverage(doc)
     expect(alerts.some((a) => a.code === 'cobertura_baja' && a.day === 1)).toBe(
       true,
+    )
+    expect(alerts.every((a) => a.level === 'warning')).toBe(true)
+    // Días vacíos no generan alerta (rotativos / 24 h)
+    expect(alerts.some((a) => a.day === 2)).toBe(false)
+  })
+
+  it('permite enviar a revisión con mes parcial (rotativos)', async () => {
+    const { getSubmissionChecklist, isReadyToSubmit, validateCoverage } =
+      await import('./validation')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dr. Rotativo',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'X',
+        order: 1,
+      },
+    ]
+    doc.jefeServicio = 'Dr. Jefe'
+    doc.cells = { [cellKey('a', 1)]: 'X', [cellKey('a', 3)]: 'CE' }
+    doc.coverageRule = { minStaffPerDay: 2, minHoursPerDay: 16 }
+    // Cobertura baja solo como aviso, no bloquea
+    expect(validateCoverage(doc).every((a) => a.level === 'warning')).toBe(true)
+    expect(isReadyToSubmit(doc)).toBe(true)
+    expect(getSubmissionChecklist(doc).find((i) => i.id === 'errores')).toBe(
+      undefined,
     )
   })
 
