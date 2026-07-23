@@ -14,6 +14,7 @@ type Props = {
   onGoHorario?: () => void
 }
 
+/** Paleta de claves: un solo módulo estético para seleccionar y pintar. */
 export function ShiftPalette({
   serviceType,
   activeCode,
@@ -33,47 +34,50 @@ export function ShiftPalette({
   const recent = recentCodes
     .map((c) => shiftMeta(serviceType, c))
     .filter((s): s is ShiftCode => !!s)
+  const activeMeta = shiftMeta(serviceType, activeCode)
+
+  const filters = (
+    [
+      ['todas', 'Todas'],
+      ['turno', 'Turnos'],
+      ...(isEnf ? [] : ([['area', 'Áreas']] as const)),
+      ['ausencia', 'Ausencias'],
+    ] as const
+  )
 
   return (
-    <section className="no-print mb-4 rounded-2xl rounded-tl-none border border-line bg-white/85 p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+    <section className="no-print mb-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line bg-gradient-to-r from-navy/[0.04] to-teal/[0.06] px-4 py-3">
         <div>
-          <h2 className="font-display text-xl text-navy">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+            Pintura
+          </p>
+          <h2 className="font-display text-lg text-navy">
             Claves — {SERVICE_LABEL[serviceType]}
           </h2>
-          <p className="text-sm text-muted">
-            Seleccione una clave y pinte. Atajos: L F V · CE X · D1 N1 (si no
-            está escribiendo).
+          <p className="text-xs text-muted">
+            Elija clave y pinte en la grilla · Atajos L F V · CE X · D1 N1
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              ['todas', 'Todas'],
-              ['turno', 'Turnos'],
-              ...(isEnf ? [] : ([['area', 'Áreas']] as const)),
-              ['ausencia', 'Ausencias'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onClaveTab(id)}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                claveTab === id
-                  ? 'border-navy bg-navy text-white'
-                  : 'border-line bg-sand/60 text-muted'
-              }`}
+          {activeMeta && (
+            <span
+              className="rounded-xl px-3 py-1.5 text-sm font-bold shadow-sm"
+              style={{
+                background: activeMeta.color,
+                color: activeMeta.text,
+              }}
             >
-              {label}
-            </button>
-          ))}
+              Activa: {activeMeta.code}
+            </span>
+          )}
           {!showTable && (
-            <label className="ml-2 flex items-center gap-2 text-sm">
+            <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-white px-3 py-1.5 text-sm font-semibold text-navy">
               <input
                 type="checkbox"
                 checked={paintMode}
                 onChange={(e) => onPaintMode(e.target.checked)}
+                className="accent-teal"
               />
               Pintar
             </label>
@@ -81,9 +85,28 @@ export function ShiftPalette({
         </div>
       </div>
 
+      <div className="px-4 pt-3">
+        <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-sand/70 p-1">
+          {filters.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onClaveTab(id)}
+              className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${
+                claveTab === id
+                  ? 'bg-navy text-white shadow-sm'
+                  : 'text-muted hover:bg-white hover:text-navy'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {recent.length > 0 && !showTable && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted">
             Recientes
           </span>
           {recent.map((s) => (
@@ -94,8 +117,8 @@ export function ShiftPalette({
                 onActiveCode(s.code)
                 onGoHorario?.()
               }}
-              className={`rounded border px-2 py-1 text-xs font-bold ${
-                activeCode === s.code ? 'ring-2 ring-navy' : ''
+              className={`rounded-lg border px-2.5 py-1 text-xs font-bold transition ${
+                activeCode === s.code ? 'ring-2 ring-navy ring-offset-1' : ''
               }`}
               style={{ background: s.color, color: s.text }}
             >
@@ -105,7 +128,7 @@ export function ShiftPalette({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 px-4 py-4">
         {visible.map((s) => {
           const active = activeCode === s.code
           return (
@@ -117,19 +140,19 @@ export function ShiftPalette({
                 onGoHorario?.()
               }}
               title={`${s.label}${s.timeRange ? ` · ${s.timeRange}` : ''}${s.note ? ` · ${s.note}` : ''}`}
-              className={`rounded-lg border px-3 py-2 text-left transition ${
+              className={`rounded-xl border px-3 py-2 text-left shadow-sm transition hover:brightness-105 ${
                 active ? 'ring-2 ring-navy ring-offset-1' : ''
               }`}
               style={{
                 background: s.color,
                 color: s.text,
-                borderColor: active ? '#1c3a5c' : '#cfd8e0',
+                borderColor: active ? '#1c3a5c' : 'transparent',
               }}
             >
               <span className="block text-sm font-bold leading-none">
                 {s.code}
               </span>
-              <span className="block max-w-[140px] truncate text-[11px] opacity-85">
+              <span className="mt-0.5 block max-w-[130px] truncate text-[11px] opacity-85">
                 {s.timeRange ?? s.label}
               </span>
             </button>
@@ -138,40 +161,49 @@ export function ShiftPalette({
       </div>
 
       {showTable && (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-line">
-          <table className="w-full text-sm">
-            <thead className="bg-navy text-white">
-              <tr>
-                <th className="px-3 py-2 text-left">Clave</th>
-                <th className="px-3 py-2 text-left">Descripción</th>
-                <th className="px-3 py-2 text-left">Horario</th>
-                <th className="px-3 py-2 text-left">Nota</th>
-                <th className="px-3 py-2 text-right">Horas</th>
-                <th className="px-3 py-2 text-left">Grupo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shifts.map((s) => (
-                <tr key={s.code} className="border-t border-line">
-                  <td className="px-3 py-2">
-                    <span
-                      className="inline-block rounded px-2 py-0.5 font-bold"
-                      style={{ background: s.color, color: s.text }}
-                    >
-                      {s.code}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">{s.label}</td>
-                  <td className="px-3 py-2 text-muted">{s.timeRange ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted">{s.note ?? '—'}</td>
-                  <td className="px-3 py-2 text-right font-semibold">
-                    {s.hours}
-                  </td>
-                  <td className="px-3 py-2 capitalize text-muted">{s.group}</td>
+        <div className="border-t border-line px-4 pb-4">
+          <div className="overflow-x-auto rounded-xl border border-line">
+            <table className="w-full text-sm">
+              <thead className="bg-navy text-white">
+                <tr>
+                  <th className="px-3 py-2 text-left">Clave</th>
+                  <th className="px-3 py-2 text-left">Descripción</th>
+                  <th className="px-3 py-2 text-left">Horario</th>
+                  <th className="px-3 py-2 text-left">Nota</th>
+                  <th className="px-3 py-2 text-right">Horas</th>
+                  <th className="px-3 py-2 text-left">Grupo</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shifts.map((s) => (
+                  <tr
+                    key={s.code}
+                    className="border-t border-line hover:bg-sand/40"
+                  >
+                    <td className="px-3 py-2">
+                      <span
+                        className="inline-block rounded-lg px-2 py-0.5 font-bold"
+                        style={{ background: s.color, color: s.text }}
+                      >
+                        {s.code}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">{s.label}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {s.timeRange ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-muted">{s.note ?? '—'}</td>
+                    <td className="px-3 py-2 text-right font-semibold">
+                      {s.hours}
+                    </td>
+                    <td className="px-3 py-2 capitalize text-muted">
+                      {s.group}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>

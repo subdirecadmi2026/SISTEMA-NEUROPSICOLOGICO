@@ -59,8 +59,7 @@ import { NotesPanel } from './components/NotesPanel'
 import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
 import { AuditTrail } from './components/AuditTrail'
-import { EmptyCellsPanel } from './components/EmptyCellsPanel'
-import { ReplaceCodePanel } from './components/ReplaceCodePanel'
+import { CellAdjustModule } from './components/CellAdjustModule'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { ToolsToolbar } from './components/ToolsToolbar'
 import { SubmissionChecklist } from './components/SubmissionChecklist'
@@ -1111,22 +1110,14 @@ export default function App() {
           />
         )}
 
-        {tab === 'horario' && (
-          <>
-            <EmptyCellsPanel
-              doc={doc}
-              readOnly={readOnly}
-              activeCode={activeCode}
-              onChange={patchDoc}
-              onFlash={flash}
-            />
-            <ReplaceCodePanel
-              doc={doc}
-              readOnly={readOnly}
-              onChange={patchDoc}
-              onFlash={flash}
-            />
-          </>
+        {tab === 'horario' && !readOnly && (
+          <CellAdjustModule
+            doc={doc}
+            readOnly={readOnly}
+            activeCode={activeCode}
+            onChange={patchDoc}
+            onFlash={flash}
+          />
         )}
 
         <SchedulesHome
