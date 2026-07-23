@@ -127,15 +127,30 @@ export function AdminWorkspace({
   }, [staffType, staffTick])
 
   const counts = useMemo(() => {
-    const byStatus: Record<string, number> = {}
+    const byStatus: Record<string, number> = {
+      BORRADOR: 0,
+      EN_REVISION: 0,
+      APROBADO: 0,
+      ARCHIVADO: 0,
+    }
     for (const i of items) {
       const s = i.status ?? 'BORRADOR'
       byStatus[s] = (byStatus[s] ?? 0) + 1
     }
+    const borrador = byStatus.BORRADOR ?? 0
+    const enRevision = byStatus.EN_REVISION ?? 0
+    const aprobados = byStatus.APROBADO ?? 0
+    const validados = byStatus.ARCHIVADO ?? 0
     return {
       users: users.length,
       schedules: items.length,
       byStatus,
+      borrador,
+      /** Pendientes de firma del revisor o del validador. */
+      pendientesFirmar: enRevision + aprobados,
+      enRevision,
+      revisados: aprobados,
+      validados,
       unitsMed: listUnits('medico').length,
       unitsEnf: listUnits('enfermeria').length,
       clavesMed: shiftsFor('medico').length,
@@ -238,67 +253,119 @@ export function AdminWorkspace({
       </nav>
 
       {tab === 'resumen' && (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {(
-            [
-              { label: 'Perfiles', value: counts.users, go: 'perfiles' as TabId },
-              {
-                label: 'Horarios',
-                value: counts.schedules,
-                go: 'horarios' as TabId,
-              },
-              {
-                label: 'Servicios médico',
-                value: counts.unitsMed,
-                go: 'especialidades' as TabId,
-              },
-              {
-                label: 'Servicios enfermería',
-                value: counts.unitsEnf,
-                go: 'especialidades' as TabId,
-              },
-            ] as const
-          ).map((c) => (
-            <button
-              key={c.label}
-              type="button"
-              onClick={() => setTab(c.go)}
-              className="rounded-2xl border border-line bg-white p-4 text-left shadow-sm hover:border-teal/40"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                {c.label}
-              </p>
-              <p className="mt-1 font-display text-3xl text-navy">{c.value}</p>
-            </button>
-          ))}
-          <div className="rounded-2xl border border-line bg-white p-4 shadow-sm sm:col-span-2 lg:col-span-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Horarios por estado
+        <section className="space-y-4">
+          <div>
+            <h2 className="font-display text-lg text-navy">Horarios</h2>
+            <p className="text-xs text-muted">
+              Totales por estado del flujo Jefe → Revisor → Validador
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(Object.keys(STATUS_LABEL) as Array<keyof typeof STATUS_LABEL>).map(
-                (s) => (
-                  <span
-                    key={s}
-                    className="rounded-lg border border-line bg-sand/40 px-2.5 py-1 text-xs text-navy"
-                  >
-                    {STATUS_LABEL[s]}: <strong>{counts.byStatus[s] ?? 0}</strong>
-                  </span>
-                ),
-              )}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {(
+                [
+                  {
+                    label: 'Creados',
+                    hint: 'Total de horarios',
+                    value: counts.schedules,
+                    accent: 'border-navy/20 bg-navy/5',
+                  },
+                  {
+                    label: 'Borrador',
+                    hint: 'Aún con el jefe',
+                    value: counts.borrador,
+                    accent: 'border-amber-200 bg-amber-50',
+                  },
+                  {
+                    label: 'Pendientes de firmar',
+                    hint: 'En revisión + por validar',
+                    value: counts.pendientesFirmar,
+                    accent: 'border-orange-200 bg-orange-50',
+                  },
+                  {
+                    label: 'Revisados',
+                    hint: 'Aprobados por revisor',
+                    value: counts.revisados,
+                    accent: 'border-sky-200 bg-sky-50',
+                  },
+                  {
+                    label: 'Validados',
+                    hint: 'Archivados con firma',
+                    value: counts.validados,
+                    accent: 'border-teal/30 bg-teal/10',
+                  },
+                ] as const
+              ).map((c) => (
+                <button
+                  key={c.label}
+                  type="button"
+                  onClick={() => setTab('horarios')}
+                  className={`rounded-2xl border p-4 text-left shadow-sm transition hover:brightness-[0.98] ${c.accent}`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    {c.label}
+                  </p>
+                  <p className="mt-1 font-display text-3xl text-navy">
+                    {c.value}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted">{c.hint}</p>
+                </button>
+              ))}
             </div>
-            <p className="mt-3 text-sm text-muted">
-              Claves médico: {counts.clavesMed} · enfermería: {counts.clavesEnf} ·
-              bibliotecas personal: {counts.staffBuckets} · demo pass:{' '}
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
+              <span className="rounded-lg border border-line bg-white px-2.5 py-1">
+                En revisión (revisor):{' '}
+                <strong className="text-navy">{counts.enRevision}</strong>
+              </span>
+              <span className="rounded-lg border border-line bg-white px-2.5 py-1">
+                Por validar (validador):{' '}
+                <strong className="text-navy">{counts.revisados}</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {(
+              [
+                {
+                  label: 'Perfiles',
+                  value: counts.users,
+                  go: 'perfiles' as TabId,
+                },
+                {
+                  label: 'Esp. médico',
+                  value: counts.unitsMed,
+                  go: 'especialidades' as TabId,
+                },
+                {
+                  label: 'Esp. enfermería',
+                  value: counts.unitsEnf,
+                  go: 'especialidades' as TabId,
+                },
+                {
+                  label: 'Claves',
+                  value: counts.clavesMed + counts.clavesEnf,
+                  go: 'claves' as TabId,
+                },
+              ] as const
+            ).map((c) => (
+              <button
+                key={c.label}
+                type="button"
+                onClick={() => setTab(c.go)}
+                className="rounded-2xl border border-line bg-white p-4 text-left shadow-sm hover:border-teal/40"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  {c.label}
+                </p>
+                <p className="mt-1 font-display text-3xl text-navy">{c.value}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+            <p className="text-sm text-muted">
+              Bibliotecas de personal: {counts.staffBuckets} · Contraseña demo:{' '}
               <code className="rounded bg-sand px-1">{DEMO_PASSWORD}</code>
             </p>
-            <button
-              type="button"
-              onClick={() => setTab('claves')}
-              className="mt-2 text-xs font-semibold text-teal underline"
-            >
-              Gestionar claves →
-            </button>
           </div>
         </section>
       )}
