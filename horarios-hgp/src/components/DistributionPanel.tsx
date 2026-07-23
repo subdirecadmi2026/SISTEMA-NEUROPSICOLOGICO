@@ -144,7 +144,8 @@ export function DistributionPanel({ doc, onPaintDay }: Props) {
                     className="flex items-center justify-between gap-2 rounded-lg border border-line bg-white px-2 py-1.5 text-sm"
                   >
                     <span>
-                      <strong>{a.fun}</strong> {a.name}
+                      <strong>{a.fun !== 'MED' ? `${a.fun} ` : ''}</strong>
+                      {a.name}
                     </span>
                     <span
                       className="rounded px-2 py-0.5 text-xs font-bold"

@@ -88,7 +88,8 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
           <h2 className="font-display text-xl text-navy">{title}</h2>
           <p className="text-sm text-muted">
             Escriba aquí quiénes irán en el horario de{' '}
-            <strong>{doc.unitName}</strong>. Completados:{' '}
+            <strong>{doc.unitName}</strong>
+            {isMed ? ' (médicos / especialistas)' : ''}. Completados:{' '}
             <strong className="text-navy">
               {named}/{doc.staff.length}
             </strong>
@@ -168,7 +169,11 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
           {sorted.map((s, idx) => (
             <li
               key={s.id}
-              className={`grid gap-2 rounded-xl border px-3 py-2 sm:grid-cols-[2.5rem_4.5rem_1fr_6rem_auto] sm:items-center ${
+              className={`grid gap-2 rounded-xl border px-3 py-2 sm:items-center ${
+                isMed
+                  ? 'sm:grid-cols-[2.5rem_1fr_6rem_auto]'
+                  : 'sm:grid-cols-[2.5rem_4.5rem_1fr_6rem_auto]'
+              } ${
                 s.name.trim()
                   ? 'border-line bg-white'
                   : 'border-amber-300 bg-amber-50'
@@ -177,16 +182,18 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
               <span className="text-center text-sm font-bold text-muted">
                 {idx + 1}
               </span>
-              <input
-                disabled={readOnly}
-                aria-label={`FUN fila ${idx + 1}`}
-                className="rounded-lg border border-line bg-white px-2 py-2 text-center text-sm font-bold disabled:opacity-60"
-                value={s.fun}
-                onChange={(e) =>
-                  update(s.id, { fun: e.target.value.toUpperCase() })
-                }
-                title="FUN (MED, ENF…)"
-              />
+              {!isMed && (
+                <input
+                  disabled={readOnly}
+                  aria-label={`FUN fila ${idx + 1}`}
+                  className="rounded-lg border border-line bg-white px-2 py-2 text-center text-sm font-bold disabled:opacity-60"
+                  value={s.fun}
+                  onChange={(e) =>
+                    update(s.id, { fun: e.target.value.toUpperCase() })
+                  }
+                  title="FUN (ENF, AUX, INT…)"
+                />
+              )}
               <input
                 disabled={readOnly}
                 aria-label={`Nombre fila ${idx + 1}`}

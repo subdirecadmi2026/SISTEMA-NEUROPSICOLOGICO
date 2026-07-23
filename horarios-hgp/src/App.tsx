@@ -934,12 +934,15 @@ export default function App() {
               onChange={patchDoc}
               highlight={highlightNames}
             />
-            <ScheduleStaffEditor
-              doc={doc}
-              readOnly={readOnly}
-              onChange={patchDoc}
-              onFlash={flash}
-            />
+            {/* Médico: NamesEditor basta (FUN siempre MED). Enfermería: editor con secciones/FUN. */}
+            {doc.serviceType === 'enfermeria' && (
+              <ScheduleStaffEditor
+                doc={doc}
+                readOnly={readOnly}
+                onChange={patchDoc}
+                onFlash={flash}
+              />
+            )}
             <StaffManager
               serviceType={doc.serviceType}
               unitName={doc.unitName}

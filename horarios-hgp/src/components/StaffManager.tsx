@@ -51,7 +51,8 @@ export function StaffManager({
       onFlash('Ingrese nombres y apellidos')
       return
     }
-    upsertStaff(serviceType, unitName, editing)
+    const toSave = isEnf ? editing : { ...editing, fun: 'MED' }
+    upsertStaff(serviceType, unitName, toSave)
     setEditing(null)
     refresh()
     onFlash('Personal guardado en biblioteca del servicio')
@@ -142,13 +143,22 @@ export function StaffManager({
         <div className="mb-3 grid gap-2 rounded-xl border border-teal/30 bg-teal/5 p-3 sm:grid-cols-3 lg:grid-cols-6">
           <label className="text-xs text-muted">
             FUN
-            <input
-              className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
-              value={editing.fun}
-              onChange={(e) =>
-                setEditing({ ...editing, fun: e.target.value.toUpperCase() })
-              }
-            />
+            {isEnf ? (
+              <input
+                className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
+                value={editing.fun}
+                onChange={(e) =>
+                  setEditing({ ...editing, fun: e.target.value.toUpperCase() })
+                }
+              />
+            ) : (
+              <input
+                className="mt-1 w-full rounded-lg border border-line bg-sand/40 px-2 py-1.5 text-sm"
+                value="MED"
+                readOnly
+                title="En horarios médicos la función es siempre MED"
+              />
+            )}
           </label>
           <label className="text-xs text-muted sm:col-span-2">
             Nombres y apellidos
@@ -181,9 +191,9 @@ export function StaffManager({
               }
             />
           </label>
-          <label className="text-xs text-muted">
-            Sección
-            {isEnf ? (
+          {isEnf && (
+            <label className="text-xs text-muted">
+              Sección
               <select
                 className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
                 value={editing.section}
@@ -197,16 +207,8 @@ export function StaffManager({
                   </option>
                 ))}
               </select>
-            ) : (
-              <input
-                className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
-                value={editing.section ?? ''}
-                onChange={(e) =>
-                  setEditing({ ...editing, section: e.target.value })
-                }
-              />
-            )}
-          </label>
+            </label>
+          )}
           <div className="flex items-end gap-2 sm:col-span-3 lg:col-span-6">
             <button
               type="button"
@@ -230,11 +232,11 @@ export function StaffManager({
         <table className="w-full text-sm">
           <thead className="bg-navy text-white">
             <tr>
-              <th className="px-2 py-2 text-left">FUN</th>
+              {isEnf && <th className="px-2 py-2 text-left">FUN</th>}
               <th className="px-2 py-2 text-left">Nombres</th>
               <th className="px-2 py-2 text-left">Relación</th>
               <th className="px-2 py-2 text-left">Código</th>
-              <th className="px-2 py-2 text-left">Sección</th>
+              {isEnf && <th className="px-2 py-2 text-left">Sección</th>}
               <th className="px-2 py-2 text-center">Activo</th>
               <th className="px-2 py-2">—</th>
             </tr>
@@ -242,20 +244,28 @@ export function StaffManager({
           <tbody>
             {staff.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-4 text-center text-muted">
-                  Sin personal en la biblioteca de este servicio. Importe o agregue.
+                <td
+                  colSpan={isEnf ? 7 : 5}
+                  className="px-3 py-4 text-center text-muted"
+                >
+                  Sin personal en la biblioteca de este servicio. Importe o
+                  agregue.
                 </td>
               </tr>
             )}
             {staff.map((s) => (
               <tr key={s.id} className="border-t border-line">
-                <td className="px-2 py-1.5 font-semibold">{s.fun}</td>
+                {isEnf && (
+                  <td className="px-2 py-1.5 font-semibold">{s.fun}</td>
+                )}
                 <td className="px-2 py-1.5">{s.name}</td>
                 <td className="px-2 py-1.5 text-muted">{s.relacionLaboral}</td>
                 <td className="px-2 py-1.5 font-bold text-navy">
                   {s.codigoPersonal}
                 </td>
-                <td className="px-2 py-1.5 text-xs text-muted">{s.section}</td>
+                {isEnf && (
+                  <td className="px-2 py-1.5 text-xs text-muted">{s.section}</td>
+                )}
                 <td className="px-2 py-1.5 text-center">
                   <input
                     type="checkbox"

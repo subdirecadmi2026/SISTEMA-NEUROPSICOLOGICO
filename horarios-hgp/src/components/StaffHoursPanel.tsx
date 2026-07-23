@@ -53,7 +53,10 @@ export function StaffHoursPanel({ doc }: Props) {
               <div>
                 <div className="mb-1 flex justify-between gap-2">
                   <span>
-                    <strong className="text-navy">{r.fun}</strong> {r.name}
+                    <strong className="text-navy">
+                      {r.fun !== 'MED' ? `${r.fun} ` : ''}
+                    </strong>
+                    {r.name}
                   </span>
                   <span
                     className={

@@ -18,8 +18,11 @@ Entre con su usuario (selector «Entrar como»). Use **Jefe** para elaborar.
 4. Indique el jefe / líder de servicio
 
 ## 3. Cargar personal
+**Médico:** pestaña **PERSONAL** → nombres (sin FUN: todos son MED) + biblioteca.
+**Enfermería:** nombres / FUN / secciones + biblioteca.
+
 Opciones:
-- Pestaña **PERSONAL** → pegar lista / ordenar A–Z / importar Excel-CSV
+- Pegar lista / ordenar A–Z / importar Excel-CSV
 - Biblioteca: descargar plantilla → importar → «Cargar al horario»
 - En la grilla: **+ Agregar personal**
 

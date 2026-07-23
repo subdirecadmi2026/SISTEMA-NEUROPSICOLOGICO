@@ -42,6 +42,9 @@ export function ScheduleTable({
 }: Props) {
   const days = daysInMonth(doc.year, doc.month)
   const isEnf = doc.serviceType === 'enfermeria'
+  /** FUN (ENF/AUX…) solo aplica en enfermería; en médico siempre es MED y se omite en grilla. */
+  const showFun = isEnf
+  const staffCols = showFun ? 5 : 4
   const summaryCols = isEnf ? 8 : 2
   const staffSorted = [...doc.staff].sort((a, b) => a.order - b.order)
   const holidays = holidayDatesInMonth(doc.year, doc.month)
@@ -242,10 +245,16 @@ export function ScheduleTable({
               <th className="sticky left-0 z-20 border border-line bg-sand px-1 py-2">
                 N°
               </th>
-              <th className="sticky left-7 z-20 border border-line bg-sand px-1 py-2">
-                FUN
-              </th>
-              <th className="sticky left-[3.25rem] z-20 min-w-[170px] border border-line bg-sand px-2 py-2 text-left">
+              {showFun && (
+                <th className="sticky left-7 z-20 border border-line bg-sand px-1 py-2">
+                  FUN
+                </th>
+              )}
+              <th
+                className={`sticky z-20 min-w-[170px] border border-line bg-sand px-2 py-2 text-left ${
+                  showFun ? 'left-[3.25rem]' : 'left-7'
+                }`}
+              >
                 Nombres y apellidos
               </th>
               <th className="min-w-[100px] border border-line px-1 py-2 text-left">
@@ -352,7 +361,9 @@ export function ScheduleTable({
                 rows.push(
                   <tr key={`sec-${section}`}>
                     <td
-                      colSpan={5 + days + summaryCols + (readOnly ? 0 : 1)}
+                      colSpan={
+                        staffCols + days + summaryCols + (readOnly ? 0 : 1)
+                      }
                       className="border border-line bg-[#1c5c57] px-3 py-1.5 text-xs font-semibold text-white"
                     >
                       {section}
@@ -367,19 +378,25 @@ export function ScheduleTable({
                     <td className="sticky left-0 z-10 border border-line bg-white px-1 py-0.5 text-center">
                       {globalIdx + 1}
                     </td>
-                    <td className="sticky left-7 z-10 border border-line bg-white px-0.5 py-0.5">
-                      <input
-                        disabled={readOnly}
-                        className="w-11 rounded border-0 bg-transparent px-0.5 py-1 text-center font-semibold outline-none focus:bg-sand/60 disabled:opacity-70"
-                        value={s.fun}
-                        onChange={(e) =>
-                          updateStaff(s.id, {
-                            fun: e.target.value.toUpperCase(),
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="sticky left-[3.25rem] z-10 border border-line bg-white px-1 py-0.5">
+                    {showFun && (
+                      <td className="sticky left-7 z-10 border border-line bg-white px-0.5 py-0.5">
+                        <input
+                          disabled={readOnly}
+                          className="w-11 rounded border-0 bg-transparent px-0.5 py-1 text-center font-semibold outline-none focus:bg-sand/60 disabled:opacity-70"
+                          value={s.fun}
+                          onChange={(e) =>
+                            updateStaff(s.id, {
+                              fun: e.target.value.toUpperCase(),
+                            })
+                          }
+                        />
+                      </td>
+                    )}
+                    <td
+                      className={`sticky z-10 border border-line bg-white px-1 py-0.5 ${
+                        showFun ? 'left-[3.25rem]' : 'left-7'
+                      }`}
+                    >
                       <input
                         disabled={readOnly}
                         className={`w-full rounded border-0 bg-transparent px-1 py-1 font-medium outline-none focus:bg-sand/60 disabled:opacity-70 ${
