@@ -280,7 +280,11 @@ export default function App() {
             </button>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => {
+                setTab('imprimir')
+                // Esperar montaje/escala de la planilla a 1 hoja
+                window.setTimeout(() => window.print(), 180)
+              }}
               className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
             >
               Imprimir / PDF
@@ -773,7 +777,15 @@ export default function App() {
           </>
         )}
 
-        {tab === 'imprimir' && <PrintSheet doc={doc} />}
+        {/* Siempre montada: en pantalla solo en pestaña Imprimir; al imprimir siempre 1 hoja */}
+        <div
+          className={
+            tab === 'imprimir' ? undefined : 'print-sheet-offscreen'
+          }
+          aria-hidden={tab !== 'imprimir'}
+        >
+          <PrintSheet doc={doc} />
+        </div>
 
         {/* Vista móvil: resumen consultable */}
         <section className="no-print mt-4 rounded-2xl border border-line bg-white/85 p-4 shadow-sm md:hidden">

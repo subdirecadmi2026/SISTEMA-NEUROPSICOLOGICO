@@ -89,7 +89,7 @@ export function ScheduleTable({
   }
 
   return (
-    <section className="print-area overflow-hidden rounded-2xl rounded-tl-none border border-line bg-white shadow-sm">
+    <section className="no-print overflow-hidden rounded-2xl rounded-tl-none border border-line bg-white shadow-sm">
       <div className="border-b border-line bg-gradient-to-r from-navy to-[#2e7d84] px-4 py-4 text-white sm:px-5">
         <div className="flex flex-wrap items-start gap-3">
           <img
