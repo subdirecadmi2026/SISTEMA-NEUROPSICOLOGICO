@@ -250,6 +250,57 @@ describe('operaciones de mes', () => {
     expect(next.cells[cellKey('a', 3)]).toBe('CE')
     expect(next.cells[cellKey('b', 3)]).toBe('CE')
   })
+
+  it('reordena y duplica personal', async () => {
+    const { moveStaffOrder, duplicateStaffRow } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Ana',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+      {
+        id: 'b',
+        name: 'Bruno',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 2,
+      },
+    ]
+    const moved = moveStaffOrder(doc, 'b', -1)
+    expect(moved.staff[0].id).toBe('b')
+    const dup = duplicateStaffRow(doc, 'a')
+    expect(dup.staff.length).toBe(3)
+    expect(dup.staff.some((s) => s.name.includes('(copia)'))).toBe(true)
+  })
+
+  it('sugiere contingencia desde ausencias', async () => {
+    const { suggestContingencyFromAbsences } = await import('./scheduleOps')
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dr. Ausente',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 2)]: 'V' }
+    const next = suggestContingencyFromAbsences(doc)
+    expect(next.contingencyStaff.some((c) => c.name === 'Dr. Ausente')).toBe(
+      true,
+    )
+  })
 })
 
 describe('feriados Ecuador', () => {

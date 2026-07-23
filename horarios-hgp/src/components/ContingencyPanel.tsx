@@ -1,13 +1,20 @@
 import type { ContingencyRow, ScheduleDoc } from '../types'
 import { uid } from '../types'
+import { suggestContingencyFromAbsences } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
   readOnly: boolean
   onChange: (doc: ScheduleDoc) => void
+  onFlash?: (msg: string) => void
 }
 
-export function ContingencyPanel({ doc, readOnly, onChange }: Props) {
+export function ContingencyPanel({
+  doc,
+  readOnly,
+  onChange,
+  onFlash,
+}: Props) {
   function addRow() {
     const row: ContingencyRow = {
       id: uid('cont'),
@@ -19,6 +26,18 @@ export function ContingencyPanel({ doc, readOnly, onChange }: Props) {
       ...doc,
       contingencyStaff: [...doc.contingencyStaff, row],
     })
+  }
+
+  function suggest() {
+    const next = suggestContingencyFromAbsences(doc)
+    if (next === doc) {
+      onFlash?.(
+        'No hay ausencias nuevas (V/P/INC/CD) o ya están en contingencia',
+      )
+      return
+    }
+    onChange(next)
+    onFlash?.('Filas de contingencia sugeridas desde ausencias del mes')
   }
 
   return (
@@ -126,13 +145,22 @@ export function ContingencyPanel({ doc, readOnly, onChange }: Props) {
         </table>
       </div>
       {!readOnly && (
-        <button
-          type="button"
-          onClick={addRow}
-          className="no-print mt-3 rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
-        >
-          + Agregar fila de contingencia
-        </button>
+        <div className="no-print mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={addRow}
+            className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
+          >
+            + Agregar fila de contingencia
+          </button>
+          <button
+            type="button"
+            onClick={suggest}
+            className="rounded-lg border border-teal/40 bg-teal/5 px-3 py-2 text-sm font-semibold text-navy hover:bg-teal/10"
+          >
+            Sugerir desde ausencias (V/P/INC/CD)
+          </button>
+        </div>
       )}
     </section>
   )

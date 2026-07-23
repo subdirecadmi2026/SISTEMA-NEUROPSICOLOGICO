@@ -51,6 +51,7 @@ import { PrintSheet } from './components/PrintSheet'
 import { AlertsBanner } from './components/AlertsBanner'
 import { MonthSummary } from './components/MonthSummary'
 import { NotesPanel } from './components/NotesPanel'
+import { CodeUsageBar } from './components/CodeUsageBar'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 
 type TabId =
@@ -166,6 +167,16 @@ export default function App() {
     }, 12000)
     return () => window.clearTimeout(t)
   }, [dirty, doc, readOnly])
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirty) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
 
   function switchService(serviceType: ServiceType) {
     const next = createBlankSchedule(serviceType, doc.year, doc.month)
@@ -786,6 +797,17 @@ export default function App() {
 
         <NotesPanel doc={doc} readOnly={readOnly} onChange={patchDoc} />
 
+        {(tab === 'horario' || tab === 'claves') && (
+          <CodeUsageBar
+            doc={doc}
+            onPickCode={(code) => {
+              setActiveCode(code)
+              setPaintMode(true)
+              setTab('horario')
+            }}
+          />
+        )}
+
         <SchedulesHome
           items={saved}
           remote={isRemoteEnabled()}
@@ -898,6 +920,7 @@ export default function App() {
             doc={doc}
             readOnly={readOnly}
             onChange={patchDoc}
+            onFlash={flash}
           />
         )}
 

@@ -353,3 +353,129 @@ export function copyFirstWeekPattern(doc: ScheduleDoc): ScheduleDoc {
     ],
   }
 }
+
+/** Mueve un miembro de personal una posición (arriba/abajo). */
+export function moveStaffOrder(
+  doc: ScheduleDoc,
+  staffId: string,
+  direction: -1 | 1,
+): ScheduleDoc {
+  const sorted = [...doc.staff].sort((a, b) => a.order - b.order)
+  const idx = sorted.findIndex((s) => s.id === staffId)
+  if (idx < 0) return doc
+  const swap = idx + direction
+  if (swap < 0 || swap >= sorted.length) return doc
+  ;[sorted[idx], sorted[swap]] = [sorted[swap], sorted[idx]]
+  const staff = sorted.map((s, i) => ({ ...s, order: i + 1 }))
+  return {
+    ...doc,
+    staff,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/** Duplica una fila de personal (sin celdas). */
+export function duplicateStaffRow(
+  doc: ScheduleDoc,
+  staffId: string,
+): ScheduleDoc {
+  const sorted = [...doc.staff].sort((a, b) => a.order - b.order)
+  const src = sorted.find((s) => s.id === staffId)
+  if (!src) return doc
+  const idx = sorted.findIndex((s) => s.id === staffId)
+  const copy: StaffMember = {
+    ...src,
+    id: uid(src.fun === 'MED' || src.fun.startsWith('M') ? 'med' : 'enf'),
+    name: src.name ? `${src.name} (copia)` : '',
+    order: idx + 2,
+    horasMedicas: 0,
+    horasViolenciaDomestica: 0,
+    horasLactancia: 0,
+    horasExtras: 0,
+  }
+  const staff = [
+    ...sorted.slice(0, idx + 1),
+    copy,
+    ...sorted.slice(idx + 1),
+  ].map((s, i) => ({ ...s, order: i + 1 }))
+  return {
+    ...doc,
+    staff,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'duplicar_personal',
+        detail: `Desde ${src.name || staffId}`,
+      },
+    ],
+  }
+}
+
+/**
+ * Sugiere filas de contingencia a partir de personal con V/P/INC/CD
+ * en el mes (no duplica nombres ya listados).
+ */
+export function suggestContingencyFromAbsences(
+  doc: ScheduleDoc,
+): ScheduleDoc {
+  const absence = new Set(['V', 'P', 'INC', 'CD'])
+  const existing = new Set(
+    doc.contingencyStaff.map((c) => c.name.trim().toLowerCase()).filter(Boolean),
+  )
+  const rows = [...doc.contingencyStaff]
+  let added = 0
+  for (const s of doc.staff) {
+    if (!s.name.trim()) continue
+    const key = s.name.trim().toLowerCase()
+    if (existing.has(key)) continue
+    const hasAbs = Object.entries(doc.cells).some(
+      ([k, code]) => k.startsWith(`${s.id}:`) && absence.has(code),
+    )
+    if (!hasAbs) continue
+    rows.push({
+      id: uid('cont'),
+      name: s.name,
+      coverage: 'Cobertura por ausencia/vacaciones — definir reemplazo',
+      phone: '',
+    })
+    existing.add(key)
+    added += 1
+  }
+  if (added === 0) return doc
+  return {
+    ...doc,
+    contingencyStaff: rows,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+    audit: [
+      ...doc.audit,
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Usuario',
+        action: 'sugerir_contingencia',
+        detail: `${added} filas sugeridas`,
+      },
+    ],
+  }
+}
+
+/** Conteo de uso de cada clave en el mes. */
+export function countCodesUsed(
+  doc: ScheduleDoc,
+): Array<{ code: string; count: number }> {
+  const map = new Map<string, number>()
+  for (const code of Object.values(doc.cells)) {
+    if (!code) continue
+    map.set(code, (map.get(code) ?? 0) + 1)
+  }
+  return [...map.entries()]
+    .map(([code, count]) => ({ code, count }))
+    .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
+}

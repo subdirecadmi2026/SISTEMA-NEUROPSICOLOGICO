@@ -13,7 +13,7 @@ import {
   weekdayLetter,
 } from '../lib/calendar'
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
-import { fillStaffEmptyDays, paintDayColumn } from '../lib/scheduleOps'
+import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -314,7 +314,7 @@ export function ScheduleTable({
                 </>
               )}
               {!readOnly && (
-                <th className="no-print min-w-[70px] border border-line px-1 py-2">
+                <th className="no-print min-w-[52px] border border-line px-1 py-2">
                   —
                 </th>
               )}
@@ -511,6 +511,26 @@ export function ScheduleTable({
                         <div className="flex flex-col gap-0.5">
                           <button
                             type="button"
+                            title="Subir"
+                            onClick={() =>
+                              onChange(moveStaffOrder(docRef.current, s.id, -1))
+                            }
+                            className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            title="Bajar"
+                            onClick={() =>
+                              onChange(moveStaffOrder(docRef.current, s.id, 1))
+                            }
+                            className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
                             title={`Llenar vacíos con ${activeCode || 'clave'}`}
                             disabled={!activeCode}
                             onClick={() => {
@@ -526,6 +546,16 @@ export function ScheduleTable({
                             className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand disabled:opacity-40"
                           >
                             Fila
+                          </button>
+                          <button
+                            type="button"
+                            title="Duplicar fila"
+                            onClick={() =>
+                              onChange(duplicateStaffRow(docRef.current, s.id))
+                            }
+                            className="rounded px-1 py-0.5 text-[10px] text-navy hover:bg-sand"
+                          >
+                            Dup
                           </button>
                           <button
                             type="button"
