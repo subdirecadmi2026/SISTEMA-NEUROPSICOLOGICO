@@ -1102,6 +1102,7 @@ export default function App() {
               defaultServiceType={doc.serviceType}
               defaultUnitName={doc.unitName}
               scheduleStaff={doc.staff}
+              variant="servicio"
             />
           </div>
         )}

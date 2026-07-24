@@ -175,7 +175,7 @@ export const WEEKDAYS_ES = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 export const ROLE_LABEL: Record<UserRole, string> = {
   lider_servicio: 'Jefe de servicio',
   revisor: 'Revisor (visualización)',
-  validador: 'Validador',
+  validador: 'Validador · Talento Humano',
   gestion_enfermeria: 'Gestión de Enfermería',
   subdireccion: 'Subdirección Médica',
   direccion_asistencial: 'Dirección Asistencial',

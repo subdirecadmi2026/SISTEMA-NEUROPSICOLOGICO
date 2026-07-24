@@ -792,6 +792,7 @@ export function AdminWorkspace({
           user={user}
           onFlash={onFlash}
           onNotify={onNotify}
+          variant="talento_humano"
         />
       )}
 

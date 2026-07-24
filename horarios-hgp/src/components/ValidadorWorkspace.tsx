@@ -24,6 +24,7 @@ import {
 } from '../lib/archiveFolder'
 import { SignatureGate } from './SignatureGate'
 import { InstitutionalPreview } from './InstitutionalPreview'
+import { PermisosVacacionesPanel } from './PermisosVacacionesPanel'
 
 type Props = {
   user: AppUser
@@ -35,11 +36,11 @@ type Props = {
   onNotify?: () => void
 }
 
-type ModuleTab = 'pendientes' | 'archivo'
+type ModuleTab = 'pendientes' | 'archivo' | 'permisos'
 
 /**
- * Validador: 1) tarjetas pendientes de todas las especialidades
- * 2) archivo validado + al validar guarda PDF en carpeta de la especialidad
+ * Validador = Talento Humano:
+ * 1) pendientes de validar  2) archivo  3) permisos/vacaciones (visualiza todo)
  */
 export function ValidadorWorkspace({
   user,
@@ -384,21 +385,23 @@ export function ValidadorWorkspace({
     )
   }
 
-  // ——— Tarjetas: dos módulos ———
+  // ——— Tarjetas: módulos ———
   return (
     <div
       className={`mx-auto px-3 py-6 sm:px-6 ${
-        module === 'archivo' ? 'max-w-[1400px]' : 'max-w-5xl'
+        module === 'archivo' || module === 'permisos'
+          ? 'max-w-[1400px]'
+          : 'max-w-5xl'
       }`}
     >
       <header className="mb-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-          Módulo validador
+          Talento Humano · Validador
         </p>
         <h1 className="font-display text-3xl text-navy">Validación HGP</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Pendientes de todas las especialidades y archivo de horarios ya
-          validados (PDF en carpeta por especialidad).
+          Valide horarios aprobados, archive el PDF y consulte los permisos /
+          vacaciones que registran los médicos de cada servicio.
         </p>
       </header>
 
@@ -427,28 +430,43 @@ export function ValidadorWorkspace({
                 : 'text-muted hover:bg-sand'
             }`}
           >
-            2. Archivo validado
+            2. Archivo
             <span className="ml-2 rounded-full bg-white/20 px-1.5 text-xs">
               {archived.length}
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => setModule('permisos')}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              module === 'permisos'
+                ? 'bg-navy text-white'
+                : 'text-muted hover:bg-sand'
+            }`}
+          >
+            3. Permisos TH
+          </button>
         </div>
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Buscar especialidad o mes…"
-          className="min-w-[180px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm"
-        />
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold hover:bg-sand"
-        >
-          Actualizar
-        </button>
+        {module !== 'permisos' ? (
+          <>
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Buscar especialidad o mes…"
+              className="min-w-[180px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold hover:bg-sand"
+            >
+              Actualizar
+            </button>
+          </>
+        ) : null}
       </div>
 
-      {supportsDirectoryPicker() && (
+      {module !== 'permisos' && supportsDirectoryPicker() && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white/90 px-3 py-2 text-sm">
           <p className="text-muted">
             Carpeta raíz del archivo:{' '}
@@ -479,7 +497,7 @@ export function ValidadorWorkspace({
         </div>
       )}
 
-      {!supportsDirectoryPicker() && (
+      {!supportsDirectoryPicker() && module !== 'permisos' && (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           Su navegador no permite crear carpetas en disco. Al validar se
           descargará un <strong>ZIP</strong> con la carpeta de la especialidad.
@@ -491,6 +509,13 @@ export function ValidadorWorkspace({
         <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-10 text-center text-sm text-muted">
           Cargando…
         </p>
+      ) : module === 'permisos' ? (
+        <PermisosVacacionesPanel
+          user={user}
+          onFlash={onFlash}
+          onNotify={onNotify}
+          variant="talento_humano"
+        />
       ) : module === 'archivo' ? (
         archivedBySpecialty.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-12 text-center text-sm text-muted">

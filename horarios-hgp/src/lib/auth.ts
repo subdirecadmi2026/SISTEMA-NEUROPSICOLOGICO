@@ -163,7 +163,7 @@ export function roleLabel(role: UserRole): string {
 export function roleMission(role: UserRole): string {
   switch (role) {
     case 'lider_servicio':
-      return 'Elabora el horario del servicio, firma y lo envía a revisión.'
+      return 'Elabora el horario, registra permisos/vacaciones del personal y lo envía a revisión.'
     case 'revisor':
     case 'direccion_asistencial':
     case 'subdireccion':
@@ -171,9 +171,9 @@ export function roleMission(role: UserRole): string {
       return 'Revisa en solo lectura: aprueba o devuelve con comentario.'
     case 'validador':
     case 'talento_humano':
-      return 'Valida horarios aprobados, firma con QR y archiva el PDF.'
+      return 'Talento Humano: valida horarios, archiva PDF y visualiza/gestiona permisos y vacaciones.'
     case 'admin':
-      return 'Administra usuarios, servicios, personal y horarios; puede crear, editar y eliminar.'
+      return 'Administra usuarios, servicios, personal, permisos y horarios.'
     default:
       return ROLE_LABEL[role]
   }

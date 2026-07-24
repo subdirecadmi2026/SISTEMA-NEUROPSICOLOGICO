@@ -30,6 +30,11 @@ type Props = {
   /** Personal del horario abierto (además de biblioteca). */
   scheduleStaff?: StaffMember[]
   compact?: boolean
+  /**
+   * servicio = médico/jefe registra de su unidad
+   * talento_humano = validador TH visualiza todo el hospital y puede gestionar
+   */
+  variant?: 'servicio' | 'talento_humano'
 }
 
 type FormState = {
@@ -74,8 +79,9 @@ function emptyForm(
 }
 
 /**
- * Módulo de registro de vacaciones y permisos temporales.
- * Al llenar el horario se comparan horas usadas vs autorizadas.
+ * Módulo de vacaciones y permisos temporales.
+ * - servicio (médico/jefe): registra los de su especialidad
+ * - talento_humano (validador): visualiza y gestiona todos
  */
 export function PermisosVacacionesPanel({
   user,
@@ -85,12 +91,19 @@ export function PermisosVacacionesPanel({
   defaultUnitName = '',
   scheduleStaff = [],
   compact = false,
+  variant = 'servicio',
 }: Props) {
+  const isTH = variant === 'talento_humano'
   const [tick, setTick] = useState(0)
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<'activo' | 'all'>('activo')
+  /** TH puede ver todas las unidades; servicio queda en su unidad. */
+  const [scopeAll, setScopeAll] = useState(isTH)
   const [form, setForm] = useState<FormState>(() =>
-    emptyForm(defaultServiceType, defaultUnitName || listUnits(defaultServiceType)[0] || ''),
+    emptyForm(
+      defaultServiceType,
+      defaultUnitName || listUnits(defaultServiceType)[0] || '',
+    ),
   )
 
   useEffect(() => {
@@ -102,6 +115,10 @@ export function PermisosVacacionesPanel({
       }))
     }
   }, [defaultServiceType, defaultUnitName])
+
+  useEffect(() => {
+    setScopeAll(isTH)
+  }, [isTH])
 
   const units = listUnits(form.serviceType)
   const libraryStaff = useMemo(() => {
@@ -123,20 +140,20 @@ export function PermisosVacacionesPanel({
   const leaves = useMemo(() => {
     void tick
     return listLeaves({
-      serviceType: form.serviceType,
-      unitName: form.unitName || undefined,
+      serviceType: scopeAll ? undefined : form.serviceType,
+      unitName: scopeAll ? undefined : form.unitName || undefined,
       status: statusFilter,
     })
-  }, [form.serviceType, form.unitName, statusFilter, tick])
+  }, [form.serviceType, form.unitName, statusFilter, scopeAll, tick])
 
   const summary = useMemo(() => {
     void tick
     return leavesSummary({
-      serviceType: form.serviceType,
-      unitName: form.unitName || undefined,
+      serviceType: scopeAll ? undefined : form.serviceType,
+      unitName: scopeAll ? undefined : form.unitName || undefined,
       status: 'all',
     })
-  }, [form.serviceType, form.unitName, tick])
+  }, [form.serviceType, form.unitName, scopeAll, tick])
 
   const overlaps = useMemo(
     () =>
@@ -164,7 +181,7 @@ export function PermisosVacacionesPanel({
   const visible = leaves.filter((l) => {
     const q = filter.trim().toLowerCase()
     if (!q) return true
-    return `${l.staffName} ${l.kind} ${l.absenceCode} ${l.notes}`
+    return `${l.staffName} ${l.kind} ${l.absenceCode} ${l.notes} ${l.unitName} ${l.serviceType}`
       .toLowerCase()
       .includes(q)
   })
@@ -335,6 +352,23 @@ export function PermisosVacacionesPanel({
 
   return (
     <div className="space-y-4">
+      <div
+        className={`rounded-2xl border px-4 py-3 ${
+          isTH
+            ? 'border-teal/30 bg-teal/5'
+            : 'border-navy/20 bg-navy/5'
+        }`}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+          {isTH ? 'Talento Humano' : 'Jefe / médico de servicio'}
+        </p>
+        <p className="text-sm text-ink">
+          {isTH
+            ? 'Visualice todos los permisos y vacaciones registrados por los servicios. Puede corregir o completar registros institucionales.'
+            : 'Registre aquí las vacaciones y permisos temporales de su personal. Al llenar el horario se validarán las horas. Talento Humano también los visualizará.'}
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
           { label: 'Activos', value: String(summary.activos) },
@@ -364,14 +398,19 @@ export function PermisosVacacionesPanel({
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-              Registro institucional
+              {isTH ? 'Gestión institucional' : 'Registro del servicio'}
             </p>
             <h2 className="font-display text-xl text-navy">
-              {form.id ? 'Editar permiso / vacaciones' : 'Nuevo permiso / vacaciones'}
+              {form.id
+                ? 'Editar permiso / vacaciones'
+                : isTH
+                  ? 'Registrar o completar permiso'
+                  : 'Nuevo permiso / vacaciones'}
             </h2>
             <p className="mt-1 text-xs text-muted">
-              Al llenar el horario se comparan las horas marcadas con las
-              autorizadas y se avisa al jefe si hay conflicto o exceso.
+              {isTH
+                ? 'Puede filtrar por unidad o ver todo el hospital.'
+                : 'Las horas marcadas en planilla se comparan con las autorizadas.'}
             </p>
           </div>
           {form.id ? (
@@ -605,9 +644,20 @@ export function PermisosVacacionesPanel({
       <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-lg text-navy">
-            Registros ({visible.length})
+            {isTH ? 'Permisos del hospital' : 'Registros del servicio'} (
+            {visible.length})
           </h2>
           <div className="flex flex-wrap gap-2">
+            {isTH ? (
+              <select
+                className="rounded-lg border border-line px-2 py-1.5 text-xs"
+                value={scopeAll ? 'all' : 'unit'}
+                onChange={(e) => setScopeAll(e.target.value === 'all')}
+              >
+                <option value="all">Todas las unidades</option>
+                <option value="unit">Solo unidad del formulario</option>
+              </select>
+            ) : null}
             <select
               className="rounded-lg border border-line px-2 py-1.5 text-xs"
               value={statusFilter}
@@ -622,7 +672,7 @@ export function PermisosVacacionesPanel({
               className="w-40 rounded-lg border border-line px-2 py-1.5 text-xs sm:w-52"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Buscar…"
+              placeholder={isTH ? 'Buscar nombre, unidad…' : 'Buscar…'}
             />
           </div>
         </div>
@@ -643,8 +693,11 @@ export function PermisosVacacionesPanel({
                   </p>
                   <p className="mt-0.5 text-xs text-ink">
                     <strong>{l.authorizedHours} h</strong> autorizadas (
-                    {l.hoursPerDay} h/día) · {l.unitName}
+                    {l.hoursPerDay} h/día) ·{' '}
+                    {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
+                    {l.unitName}
                     {l.status === 'cancelado' ? ' · cancelado' : ''}
+                    {l.createdByName ? ` · por ${l.createdByName}` : ''}
                   </p>
                   {l.notes ? (
                     <p className="mt-1 text-[11px] text-muted">{l.notes}</p>

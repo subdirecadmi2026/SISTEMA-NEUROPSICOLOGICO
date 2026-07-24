@@ -110,8 +110,8 @@ const ROLE_VISUALS: RoleVisual[] = [
   },
   {
     id: 'u-validador',
-    title: 'Validador',
-    action: 'Firmar y validar',
+    title: 'Talento Humano',
+    action: 'Validar horarios y ver permisos',
     accent: 'border-teal-soft/40 bg-teal-soft/10',
     selected: 'border-teal-soft ring-2 ring-teal-soft/50 bg-teal-soft/15',
     Illustration: IlluValidador,
