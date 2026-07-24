@@ -72,9 +72,12 @@ describe('autoridades de firma', () => {
     expect(boxes[0].kind).toBe('elaborado')
     expect(boxes[0].label).toMatch(/Jefe de servicio/i)
     expect(boxes[0].designatedName).toBe('Dra. Ana López')
-    expect(boxes[1].kind).toBe('admisiones')
-    expect(boxes[1].label).toMatch(/Validado por Admisiones/i)
-    expect(boxes.length).toBe(2 + listActiveSigners().length)
+    expect(boxes.every((b) => b.kind !== 'admisiones')).toBe(true)
+    expect(boxes.length).toBe(1 + listActiveSigners().length)
+    const adm = buildAdmisionesSignatureBox(doc)
+    expect(adm.kind).toBe('admisiones')
+    expect(adm.label).toMatch(/Validado por Admisiones/i)
+    expect(adm.designatedName).toBe('Dra. Ana López')
   })
 
   it('crea usuario de autoridad con nombres y responsabilidad', () => {
@@ -133,7 +136,7 @@ describe('autoridades de firma', () => {
         unitName: 'UCI',
         staff: [],
       }),
-    )).toHaveLength(2)
+    )).toHaveLength(1)
   })
 
   it('permite espacios al escribir nombres y apellidos', () => {

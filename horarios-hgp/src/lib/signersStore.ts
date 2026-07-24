@@ -347,6 +347,23 @@ export type PrintSignatureBox = {
   kind: SignerKind | 'admisiones'
 }
 
+/** Casilla «Validado por Admisiones» (va bajo feriados, no con autoridades). */
+export function buildAdmisionesSignatureBox(
+  doc: ScheduleDoc,
+): PrintSignatureBox {
+  const admisionesStamp = doc.admisionesPor?.trim() ?? ''
+  const admisionesName =
+    admisionesStamp.split('\n')[0]?.split('—')[0]?.trim() || ''
+  return {
+    key: 'admisiones-auto',
+    label: 'Validado por Admisiones',
+    value: admisionesStamp,
+    designatedName: doc.jefeServicio.trim() || admisionesName || undefined,
+    slot: 'admisiones',
+    kind: 'admisiones',
+  }
+}
+
 export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] {
   const jefeName =
     doc.elaboradoPor?.split('\n')[0]?.split('—')[0]?.trim() ||
@@ -360,19 +377,6 @@ export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] 
     designatedName: jefeName || undefined,
     slot: 'jefe',
     kind: 'elaborado',
-  }
-
-  // Casilla Admisiones justo debajo del jefe (no al final)
-  const admisionesStamp = doc.admisionesPor?.trim() ?? ''
-  const admisionesName =
-    admisionesStamp.split('\n')[0]?.split('—')[0]?.trim() || ''
-  const admisiones: PrintSignatureBox = {
-    key: 'admisiones-auto',
-    label: 'Validado por Admisiones',
-    value: admisionesStamp,
-    designatedName: doc.jefeServicio.trim() || admisionesName || undefined,
-    slot: 'admisiones',
-    kind: 'admisiones',
   }
 
   const usedSlots = new Set<string>(['jefe', 'admisiones'])
@@ -403,7 +407,7 @@ export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] 
     }
   })
 
-  return [jefe, admisiones, ...authorities]
+  return [jefe, ...authorities]
 }
 
 export function createOrUpdateUserFromSigner(

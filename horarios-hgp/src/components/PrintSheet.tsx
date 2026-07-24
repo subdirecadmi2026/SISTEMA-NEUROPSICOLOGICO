@@ -13,7 +13,10 @@ import {
 import { shiftMeta } from '../data/templates'
 import { formatHolidaysLabel } from '../lib/holidays'
 import { SignatureStampBox } from './SignatureStampBox'
-import { buildPrintSignatureBoxes } from '../lib/signersStore'
+import {
+  buildAdmisionesSignatureBox,
+  buildPrintSignatureBoxes,
+} from '../lib/signersStore'
 
 type Props = {
   doc: ScheduleDoc
@@ -48,12 +51,16 @@ export function InstitutionalPrintBody({
   const gridCells = isAreaGrid ? (doc.areaCells ?? {}) : doc.cells
 
   const boxes = buildPrintSignatureBoxes(doc)
+  const admisionesBox = buildAdmisionesSignatureBox(doc)
   const signatures = boxes.map((s) => ({
     ...s,
     electronic: s.slot
       ? (doc.electronicSigns ?? []).find((e) => e.slot === s.slot)
       : undefined,
   }))
+  const admisionesElectronic = (doc.electronicSigns ?? []).find(
+    (e) => e.slot === 'admisiones',
+  )
 
   const cols =
     signatures.length >= 5
@@ -205,6 +212,19 @@ export function InstitutionalPrintBody({
         <div>
           <p className="mb-1 font-semibold text-navy">Feriados {doc.year}</p>
           <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
+
+          <div className="mt-3 max-w-xs">
+            <SignatureStampBox
+              label={admisionesBox.label}
+              value={admisionesBox.value}
+              designatedName={admisionesBox.designatedName}
+              slot={admisionesBox.slot}
+              electronic={admisionesElectronic}
+              scheduleId={doc.id}
+              unitName={doc.unitName}
+            />
+          </div>
+
           {doc.notes ? (
             <>
               <p className="mb-1 mt-3 font-semibold text-navy">Observaciones</p>
