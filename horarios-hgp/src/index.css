@@ -104,6 +104,19 @@ textarea {
     visibility: visible !important;
   }
 
+  /* Impresión selectiva: solo horario o solo distribución */
+  body[data-print-only='turno'] .print-area[data-print-grid='area'],
+  body[data-print-only='turno'] .print-area[data-print-grid='area'] * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body[data-print-only='area'] .print-area[data-print-grid='turno'],
+  body[data-print-only='area'] .print-area[data-print-grid='turno'] * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   .print-stack {
     position: static !important;
     display: block !important;
@@ -130,6 +143,12 @@ textarea {
     break-after: page !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  body[data-print-only='turno'] .print-area,
+  body[data-print-only='area'] .print-area {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   .print-area.print-sheet-page:last-child,

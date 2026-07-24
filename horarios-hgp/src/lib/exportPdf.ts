@@ -17,9 +17,18 @@ function safeName(s: string): string {
 }
 
 /** Nombre de archivo PDF institucional. */
-export function pdfFileName(doc: ScheduleDoc): string {
+export function pdfFileName(
+  doc: ScheduleDoc,
+  kind: 'turno' | 'area' | 'ambos' = 'turno',
+): string {
   const period = `${doc.year}-${String(doc.month).padStart(2, '0')}`
-  return `${safeName(doc.unitName)} ${period}.pdf`
+  const suffix =
+    kind === 'area'
+      ? ' distribucion'
+      : kind === 'ambos'
+        ? ' horario-distribucion'
+        : ' horario'
+  return `${safeName(doc.unitName)}${suffix} ${period}.pdf`
 }
 
 /** Carpeta = especialidad / servicio. */
@@ -80,14 +89,16 @@ function addCanvasPage(
 
 /**
  * Genera PDF A4 horizontal institucional.
- * Médico: página 1 = horario (turnos), página 2 = distribución (áreas).
+ * `grids`: qué hojas incluir (turno, área o ambas).
  */
-export async function buildSchedulePdfBlob(doc: ScheduleDoc): Promise<Blob> {
+export async function buildSchedulePdfBlob(
+  doc: ScheduleDoc,
+  opts?: { grids?: Array<'turno' | 'area'> },
+): Promise<Blob> {
   const enriched = await enrichSigns(doc)
-  const includeAreas = doc.serviceType === 'medico'
-  const modes: Array<'turno' | 'area'> = includeAreas
-    ? ['turno', 'area']
-    : ['turno']
+  const defaultModes: Array<'turno' | 'area'> =
+    doc.serviceType === 'medico' ? ['turno', 'area'] : ['turno']
+  const modes = opts?.grids?.length ? opts.grids : defaultModes
 
   const host = document.createElement('div')
   host.setAttribute('data-pdf-capture', '1')

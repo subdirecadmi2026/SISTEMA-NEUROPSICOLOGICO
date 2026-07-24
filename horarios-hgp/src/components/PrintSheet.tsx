@@ -297,10 +297,15 @@ export function PrintSheet({ doc, gridMode = 'turno' }: Props) {
 
     const before = () => {
       document.body.dataset.printing = '1'
+      // Si no hay selección explícita (Ctrl+P), imprimir solo esta hoja
+      if (!document.body.dataset.printOnly) {
+        document.body.dataset.printOnly = gridMode
+      }
       onPrint()
     }
     const after = () => {
       delete document.body.dataset.printing
+      delete document.body.dataset.printOnly
       onScreen()
     }
     window.addEventListener('beforeprint', before)
@@ -311,7 +316,7 @@ export function PrintSheet({ doc, gridMode = 'turno' }: Props) {
       window.removeEventListener('beforeprint', before)
       window.removeEventListener('afterprint', after)
     }
-  }, [doc, days, staffCount])
+  }, [doc, days, staffCount, gridMode])
 
   const handlePrint = () => {
     const fit = fitRef.current
@@ -332,23 +337,30 @@ export function PrintSheet({ doc, gridMode = 'turno' }: Props) {
         root.style.height = `${needH * scale}px`
       }
     }
+    document.body.dataset.printing = '1'
+    document.body.dataset.printOnly = gridMode
     window.print()
+    window.setTimeout(() => {
+      delete document.body.dataset.printing
+      delete document.body.dataset.printOnly
+    }, 800)
   }
 
   return (
     <section
       ref={rootRef}
+      data-print-grid={gridMode}
       className="print-area mb-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm"
     >
       <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-line bg-sand/50 px-4 py-3">
         <div>
           <h2 className="font-display text-xl text-navy">
-            {isArea ? 'IMPRIMIR DISTRIBUCIÓN' : 'IMPRIMIR'}
+            {isArea ? 'IMPRIMIR DISTRIBUCIÓN' : 'IMPRIMIR HORARIO'}
           </h2>
           <p className="text-sm text-muted">
             {isArea
               ? 'Áreas de servicio · 1 hoja A4 horizontal · '
-              : 'Formato institucional · 1 hoja A4 horizontal · '}
+              : 'Consulta / jornada · 1 hoja A4 horizontal · '}
             {STATUS_LABEL[doc.status]}
           </p>
         </div>
@@ -357,7 +369,7 @@ export function PrintSheet({ doc, gridMode = 'turno' }: Props) {
           onClick={handlePrint}
           className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white"
         >
-          Imprimir / Guardar PDF
+          {isArea ? 'Imprimir solo distribución' : 'Imprimir solo horario'}
         </button>
       </div>
 

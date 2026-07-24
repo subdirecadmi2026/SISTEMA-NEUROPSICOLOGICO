@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react'
 import type { ScheduleDoc } from '../types'
 import { InstitutionalPrintBody } from './PrintSheet'
-import { buildSchedulePdfBlob, downloadBlob, pdfFileName } from '../lib/exportPdf'
+import {
+  buildSchedulePdfBlob,
+  downloadBlob,
+  pdfFileName,
+} from '../lib/exportPdf'
 
 type Props = {
   doc: ScheduleDoc
@@ -9,6 +13,8 @@ type Props = {
   /** Abrir la vista institucional al montar (útil en validador). */
   defaultOpen?: boolean
 }
+
+type PrintKind = 'turno' | 'area'
 
 async function waitForQrImages(root: HTMLElement | null, ms = 800) {
   if (!root) {
@@ -42,7 +48,7 @@ async function waitForQrImages(root: HTMLElement | null, ms = 800) {
 
 /**
  * Vista institucional + PDF + impresión (revisor / validador).
- * Médico: muestra Horario y Distribución por separado, cada uno con su formato.
+ * Médico: Horario y Distribución con impresión / PDF independientes.
  */
 export function InstitutionalPreview({
   doc,
@@ -50,40 +56,52 @@ export function InstitutionalPreview({
   defaultOpen = false,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<PrintKind | 'ambos' | null>(null)
   const printWrapRef = useRef<HTMLDivElement>(null)
   const isMedico = doc.serviceType === 'medico'
-  const showDistribution =
-    isMedico && Object.keys(doc.areaCells ?? {}).length >= 0
+  const showDistribution = isMedico
 
-  async function downloadPdf() {
-    setBusy(true)
+  async function downloadPdf(kind: PrintKind | 'ambos') {
+    setBusy(kind)
     try {
-      const blob = await buildSchedulePdfBlob(doc)
-      downloadBlob(blob, pdfFileName(doc))
+      const grids: Array<'turno' | 'area'> =
+        kind === 'ambos'
+          ? ['turno', 'area']
+          : kind === 'area'
+            ? ['area']
+            : ['turno']
+      const blob = await buildSchedulePdfBlob(doc, { grids })
+      downloadBlob(
+        blob,
+        pdfFileName(doc, kind === 'ambos' ? 'ambos' : kind),
+      )
       onFlash?.(
-        isMedico
-          ? 'PDF institucional (horario + distribución) descargado'
-          : 'PDF institucional descargado',
+        kind === 'area'
+          ? 'PDF de distribución descargado'
+          : kind === 'ambos'
+            ? 'PDF horario + distribución descargado'
+            : 'PDF de horario descargado',
       )
     } catch (e) {
       onFlash?.(
         e instanceof Error ? e.message : 'No se pudo generar el PDF',
       )
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
-  async function printNow() {
+  async function printOnly(kind: PrintKind) {
     setOpen(true)
     await new Promise((r) => setTimeout(r, 80))
     await waitForQrImages(printWrapRef.current)
     document.body.dataset.printing = '1'
+    document.body.dataset.printOnly = kind
     window.print()
     window.setTimeout(() => {
       delete document.body.dataset.printing
-    }, 600)
+      delete document.body.dataset.printOnly
+    }, 800)
   }
 
   return (
@@ -95,7 +113,7 @@ export function InstitutionalPreview({
           </h2>
           <p className="text-xs text-muted">
             {isMedico
-              ? 'Horario y Distribución por separado · firmas con QR'
+              ? 'Imprima o descargue Horario y Distribución por separado'
               : 'Firmas con código QR · mismo formato que imprime el médico'}
           </p>
         </div>
@@ -107,21 +125,6 @@ export function InstitutionalPreview({
           >
             {open ? 'Ocultar vista' : 'Ver planilla institucional'}
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void downloadPdf()}
-            className="rounded-xl bg-navy px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            {busy ? 'Generando…' : 'Descargar PDF'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void printNow()}
-            className="rounded-xl border border-teal/40 bg-teal px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            Imprimir
-          </button>
         </div>
       </div>
 
@@ -131,12 +134,34 @@ export function InstitutionalPreview({
         aria-hidden={!open}
       >
         <div className="print-stack space-y-6 bg-white p-2">
-          <div className="no-print mb-1 px-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
-              {isMedico ? '1 · Horario (consulta / jornada)' : 'Planilla'}
-            </p>
+          <div className="no-print mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-sand/30 px-3 py-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                {isMedico ? 'Horario (consulta / jornada)' : 'Planilla'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void downloadPdf('turno')}
+                className="rounded-lg bg-navy px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {busy === 'turno' ? 'Generando…' : 'PDF horario'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void printOnly('turno')}
+                className="rounded-lg border border-teal/40 bg-teal px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Imprimir horario
+              </button>
+            </div>
           </div>
-          <div className="print-area print-sheet-page overflow-x-auto bg-white">
+          <div
+            data-print-grid="turno"
+            className="print-area print-sheet-page overflow-x-auto bg-white"
+          >
             <div className="print-fit-one-page min-w-[900px]">
               <InstitutionalPrintBody doc={doc} gridMode="turno" />
             </div>
@@ -144,12 +169,34 @@ export function InstitutionalPreview({
 
           {showDistribution ? (
             <>
-              <div className="no-print mb-1 px-1 pt-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-teal">
-                  2 · Distribución (áreas de servicio)
-                </p>
+              <div className="no-print mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal/30 bg-teal/5 px-3 py-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-teal">
+                    Distribución (áreas de servicio)
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void downloadPdf('area')}
+                    className="rounded-lg bg-navy px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {busy === 'area' ? 'Generando…' : 'PDF distribución'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void printOnly('area')}
+                    className="rounded-lg border border-teal/40 bg-teal px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Imprimir distribución
+                  </button>
+                </div>
               </div>
-              <div className="print-area print-sheet-page overflow-x-auto bg-white">
+              <div
+                data-print-grid="area"
+                className="print-area print-sheet-page overflow-x-auto bg-white"
+              >
                 <div className="print-fit-one-page min-w-[900px]">
                   <InstitutionalPrintBody doc={doc} gridMode="area" />
                 </div>
