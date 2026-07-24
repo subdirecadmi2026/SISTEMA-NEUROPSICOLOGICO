@@ -371,16 +371,20 @@ export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] 
         : undefined
     if (slot) usedSlots.add(slot)
 
+    const name = fullSignerName(s)
     const stamp =
       s.kind === 'talento_humano'
         ? doc.talentoHumano
         : doc.revisadoPor || doc.aprobadoPor
+    const stampName = stamp
+      ? stamp.split('\n')[0]?.split('—')[0]?.trim()
+      : ''
 
     return {
       key: s.id,
       label: s.cargo || AUTHORITY_KIND_LABEL[s.kind],
       value: stamp,
-      designatedName: fullSignerName(s) || undefined,
+      designatedName: name || stampName || undefined,
       slot: slot ?? undefined,
       kind: s.kind,
     }

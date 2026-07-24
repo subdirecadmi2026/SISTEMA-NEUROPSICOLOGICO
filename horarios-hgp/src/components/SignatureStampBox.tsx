@@ -32,11 +32,15 @@ function methodTag(method: ElectronicSignRecord['method']): string {
   return ''
 }
 
+function normalizeName(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
 /**
  * Casilla institucional.
- * El sello electrónico (QR + «Firmado electrónicamente») SOLO aparece
- * si existe un registro en electronicSigns del encargado.
- * El contenido se adapta al tamaño fijo del cuadro (sin agrandarlo).
+ * Siempre muestra el nombre del responsable configurado.
+ * El sello electrónico (QR + «Firmado electrónicamente») se suma
+ * cuando existe registro en electronicSigns.
  */
 export function SignatureStampBox({
   label,
@@ -75,9 +79,15 @@ export function SignatureStampBox({
   const plainName = value
     ? value.split('\n')[0]?.split('—')[0]?.trim()
     : ''
-  const displayName = signedElectronic
-    ? electronic!.subjectCn
-    : plainName || designatedName || ''
+  /** Nombre del responsable (admin / jefe del horario). */
+  const responsibleName = (designatedName || plainName || '').trim()
+  const certName = signedElectronic ? electronic!.subjectCn.trim() : ''
+  const showCertAsExtra =
+    !!certName &&
+    !!responsibleName &&
+    normalizeName(certName) !== normalizeName(responsibleName)
+  /** Nombre principal visible en la casilla. */
+  const primaryName = responsibleName || certName
 
   return (
     <div className="print-sign-box flex h-full min-h-[5.5rem] flex-col overflow-hidden rounded border border-line bg-white px-1.5 py-1">
@@ -111,17 +121,25 @@ export function SignatureStampBox({
                 crossOrigin="anonymous"
               />
             ) : null}
-            <p className="print-sign-firmado text-[7px] font-bold uppercase leading-none tracking-wide text-teal">
+            {primaryName ? (
+              <p
+                className="print-sign-name text-[8px] font-semibold leading-tight text-ink"
+                title={primaryName}
+              >
+                <span className="line-clamp-2 break-words">{primaryName}</span>
+              </p>
+            ) : null}
+            <p className="print-sign-firmado mt-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-teal">
               Firmado electrónicamente
             </p>
-            <p
-              className="print-sign-name mt-0.5 text-[8px] font-semibold leading-tight text-ink"
-              title={electronic.subjectCn}
-            >
-              <span className="line-clamp-2 break-words">
-                {electronic.subjectCn}
-              </span>
-            </p>
+            {showCertAsExtra ? (
+              <p
+                className="print-sign-cert mt-0.5 text-[7px] leading-tight text-muted"
+                title={certName}
+              >
+                <span className="line-clamp-1 break-words">Cert: {certName}</span>
+              </p>
+            ) : null}
             <p className="print-sign-meta-line mt-0.5 text-[7px] leading-tight text-muted">
               <span className="line-clamp-2 break-words">
                 {shortDate(electronic.signedAt)}
@@ -135,13 +153,13 @@ export function SignatureStampBox({
             </p>
           </div>
         </div>
-      ) : displayName ? (
+      ) : primaryName ? (
         <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end overflow-hidden pt-1">
           <p
             className="text-[9px] font-semibold leading-tight text-ink"
-            title={displayName}
+            title={primaryName}
           >
-            <span className="line-clamp-2 break-words">{displayName}</span>
+            <span className="line-clamp-2 break-words">{primaryName}</span>
           </p>
           <p className="mt-1 border-t border-line pt-0.5 text-center text-[7px] leading-tight text-muted">
             {plainName && !signedElectronic
