@@ -1010,7 +1010,7 @@ export default function App() {
               onChange={patchDoc}
               highlight={highlightNames}
             />
-            {/* Médico: NamesEditor basta (FUN siempre MED). Enfermería: editor con secciones/FUN. */}
+            {/* Médico: NamesEditor con cargo/relación/clave. Enfermería: editor con secciones/FUN. */}
             {doc.serviceType === 'enfermeria' && (
               <ScheduleStaffEditor
                 doc={doc}

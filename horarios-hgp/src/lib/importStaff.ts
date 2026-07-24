@@ -38,12 +38,12 @@ export async function downloadStaffTemplate(
   const isEnf = serviceType === 'enfermeria'
   ws.addRow({
     fun: isEnf ? 'ENF' : 'MED',
-    name: isEnf ? 'Lic. Ejemplo Apellido' : 'Dr. Ejemplo Apellido',
+    name: isEnf ? 'Lic. Ejemplo Apellido' : 'Dr. Ejemplo Consulta',
     relacion: 'LOSEP',
     codigo: isEnf ? 'D1' : 'CE',
     section: isEnf
       ? 'Enfermeras/os y Auxiliar de Enfermería'
-      : 'Personal médico',
+      : 'Médicos tratantes',
     role: isEnf ? 'Enfermera' : 'Médico tratante',
   })
   if (isEnf) {
@@ -62,6 +62,31 @@ export async function downloadStaffTemplate(
       codigo: 'T',
       section: 'Internos de Enfermería',
       role: 'Interno de enfermería',
+    })
+  } else {
+    ws.addRow({
+      fun: 'MED',
+      name: 'Dra. Ejemplo Guardia 24h',
+      relacion: 'LOSEP',
+      codigo: 'X',
+      section: 'Médicos de guardia',
+      role: 'Médico de planta',
+    })
+    ws.addRow({
+      fun: 'MED',
+      name: 'Dr. Ejemplo Turno 13h',
+      relacion: 'Código de Trabajo',
+      codigo: 'HE',
+      section: 'Personal médico',
+      role: 'Especialista',
+    })
+    ws.addRow({
+      fun: 'MED',
+      name: 'Dra. Ejemplo Turno 12h',
+      relacion: 'Residente',
+      codigo: 'PT1',
+      section: 'Médicos residentes',
+      role: 'Médico residente',
     })
   }
 

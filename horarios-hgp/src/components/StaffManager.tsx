@@ -8,6 +8,15 @@ import {
   upsertStaff,
 } from '../lib/staffLibrary'
 import { downloadStaffTemplate, parseStaffFile } from '../lib/importStaff'
+import { HabitualCodeSelect } from './HabitualCodeSelect'
+import {
+  CARGOS_MEDICO,
+  RELACIONES_LABORALES,
+  SECTIONS_ENF,
+  SECTIONS_MEDICO,
+  formatHabitualCodeLabel,
+} from '../lib/staffOptions'
+import { hoursForCode } from '../lib/shiftsStore'
 
 type Props = {
   serviceType: ServiceType
@@ -15,12 +24,6 @@ type Props = {
   onLoadIntoSchedule: (staff: StaffMember[]) => void
   onFlash: (msg: string) => void
 }
-
-const SECTIONS_ENF = [
-  'Enfermeras/os y Auxiliar de Enfermería',
-  'Internos de Enfermería',
-  'Auxiliar de Enfermería',
-]
 
 export function StaffManager({
   serviceType,
@@ -32,6 +35,8 @@ export function StaffManager({
   const [editing, setEditing] = useState<StaffMember | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const isEnf = serviceType === 'enfermeria'
+  const isMed = serviceType === 'medico'
+  const sections = isEnf ? SECTIONS_ENF : SECTIONS_MEDICO
 
   useEffect(() => {
     setStaff(listStaff(serviceType, unitName))
@@ -49,6 +54,10 @@ export function StaffManager({
     if (!editing) return
     if (!editing.name.trim()) {
       onFlash('Ingrese nombres y apellidos')
+      return
+    }
+    if (!editing.codigoPersonal.trim()) {
+      onFlash('Indique la clave habitual del personal')
       return
     }
     const toSave = isEnf ? editing : { ...editing, fun: 'MED' }
@@ -86,10 +95,14 @@ export function StaffManager({
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="font-display text-xl text-navy">
-            Personal del servicio
+            {isMed
+              ? 'Biblioteca de médicos del servicio'
+              : 'Personal del servicio'}
           </h2>
           <p className="text-sm text-muted">
-            CRUD por servicio · Importar Excel/CSV · Cargar al horario del mes
+            {isMed
+              ? 'Guarde médicos por especialidad con cargo, relación y clave habitual (hasta 24 h). Luego cárguelos al horario del mes.'
+              : 'CRUD por servicio · Importar Excel/CSV · Cargar al horario del mes'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -169,46 +182,91 @@ export function StaffManager({
             />
           </label>
           <label className="text-xs text-muted">
-            Relación laboral
+            Cargo
             <input
+              list={isMed ? 'staff-cargos-medico' : undefined}
+              className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
+              value={editing.role}
+              onChange={(e) => setEditing({ ...editing, role: e.target.value })}
+              placeholder={isMed ? 'Médico tratante' : 'Cargo'}
+            />
+            {isMed ? (
+              <datalist id="staff-cargos-medico">
+                {CARGOS_MEDICO.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            ) : null}
+          </label>
+          <label className="text-xs text-muted">
+            Relación laboral
+            <select
               className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
               value={editing.relacionLaboral}
               onChange={(e) =>
                 setEditing({ ...editing, relacionLaboral: e.target.value })
               }
-            />
+            >
+              {RELACIONES_LABORALES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+              {editing.relacionLaboral &&
+              !RELACIONES_LABORALES.includes(
+                editing.relacionLaboral as (typeof RELACIONES_LABORALES)[number],
+              ) ? (
+                <option value={editing.relacionLaboral}>
+                  {editing.relacionLaboral}
+                </option>
+              ) : null}
+            </select>
           </label>
           <label className="text-xs text-muted">
-            Código
-            <input
-              className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
-              value={editing.codigoPersonal}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  codigoPersonal: e.target.value.toUpperCase(),
-                })
-              }
-            />
-          </label>
-          {isEnf && (
-            <label className="text-xs text-muted">
-              Sección
-              <select
+            Clave habitual
+            {isMed ? (
+              <div className="mt-1">
+                <HabitualCodeSelect
+                  serviceType="medico"
+                  value={editing.codigoPersonal}
+                  onChange={(codigoPersonal) =>
+                    setEditing({ ...editing, codigoPersonal })
+                  }
+                />
+              </div>
+            ) : (
+              <input
                 className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
-                value={editing.section}
+                value={editing.codigoPersonal}
                 onChange={(e) =>
-                  setEditing({ ...editing, section: e.target.value })
+                  setEditing({
+                    ...editing,
+                    codigoPersonal: e.target.value.toUpperCase(),
+                  })
                 }
-              >
-                {SECTIONS_ENF.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+              />
+            )}
+          </label>
+          <label className="text-xs text-muted sm:col-span-2">
+            Sección
+            <select
+              className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
+              value={editing.section}
+              onChange={(e) =>
+                setEditing({ ...editing, section: e.target.value })
+              }
+            >
+              {sections.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+              {editing.section &&
+              !(sections as readonly string[]).includes(editing.section) ? (
+                <option value={editing.section}>{editing.section}</option>
+              ) : null}
+            </select>
+          </label>
           <div className="flex items-end gap-2 sm:col-span-3 lg:col-span-6">
             <button
               type="button"
@@ -234,9 +292,10 @@ export function StaffManager({
             <tr>
               {isEnf && <th className="px-2 py-2 text-left">FUN</th>}
               <th className="px-2 py-2 text-left">Nombres</th>
+              {isMed && <th className="px-2 py-2 text-left">Cargo</th>}
               <th className="px-2 py-2 text-left">Relación</th>
-              <th className="px-2 py-2 text-left">Código</th>
-              {isEnf && <th className="px-2 py-2 text-left">Sección</th>}
+              <th className="px-2 py-2 text-left">Clave</th>
+              <th className="px-2 py-2 text-left">Sección</th>
               <th className="px-2 py-2 text-center">Activo</th>
               <th className="px-2 py-2">—</th>
             </tr>
@@ -245,11 +304,12 @@ export function StaffManager({
             {staff.length === 0 && (
               <tr>
                 <td
-                  colSpan={isEnf ? 7 : 5}
+                  colSpan={isMed ? 7 : isEnf ? 7 : 6}
                   className="px-3 py-4 text-center text-muted"
                 >
-                  Sin personal en la biblioteca de este servicio. Importe o
-                  agregue.
+                  {isMed
+                    ? 'Sin médicos en la biblioteca de esta especialidad. Importe o agregue.'
+                    : 'Sin personal en la biblioteca de este servicio. Importe o agregue.'}
                 </td>
               </tr>
             )}
@@ -259,13 +319,20 @@ export function StaffManager({
                   <td className="px-2 py-1.5 font-semibold">{s.fun}</td>
                 )}
                 <td className="px-2 py-1.5">{s.name}</td>
-                <td className="px-2 py-1.5 text-muted">{s.relacionLaboral}</td>
-                <td className="px-2 py-1.5 font-bold text-navy">
-                  {s.codigoPersonal}
-                </td>
-                {isEnf && (
-                  <td className="px-2 py-1.5 text-xs text-muted">{s.section}</td>
+                {isMed && (
+                  <td className="px-2 py-1.5 text-muted">{s.role || '—'}</td>
                 )}
+                <td className="px-2 py-1.5 text-muted">{s.relacionLaboral}</td>
+                <td
+                  className="px-2 py-1.5 font-bold text-navy"
+                  title={formatHabitualCodeLabel(serviceType, s.codigoPersonal)}
+                >
+                  {s.codigoPersonal}
+                  {hoursForCode(serviceType, s.codigoPersonal) > 0
+                    ? ` · ${hoursForCode(serviceType, s.codigoPersonal)} h`
+                    : ''}
+                </td>
+                <td className="px-2 py-1.5 text-xs text-muted">{s.section}</td>
                 <td className="px-2 py-1.5 text-center">
                   <input
                     type="checkbox"

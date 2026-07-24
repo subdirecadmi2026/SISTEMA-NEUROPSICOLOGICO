@@ -1,5 +1,6 @@
 import type { ServiceType } from '../types'
 import { UNITS_ENFERMERIA, UNITS_MEDICO } from '../data/templates'
+import { renameStaffLibraryUnit } from './staffLibrary'
 
 const UNITS_KEY = 'hgp-units-v1'
 
@@ -83,6 +84,7 @@ export function renameUnit(
     a.localeCompare(b, 'es'),
   )
   writeBlob(blob)
+  renameStaffLibraryUnit(serviceType, from, next)
   return listUnits(serviceType)
 }
 

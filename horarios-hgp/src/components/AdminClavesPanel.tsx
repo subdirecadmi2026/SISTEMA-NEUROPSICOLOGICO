@@ -135,12 +135,17 @@ export function AdminClavesPanel({ onFlash }: Props) {
               <select
                 className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
                 value={form.group}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const group = e.target.value as ShiftCode['group']
+                  const draft = emptyShiftDraft(group)
                   setForm((f) => ({
                     ...f,
-                    group: e.target.value as ShiftCode['group'],
+                    group,
+                    // Solo sugiere horas al crear (no al editar una clave existente).
+                    hours: editingCode ? f.hours : draft.hours,
+                    color: editingCode ? f.color : draft.color,
                   }))
-                }
+                }}
               >
                 {SHIFT_GROUPS.map((g) => (
                   <option key={g} value={g}>

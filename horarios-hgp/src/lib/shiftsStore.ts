@@ -145,15 +145,23 @@ export const SHIFT_GROUP_LABEL: Record<ShiftCode['group'], string> = {
   ausencia: 'Ausencia',
 }
 
-export function emptyShiftDraft(): ShiftCode {
+export function emptyShiftDraft(
+  group: ShiftCode['group'] = 'turno',
+): ShiftCode {
+  const hours = group === 'ausencia' ? 0 : group === 'area' ? 0 : 8
   return {
     code: '',
     label: '',
-    hours: 8,
+    hours,
     timeRange: '',
     note: '',
-    color: '#d9ebe9',
+    color:
+      group === 'ausencia'
+        ? '#f1f3f5'
+        : group === 'area'
+          ? '#dde8f8'
+          : '#d9ebe9',
     text: '#1c3a5c',
-    group: 'turno',
+    group,
   }
 }

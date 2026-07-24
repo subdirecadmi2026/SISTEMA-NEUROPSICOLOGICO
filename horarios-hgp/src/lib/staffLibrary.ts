@@ -80,12 +80,12 @@ export function createEmptyStaff(
     id: uid(isEnf ? 'enf' : 'med'),
     name: '',
     fun: isEnf ? 'ENF' : 'MED',
-    role: isEnf ? 'Enfermera' : 'Médico',
+    role: isEnf ? 'Enfermera' : 'Médico tratante',
     relacionLaboral: 'LOSEP',
     codigoPersonal: isEnf ? 'D1' : 'CE',
     section: isEnf
       ? 'Enfermeras/os y Auxiliar de Enfermería'
-      : 'Personal médico',
+      : 'Médicos tratantes',
     serviceUnit: unitName,
     active: true,
     order: 1,
@@ -163,5 +163,34 @@ export function clearStaffLibraryBucket(
 ) {
   const all = readAll()
   delete all[libraryKey(serviceType, unitName)]
+  writeAll(all)
+}
+
+/** Mueve el personal de biblioteca al renombrar una especialidad. */
+export function renameStaffLibraryUnit(
+  serviceType: ServiceType,
+  from: string,
+  to: string,
+) {
+  const fromKey = libraryKey(serviceType, from)
+  const toKey = libraryKey(serviceType, to)
+  if (fromKey === toKey) return
+  const all = readAll()
+  const fromList = all[fromKey]
+  if (!fromList?.length) return
+  const existing = all[toKey] ?? []
+  const byName = new Set(existing.map((s) => s.name.trim().toLowerCase()))
+  const merged = [
+    ...existing,
+    ...fromList
+      .filter((s) => !byName.has(s.name.trim().toLowerCase()))
+      .map((s) => ({ ...s, serviceUnit: to })),
+  ]
+  all[toKey] = merged.map((s, i) => ({
+    ...s,
+    serviceUnit: to,
+    order: i + 1,
+  }))
+  delete all[fromKey]
   writeAll(all)
 }
