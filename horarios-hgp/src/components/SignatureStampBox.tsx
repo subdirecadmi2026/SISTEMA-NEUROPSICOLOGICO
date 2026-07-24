@@ -14,11 +14,29 @@ type Props = {
   unitName?: string
 }
 
+function shortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('es-EC', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function methodTag(method: ElectronicSignRecord['method']): string {
+  if (method === 'pkcs12_local') return '.p12'
+  if (method === 'firmaec_protocol') return 'FirmaEC'
+  if (method === 'image_stamp') return 'imagen'
+  return ''
+}
+
 /**
  * Casilla institucional.
  * El sello electrónico (QR + «Firmado electrónicamente») SOLO aparece
  * si existe un registro en electronicSigns del encargado.
- * Si aún no firmó, muestra el responsable configurado por el admin.
+ * El contenido se adapta al tamaño fijo del cuadro (sin agrandarlo).
  */
 export function SignatureStampBox({
   label,
@@ -62,78 +80,77 @@ export function SignatureStampBox({
     : plainName || designatedName || ''
 
   return (
-    <div className="print-sign-box rounded border border-line bg-white px-2 py-1.5">
-      <p className="print-sign-role text-[9px] font-semibold uppercase tracking-wide text-navy">
-        {label}
+    <div className="print-sign-box flex h-full min-h-[5.5rem] flex-col overflow-hidden rounded border border-line bg-white px-1.5 py-1">
+      <p className="print-sign-role shrink-0 text-[8px] font-semibold uppercase leading-tight tracking-wide text-navy">
+        <span className="line-clamp-2 break-words">{label}</span>
       </p>
+
       {signedElectronic && electronic ? (
-        <div className="print-sign-stamp mt-1 flex items-start gap-1.5">
+        <div className="print-sign-stamp mt-0.5 flex min-h-0 flex-1 items-start gap-1 overflow-hidden">
           {qr ? (
             <img
               src={qr}
               alt={`Código QR firma ${label}`}
-              className="print-sign-qr h-[72px] w-[72px] shrink-0 object-contain"
+              className="print-sign-qr h-9 w-9 shrink-0 object-contain"
               crossOrigin="anonymous"
             />
           ) : (
             <div
-              className="print-sign-qr-placeholder flex h-[72px] w-[72px] shrink-0 items-center justify-center border border-dashed border-line text-[10px] text-muted"
+              className="print-sign-qr-placeholder flex h-9 w-9 shrink-0 items-center justify-center border border-dashed border-line text-[7px] text-muted"
               aria-hidden
             >
               QR
             </div>
           )}
-          <div className="print-sign-meta min-w-0 flex-1">
+          <div className="print-sign-meta min-w-0 flex-1 overflow-hidden">
             {electronic.imageDataUrl ? (
               <img
                 src={electronic.imageDataUrl}
                 alt={`Sello ${label}`}
-                className="print-sign-img mb-0.5 max-h-8 max-w-full object-contain"
+                className="print-sign-img mb-0.5 max-h-5 max-w-full object-contain object-left"
                 crossOrigin="anonymous"
               />
             ) : null}
-            <p className="print-sign-firmado text-[8px] font-bold uppercase tracking-wide text-teal">
+            <p className="print-sign-firmado text-[7px] font-bold uppercase leading-none tracking-wide text-teal">
               Firmado electrónicamente
             </p>
-            <p className="print-sign-name text-[10px] font-semibold leading-tight text-ink">
-              {electronic.subjectCn}
+            <p
+              className="print-sign-name mt-0.5 text-[8px] font-semibold leading-tight text-ink"
+              title={electronic.subjectCn}
+            >
+              <span className="line-clamp-2 break-words">
+                {electronic.subjectCn}
+              </span>
             </p>
-            {electronic.issuerCn ? (
-              <p className="print-sign-cert truncate text-[8px] text-muted">
-                {electronic.issuerCn}
-              </p>
-            ) : null}
-            <p className="print-sign-meta-line text-[8px] leading-tight text-muted">
-              {new Date(electronic.signedAt).toLocaleString('es-EC')}
-              {electronic.serialNumber
-                ? ` · Serie ${electronic.serialNumber.slice(0, 16)}`
-                : ''}
-              {electronic.method === 'pkcs12_local'
-                ? ' · .p12'
-                : electronic.method === 'firmaec_protocol'
-                  ? ' · FirmaEC'
-                  : electronic.method === 'image_stamp'
-                    ? ' · imagen'
-                    : ''}
+            <p className="print-sign-meta-line mt-0.5 text-[7px] leading-tight text-muted">
+              <span className="line-clamp-2 break-words">
+                {shortDate(electronic.signedAt)}
+                {methodTag(electronic.method)
+                  ? ` · ${methodTag(electronic.method)}`
+                  : ''}
+              </span>
             </p>
-            <p className="print-sign-verify text-[8px] font-medium text-navy">
-              Verifique con el código QR
+            <p className="print-sign-verify text-[7px] font-medium leading-tight text-navy">
+              Verifique con QR
             </p>
           </div>
         </div>
       ) : displayName ? (
-        <div className="mt-3">
-          <p className="text-[10px] font-semibold leading-tight text-ink">
-            {displayName}
+        <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end overflow-hidden pt-1">
+          <p
+            className="text-[9px] font-semibold leading-tight text-ink"
+            title={displayName}
+          >
+            <span className="line-clamp-2 break-words">{displayName}</span>
           </p>
-          <p className="mt-3 border-t border-line pt-1 text-center text-[8px] text-muted">
+          <p className="mt-1 border-t border-line pt-0.5 text-center text-[7px] leading-tight text-muted">
             {plainName && !signedElectronic
-              ? 'Registro textual · pendiente sello electrónico'
-              : 'Responsable designado · pendiente de firma'}
+              ? 'Pendiente sello electrónico'
+              : 'Pendiente de firma'}
           </p>
         </div>
       ) : (
-        <p className="print-sign-empty mt-6 text-[9px] text-muted">
+        <p className="print-sign-empty mt-auto text-[8px] text-muted">
           Pendiente de firma
         </p>
       )}

@@ -215,7 +215,7 @@ describe('operaciones de mes', () => {
     expect(next.cells[cellKey('m1', 6)]).toBeUndefined()
   })
 
-  it('no pisa celdas existentes al llenar fines de semana', async () => {
+  it('no pisa ausencias al llenar fines de semana; sí reemplaza turnos productivos', async () => {
     const { fillEmptyWeekendsWithLibre } = await import('./scheduleOps')
     const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
     doc.staff = [
@@ -229,9 +229,12 @@ describe('operaciones de mes', () => {
         order: 1,
       },
     ]
-    doc.cells = { [cellKey('m1', 4)]: 'X' }
+    doc.cells = {
+      [cellKey('m1', 4)]: 'V',
+      [cellKey('m1', 5)]: 'CE',
+    }
     const next = fillEmptyWeekendsWithLibre(doc)
-    expect(next.cells[cellKey('m1', 4)]).toBe('X')
+    expect(next.cells[cellKey('m1', 4)]).toBe('V')
     expect(next.cells[cellKey('m1', 5)]).toBe('L')
   })
 

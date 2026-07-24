@@ -749,6 +749,24 @@ export default function App() {
                 onClick: undoLast,
               },
               {
+                id: 'weekends',
+                label: 'Llenar sáb/dom con L',
+                disabled: readOnly,
+                emphasis: 'teal',
+                title: 'Marca sábados y domingos con Libre (L)',
+                onClick: () => {
+                  const next = fillEmptyWeekendsWithLibre(doc)
+                  if (next === doc) {
+                    flash(
+                      'Sábados y domingos ya tienen L o una ausencia (V, P, F…)',
+                    )
+                    return
+                  }
+                  patchDoc(next)
+                  flash('Sábados y domingos marcados con L')
+                },
+              },
+              {
                 id: 'dup-prev',
                 label: 'Duplicar mes anterior',
                 disabled: readOnly,
@@ -770,7 +788,6 @@ export default function App() {
                 id: 'copy-week',
                 label: 'Copiar 1ª semana',
                 disabled: readOnly,
-                emphasis: 'teal',
                 onClick: () => {
                   const next = copyFirstWeekPattern(doc)
                   if (next === doc) {
@@ -835,11 +852,13 @@ export default function App() {
                     onClick: () => {
                       const next = fillEmptyWeekendsWithLibre(doc)
                       if (next === doc) {
-                        flash('No hay sáb/dom vacíos para marcar L')
+                        flash(
+                          'Sábados y domingos ya tienen L o una ausencia (V, P, F…)',
+                        )
                         return
                       }
                       patchDoc(next)
-                      flash('Fines de semana vacíos marcados con L')
+                      flash('Sábados y domingos marcados con L')
                     },
                   },
                   {

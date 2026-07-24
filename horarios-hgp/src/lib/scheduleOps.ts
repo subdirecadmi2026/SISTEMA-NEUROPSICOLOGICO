@@ -1,10 +1,10 @@
 import type { ScheduleDoc, ScheduleCell, StaffMember } from '../types'
 import { uid } from '../types'
-import { daysInMonth, isWeekend } from './calendar'
+import { cellKey, daysInMonth, isWeekend } from './calendar'
 import { holidayDatesInMonth } from './holidays'
 import { loadSchedule, listSavedSchedules } from './storage'
 import { isRemoteEnabled, listRemoteSchedules, fetchRemoteSchedule } from './api'
-import { shiftMeta } from '../data/templates'
+import { hoursForCode, shiftMeta } from '../data/templates'
 
 /** Borra todas las celdas del mes (mantiene personal y metadatos). */
 export function clearMonthCells(doc: ScheduleDoc): ScheduleDoc {
@@ -202,24 +202,42 @@ export function applyHolidaysToEmptyCells(
 }
 
 /**
- * Marca sábados y domingos vacíos con clave L (libre).
- * No pisa celdas ya pintadas ni feriados ya marcados.
+ * Marca sábados y domingos con clave L (libre).
+ * - Celdas vacías → L
+ * - Turnos productivos en fin de semana → se reemplazan por L
+ * - Ausencias (V, P, F, BL, etc.) se respetan
  */
 export function fillEmptyWeekendsWithLibre(doc: ScheduleDoc): ScheduleDoc {
   const days = daysInMonth(doc.year, doc.month)
   const cells = { ...doc.cells }
   let painted = 0
+  let replaced = 0
+
   for (const s of doc.staff) {
     if (!s.name.trim()) continue
     for (let d = 1; d <= days; d++) {
       if (!isWeekend(doc.year, doc.month, d)) continue
-      const key = `${s.id}:${d}`
-      if (cells[key]) continue
-      cells[key] = 'L'
-      painted += 1
+      const key = cellKey(s.id, d)
+      const current = (cells[key] ?? '').trim()
+      if (!current) {
+        cells[key] = 'L'
+        painted += 1
+        continue
+      }
+      if (current.toUpperCase() === 'L') continue
+      const meta = shiftMeta(doc.serviceType, current)
+      const absence = meta?.group === 'ausencia'
+      const productive = hoursForCode(doc.serviceType, current) > 0 && !absence
+      // Solo sustituye turnos productivos dejados por error en sáb/dom
+      if (productive || !meta) {
+        cells[key] = 'L'
+        replaced += 1
+      }
     }
   }
-  if (painted === 0) return doc
+
+  const total = painted + replaced
+  if (total === 0) return doc
   return {
     ...doc,
     cells,
@@ -232,7 +250,7 @@ export function fillEmptyWeekendsWithLibre(doc: ScheduleDoc): ScheduleDoc {
         at: new Date().toISOString(),
         userName: 'Usuario',
         action: 'llenar_fines_semana',
-        detail: `${painted} celdas L en sáb/dom`,
+        detail: `${painted} vacías + ${replaced} reemplazadas → L en sáb/dom`,
       },
     ],
   }

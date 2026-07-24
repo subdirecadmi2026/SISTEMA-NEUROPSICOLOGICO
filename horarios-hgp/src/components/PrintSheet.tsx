@@ -214,7 +214,7 @@ export function InstitutionalPrintBody({ doc }: Props) {
             Estado: {STATUS_LABEL[doc.status]} · v{doc.version}
           </p>
         </div>
-        <div className={`grid gap-2 ${cols}`}>
+        <div className={`grid items-stretch gap-2 ${cols}`}>
           {signatures.map((s) => (
             <SignatureStampBox
               key={s.key}
