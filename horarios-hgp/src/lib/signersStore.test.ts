@@ -78,7 +78,24 @@ describe('autoridades de firma', () => {
     const adm = buildAdmisionesSignatureBox(doc)
     expect(adm.kind).toBe('admisiones')
     expect(adm.label).toMatch(/Validado por Admisiones/i)
-    expect(adm.designatedName).toBe('Dra. Ana López')
+    // Nunca el jefe médico: usa encargado de Admisiones (o quien firmó)
+    expect(adm.designatedName).not.toBe('Dra. Ana López')
+    expect(adm.designatedName).toBe('Lic. Carmen Ortiz')
+  })
+
+  it('caja Admisiones usa quien firmó, no el jefe de servicio', () => {
+    const doc = createBlankSchedule('medico', 2026, 8, {
+      withDemo: false,
+      unitName: 'Nefrología',
+      staff: [],
+    })
+    doc.jefeServicio = 'ANDRES MAYORGA'
+    doc.admisionesPor = 'Lic. Carmen Ortiz — Admisiones'
+    doc.admisionesApprovedAt = new Date().toISOString()
+    const adm = buildAdmisionesSignatureBox(doc)
+    expect(adm.designatedName).toBe('Lic. Carmen Ortiz')
+    expect(adm.value).toContain('Carmen Ortiz')
+    expect(adm.designatedName).not.toBe(doc.jefeServicio)
   })
 
   it('crea usuario de autoridad con nombres y responsabilidad', () => {

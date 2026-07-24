@@ -1,6 +1,6 @@
 import type { ScheduleDoc, UserRole } from '../types'
 import { uid } from '../types'
-import { upsertManagedUser, getManagedUser } from './usersStore'
+import { upsertManagedUser, getManagedUser, listManagedUsers } from './usersStore'
 import type { FirmaEcSlot } from './firmaEc'
 
 const KEY = 'hgp-hospital-signers-v1'
@@ -347,18 +347,39 @@ export type PrintSignatureBox = {
   kind: SignerKind | 'admisiones'
 }
 
-/** Casilla «Validado por Admisiones» (va bajo plan de contingencia, no con autoridades). */
+/** Casilla «Validado por Admisiones» (va bajo plan de contingencia, no con autoridades).
+ *  Muestra al encargado de Admisiones que firmó (o el usuario activo de ese rol).
+ *  Nunca usa el jefe de servicio del horario. */
 export function buildAdmisionesSignatureBox(
   doc: ScheduleDoc,
 ): PrintSignatureBox {
   const admisionesStamp = doc.admisionesPor?.trim() ?? ''
-  const admisionesName =
+  const stampName =
     admisionesStamp.split('\n')[0]?.split('—')[0]?.trim() || ''
+  const electronicName = (doc.electronicSigns ?? [])
+    .find((e) => e.slot === 'admisiones')
+    ?.subjectCn?.trim()
+  const signatureName = (doc.signatures ?? [])
+    .filter((s) => s.role === 'admisiones')
+    .at(-1)
+    ?.name?.trim()
+  const encargadoName = listManagedUsers()
+    .filter((u) => u.active && u.role === 'admisiones')
+    .map((u) => u.name.trim())
+    .find(Boolean)
+
+  const designatedName =
+    stampName ||
+    signatureName ||
+    electronicName ||
+    encargadoName ||
+    undefined
+
   return {
     key: 'admisiones-auto',
     label: 'Validado por Admisiones',
     value: admisionesStamp,
-    designatedName: doc.jefeServicio.trim() || admisionesName || undefined,
+    designatedName,
     slot: 'admisiones',
     kind: 'admisiones',
   }
