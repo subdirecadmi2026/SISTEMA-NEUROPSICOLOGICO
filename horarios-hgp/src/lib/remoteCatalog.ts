@@ -114,10 +114,18 @@ function leaveToRow(l: StaffLeave) {
     created_by_name: l.createdByName ?? null,
     created_at: l.createdAt,
     updated_at: l.updatedAt,
+    validated_by: l.validatedBy ?? null,
+    validated_by_name: l.validatedByName ?? null,
+    validated_at: l.validatedAt ?? null,
   }
 }
 
 function rowToLeave(r: Record<string, unknown>): StaffLeave {
+  const statusRaw = String(r.status ?? 'activo')
+  const status =
+    statusRaw === 'pendiente' || statusRaw === 'cancelado'
+      ? statusRaw
+      : 'activo'
   return {
     id: String(r.id),
     staffId: String(r.staff_id),
@@ -134,13 +142,18 @@ function rowToLeave(r: Record<string, unknown>): StaffLeave {
       return Number.isFinite(n) && n > 0 && n <= 24 ? n : 8
     })(),
     notes: String(r.notes ?? ''),
-    status: (r.status as StaffLeave['status']) || 'activo',
+    status,
     createdAt: String(r.created_at ?? new Date().toISOString()),
     updatedAt: String(r.updated_at ?? new Date().toISOString()),
     createdBy: r.created_by ? String(r.created_by) : undefined,
     createdByName: r.created_by_name
       ? String(r.created_by_name)
       : undefined,
+    validatedBy: r.validated_by ? String(r.validated_by) : undefined,
+    validatedByName: r.validated_by_name
+      ? String(r.validated_by_name)
+      : undefined,
+    validatedAt: r.validated_at ? String(r.validated_at) : undefined,
   }
 }
 
@@ -161,7 +174,11 @@ function notifToRow(n: HgpNotification) {
 function rowToNotif(r: Record<string, unknown>): HgpNotification {
   const roleRaw = String(r.to_role ?? 'lider_servicio')
   const toRole =
-    roleRaw === 'admisiones' ? 'admisiones' : 'lider_servicio'
+    roleRaw === 'admisiones'
+      ? 'admisiones'
+      : roleRaw === 'validador'
+        ? 'validador'
+        : 'lider_servicio'
   return {
     id: String(r.id),
     createdAt: String(r.created_at ?? new Date().toISOString()),

@@ -8,7 +8,10 @@ import {
 
 const KEY = 'hgp-notifications-v1'
 
-export type NotificationTargetRole = 'lider_servicio' | 'admisiones'
+export type NotificationTargetRole =
+  | 'lider_servicio'
+  | 'admisiones'
+  | 'validador'
 
 export type HgpNotification = {
   id: string
@@ -147,10 +150,85 @@ export function notifyAdmisionesLeaveApproved(opts: {
     toRole: 'admisiones',
     unitName: opts.unitName,
     scheduleId: `leave:${opts.unitName}`,
-    title: `TH · ${opts.kindLabel}`,
-    body: `${opts.staffName} (${opts.unitName}) · ${opts.startDate} → ${opts.endDate}${days} · ${opts.authorizedHours} h (clave ${opts.absenceCode}). Aprobado/registrado por Talento Humano: ${opts.approvedBy}.`,
+    title: `TH · ${opts.kindLabel} validado`,
+    body: `${opts.staffName} (${opts.unitName}) · ${opts.startDate} → ${opts.endDate}${days} · ${opts.authorizedHours} h (clave ${opts.absenceCode}). Validado por Talento Humano: ${opts.approvedBy}.`,
     kind: 'permiso',
   })
+}
+
+/** Aviso a Talento Humano: el jefe envió un permiso para validar. */
+export function notifyValidadorLeavePending(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  startDate: string
+  endDate: string
+  authorizedHours: number
+  absenceCode: string
+  submittedBy: string
+  daysLabel?: string
+}): HgpNotification {
+  const days = opts.daysLabel ? ` · ${opts.daysLabel}` : ''
+  return addNotification({
+    toRole: 'validador',
+    unitName: opts.unitName,
+    scheduleId: `leave:${opts.unitName}`,
+    title: `Pendiente validar · ${opts.kindLabel}`,
+    body: `${opts.staffName} (${opts.unitName}) · ${opts.startDate} → ${opts.endDate}${days} · ${opts.authorizedHours} h (clave ${opts.absenceCode}). Enviado por jefe: ${opts.submittedBy}. Revise en Permisos TH.`,
+    kind: 'permiso',
+  })
+}
+
+/** Aviso al jefe: TH validó su permiso/vacaciones. */
+export function notifyJefeLeaveValidated(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  startDate: string
+  endDate: string
+  authorizedHours: number
+  absenceCode: string
+  validatedBy: string
+  daysLabel?: string
+}): HgpNotification {
+  const days = opts.daysLabel ? ` · ${opts.daysLabel}` : ''
+  return addNotification({
+    toRole: 'lider_servicio',
+    unitName: opts.unitName,
+    scheduleId: `leave:${opts.unitName}`,
+    title: `${opts.kindLabel} validado por TH`,
+    body: `${opts.staffName} · ${opts.startDate} → ${opts.endDate}${days} · ${opts.authorizedHours} h (clave ${opts.absenceCode}). Validó: ${opts.validatedBy}.`,
+    kind: 'permiso',
+  })
+}
+
+/**
+ * Tras validar TH: notifica al jefe y a Admisiones.
+ */
+export function notifyLeaveValidatedByTH(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  startDate: string
+  endDate: string
+  authorizedHours: number
+  absenceCode: string
+  validatedBy: string
+  daysLabel?: string
+}): { jefe: HgpNotification; admisiones: HgpNotification } {
+  const jefe = notifyJefeLeaveValidated(opts)
+  const admisiones = notifyAdmisionesLeaveApproved({
+    unitName: opts.unitName,
+    staffName: opts.staffName,
+    kindLabel: opts.kindLabel,
+    startDate: opts.startDate,
+    endDate: opts.endDate,
+    authorizedHours: opts.authorizedHours,
+    absenceCode: opts.absenceCode,
+    approvedBy: opts.validatedBy,
+    daysLabel: opts.daysLabel,
+  })
+  return { jefe, admisiones }
 }
 
 /** Aviso a Admisiones: TH canceló, eliminó o actualizó un permiso. */
@@ -259,6 +337,9 @@ export function listNotificationsFor(user: AppUser | null): HgpNotification[] {
     .filter((n) => {
       if (user.role === 'admin') return true
       if (user.role === 'admisiones') return n.toRole === 'admisiones'
+      if (user.role === 'validador' || user.role === 'talento_humano') {
+        return n.toRole === 'validador'
+      }
       if (isJefeRole(user.role)) {
         if (n.toRole !== 'lider_servicio') return false
         if (!n.unitName) return true

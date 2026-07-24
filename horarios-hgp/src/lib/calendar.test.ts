@@ -805,6 +805,90 @@ describe('notificación al jefe al validar', () => {
     expect(forJefe.some((n) => n.toRole === 'lider_servicio')).toBe(true)
     expect(forJefe.every((n) => n.toRole === 'lider_servicio')).toBe(true)
   })
+
+  it('flujo jefe → TH valida → notifica jefe y Admisiones', async () => {
+    const {
+      notifyValidadorLeavePending,
+      notifyLeaveValidatedByTH,
+      listNotificationsFor,
+    } = await import('./notifications')
+    const { upsertLeave, validateLeave, getLeave } = await import('./leavesStore')
+    const { DEMO_USERS } = await import('./auth')
+
+    const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+    const th = DEMO_USERS.find((u) => u.id === 'u-validador')!
+    const admisiones = DEMO_USERS.find((u) => u.id === 'u-admisiones')!
+
+    const pending = upsertLeave(
+      {
+        staffId: 'st-flow-1',
+        staffName: 'Dra. Flujo',
+        serviceType: 'medico',
+        unitName: jefe.serviceUnits?.[0] || 'Medicina interna',
+        kind: 'vacaciones',
+        absenceCode: 'V',
+        startDate: '2026-09-01',
+        endDate: '2026-09-05',
+        hoursPerDay: 8,
+        authorizedHours: 40,
+        status: 'pendiente',
+      },
+      jefe,
+    )
+    expect(pending.status).toBe('pendiente')
+
+    notifyValidadorLeavePending({
+      unitName: pending.unitName,
+      staffName: pending.staffName,
+      kindLabel: 'Vacaciones',
+      startDate: pending.startDate,
+      endDate: pending.endDate,
+      authorizedHours: pending.authorizedHours,
+      absenceCode: pending.absenceCode,
+      submittedBy: jefe.name,
+    })
+
+    const forTH = listNotificationsFor(th)
+    expect(forTH.some((n) => n.toRole === 'validador')).toBe(true)
+    expect(forTH.some((n) => n.title.includes('Pendiente validar'))).toBe(true)
+    expect(forTH.every((n) => n.toRole === 'validador')).toBe(true)
+
+    const beforeJefe = listNotificationsFor(jefe).length
+    const beforeAdm = listNotificationsFor(admisiones).length
+
+    const validated = validateLeave(pending.id, th)
+    expect(validated.status).toBe('activo')
+    expect(validated.validatedByName).toBe(th.name)
+    expect(getLeave(pending.id)?.status).toBe('activo')
+
+    notifyLeaveValidatedByTH({
+      unitName: validated.unitName,
+      staffName: validated.staffName,
+      kindLabel: 'Vacaciones',
+      startDate: validated.startDate,
+      endDate: validated.endDate,
+      authorizedHours: validated.authorizedHours,
+      absenceCode: validated.absenceCode,
+      validatedBy: th.name,
+    })
+
+    const forJefe = listNotificationsFor(jefe)
+    const forAdm = listNotificationsFor(admisiones)
+    expect(forJefe.length).toBeGreaterThan(beforeJefe)
+    expect(forAdm.length).toBeGreaterThan(beforeAdm)
+    expect(
+      forJefe.some(
+        (n) =>
+          n.toRole === 'lider_servicio' &&
+          n.title.includes('validado por TH'),
+      ),
+    ).toBe(true)
+    expect(
+      forAdm.some(
+        (n) => n.toRole === 'admisiones' && n.body.includes('Dra. Flujo'),
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('FirmaEC PKCS#12 local', () => {

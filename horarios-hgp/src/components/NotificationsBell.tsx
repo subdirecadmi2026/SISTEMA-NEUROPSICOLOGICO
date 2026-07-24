@@ -20,7 +20,9 @@ function canSeeNotifications(user: AppUser | null): boolean {
   return (
     isJefeRole(user.role) ||
     user.role === 'admin' ||
-    user.role === 'admisiones'
+    user.role === 'admisiones' ||
+    user.role === 'validador' ||
+    user.role === 'talento_humano'
   )
 }
 
@@ -57,9 +59,11 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
   const panelTitle =
     user?.role === 'admisiones'
       ? 'Avisos Admisiones'
-      : user?.role === 'admin'
-        ? 'Avisos'
-        : 'Avisos del servicio'
+      : user?.role === 'validador' || user?.role === 'talento_humano'
+        ? 'Avisos Talento Humano'
+        : user?.role === 'admin'
+          ? 'Avisos'
+          : 'Avisos del servicio'
 
   return (
     <div className="relative">
@@ -102,7 +106,9 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
               <li className="px-3 py-6 text-center text-sm text-muted">
                 {user?.role === 'admisiones'
                   ? 'Sin avisos de Talento Humano'
-                  : 'Sin avisos'}
+                  : user?.role === 'validador' || user?.role === 'talento_humano'
+                    ? 'Sin permisos pendientes de jefes'
+                    : 'Sin avisos'}
               </li>
             ) : (
               items.slice(0, 20).map((n) => (
@@ -116,7 +122,11 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
                   <p className="mt-0.5 text-xs text-ink">{n.body}</p>
                   <p className="mt-1 text-[10px] text-muted">
                     {new Date(n.createdAt).toLocaleString('es-EC')}
-                    {n.toRole === 'admisiones' ? ' · Admisiones' : ''}
+                    {n.toRole === 'admisiones'
+                      ? ' · Admisiones'
+                      : n.toRole === 'validador'
+                        ? ' · TH'
+                        : ''}
                   </p>
                   {!n.read && (
                     <button

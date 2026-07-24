@@ -7,6 +7,7 @@ import {
   LEAVE_HOUR_PRESETS,
   LEAVE_KINDS,
   LEAVE_KIND_LABEL,
+  LEAVE_STATUS_LABEL,
   type LeaveKind,
   type StaffLeave,
   cancelLeave,
@@ -21,8 +22,13 @@ import {
   leavesSummary,
   listLeaves,
   upsertLeave,
+  validateLeave,
 } from '../lib/leavesStore'
-import { notifyLeaveRegisteredForRoles, notifyLeaveChangedForRoles } from '../lib/notifications'
+import {
+  notifyLeaveChangedForRoles,
+  notifyValidadorLeavePending,
+  notifyLeaveValidatedByTH,
+} from '../lib/notifications'
 
 type Props = {
   user: AppUser
@@ -104,7 +110,9 @@ export function PermisosVacacionesPanel({
   const isTH = variant === 'talento_humano'
   const [tick, setTick] = useState(0)
   const [filter, setFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'activo' | 'all'>('activo')
+  const [statusFilter, setStatusFilter] = useState<
+    'activo' | 'pendiente' | 'all'
+  >(isTH ? 'pendiente' : 'all')
   /** TH puede ver todas las unidades; servicio queda en su unidad. */
   const [scopeAll, setScopeAll] = useState(isTH)
   const [detailLeave, setDetailLeave] = useState<StaffLeave | null>(null)
@@ -127,6 +135,7 @@ export function PermisosVacacionesPanel({
 
   useEffect(() => {
     setScopeAll(isTH)
+    setStatusFilter(isTH ? 'pendiente' : 'all')
   }, [isTH])
 
   useEffect(() => {
@@ -304,6 +313,7 @@ export function PermisosVacacionesPanel({
           return
         }
       }
+      const leaveStatus = isTH ? 'activo' : 'pendiente'
       const saved = upsertLeave(
         {
           id: form.id,
@@ -318,37 +328,55 @@ export function PermisosVacacionesPanel({
           authorizedHours: form.authorizedHours,
           hoursPerDay: form.hoursPerDay,
           notes: form.notes,
-          status: 'activo',
+          status: form.id ? undefined : leaveStatus,
         },
         user,
       )
+      const daysLabel = formatLeaveDaysAndHours(
+        saved.authorizedHours,
+        saved.hoursPerDay,
+        inclusiveDayCount(saved.startDate, saved.endDate),
+      )
       if (!form.id) {
-        notifyLeaveRegisteredForRoles({
-          unitName: saved.unitName,
-          staffName: saved.staffName,
-          kindLabel: LEAVE_KIND_LABEL[saved.kind],
-          startDate: saved.startDate,
-          endDate: saved.endDate,
-          authorizedHours: saved.authorizedHours,
-          absenceCode: saved.absenceCode,
-          registeredBy: user.name,
-          notifyAdmisiones: isTH,
-          daysLabel: formatLeaveDaysAndHours(
-            saved.authorizedHours,
-            saved.hoursPerDay,
-            inclusiveDayCount(saved.startDate, saved.endDate),
-          ),
-        })
+        if (isTH) {
+          // TH registra ya validado → avisa jefe + admisiones
+          notifyLeaveValidatedByTH({
+            unitName: saved.unitName,
+            staffName: saved.staffName,
+            kindLabel: LEAVE_KIND_LABEL[saved.kind],
+            startDate: saved.startDate,
+            endDate: saved.endDate,
+            authorizedHours: saved.authorizedHours,
+            absenceCode: saved.absenceCode,
+            validatedBy: user.name,
+            daysLabel,
+          })
+        } else {
+          // Jefe envía a TH para validar
+          notifyValidadorLeavePending({
+            unitName: saved.unitName,
+            staffName: saved.staffName,
+            kindLabel: LEAVE_KIND_LABEL[saved.kind],
+            startDate: saved.startDate,
+            endDate: saved.endDate,
+            authorizedHours: saved.authorizedHours,
+            absenceCode: saved.absenceCode,
+            submittedBy: user.name,
+            daysLabel,
+          })
+        }
         onNotify?.()
       }
       onFlash(
         form.id
           ? 'Permiso actualizado'
           : isTH
-            ? `${LEAVE_KIND_LABEL[saved.kind]} registradas · aviso a Jefe y Admisiones`
-            : `${LEAVE_KIND_LABEL[saved.kind]} registradas · aviso al jefe`,
+            ? `${LEAVE_KIND_LABEL[saved.kind]} validado · aviso a Jefe y Admisiones`
+            : `${LEAVE_KIND_LABEL[saved.kind]} enviado a Talento Humano para validar`,
       )
-      onApplyLeaveToSchedule?.()
+      if (saved.status === 'activo') {
+        onApplyLeaveToSchedule?.()
+      }
       if (form.id) {
         notifyLeaveChangedForRoles({
           unitName: saved.unitName,
@@ -356,7 +384,7 @@ export function PermisosVacacionesPanel({
           kindLabel: LEAVE_KIND_LABEL[saved.kind],
           action: 'actualizado',
           by: user.name,
-          notifyAdmisiones: isTH,
+          notifyAdmisiones: isTH && saved.status === 'activo',
         })
         onNotify?.()
       }
@@ -364,6 +392,37 @@ export function PermisosVacacionesPanel({
       refresh()
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo guardar')
+    }
+  }
+
+  function approvePending(l: StaffLeave) {
+    try {
+      const saved = validateLeave(l.id, user)
+      const daysLabel = formatLeaveDaysAndHours(
+        saved.authorizedHours,
+        saved.hoursPerDay,
+        inclusiveDayCount(saved.startDate, saved.endDate),
+      )
+      notifyLeaveValidatedByTH({
+        unitName: saved.unitName,
+        staffName: saved.staffName,
+        kindLabel: LEAVE_KIND_LABEL[saved.kind],
+        startDate: saved.startDate,
+        endDate: saved.endDate,
+        authorizedHours: saved.authorizedHours,
+        absenceCode: saved.absenceCode,
+        validatedBy: user.name,
+        daysLabel,
+      })
+      onNotify?.()
+      setDetailLeave(null)
+      refresh()
+      onFlash(
+        `${LEAVE_KIND_LABEL[saved.kind]} validado · aviso a Jefe y Admisiones`,
+      )
+      onApplyLeaveToSchedule?.()
+    } catch (e) {
+      onFlash(e instanceof Error ? e.message : 'No se pudo validar')
     }
   }
 
@@ -433,14 +492,15 @@ export function PermisosVacacionesPanel({
         </p>
         <p className="text-sm text-ink">
           {isTH
-            ? 'Visualice permisos y vacaciones por días y horas según la jornada del personal (hasta 24 h). Puede corregir registros institucionales.'
-            : 'Registre vacaciones y permisos. Se calculan días del rango y horas = días × jornada (8, 12, 13 o 24 h según la clave).'}
+            ? 'Valide los permisos enviados por jefes. Al validar, se notifica al jefe del servicio y a Admisiones. También puede registrar permisos ya validados.'
+            : 'Registre vacaciones y permisos: se envían a Talento Humano para validar. Al validarse, usted y Admisiones reciben aviso. Horas = días × jornada (8–24 h).'}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { label: 'Activos', value: String(summary.activos) },
+          { label: 'Pendientes TH', value: String(summary.pendientes) },
+          { label: 'Validados', value: String(summary.activos) },
           { label: 'Vacaciones', value: String(summary.vacaciones) },
           { label: 'Permisos', value: String(summary.permisos) },
           {
@@ -482,8 +542,8 @@ export function PermisosVacacionesPanel({
             </h2>
             <p className="mt-1 text-xs text-muted">
               {isTH
-                ? 'Puede filtrar por unidad o ver todo el hospital.'
-                : 'Las horas marcadas en planilla se comparan con las autorizadas.'}
+                ? 'Pendientes llegan del jefe; al validar avisa a jefe y Admisiones.'
+                : 'Al guardar se envía a Talento Humano. Queda pendiente hasta su validación.'}
             </p>
           </div>
           {form.id ? (
@@ -779,7 +839,11 @@ export function PermisosVacacionesPanel({
             onClick={save}
             className="rounded-xl bg-teal px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110"
           >
-            {form.id ? 'Guardar cambios' : 'Registrar permiso'}
+            {form.id
+              ? 'Guardar cambios'
+              : isTH
+                ? 'Registrar y validar'
+                : 'Enviar a Talento Humano'}
           </button>
           <button
             type="button"
@@ -820,10 +884,13 @@ export function PermisosVacacionesPanel({
               className="rounded-lg border border-line px-2 py-1.5 text-xs"
               value={statusFilter}
               onChange={(e) =>
-                setStatusFilter(e.target.value as 'activo' | 'all')
+                setStatusFilter(
+                  e.target.value as 'activo' | 'pendiente' | 'all',
+                )
               }
             >
-              <option value="activo">Activos</option>
+              <option value="pendiente">Pendientes TH</option>
+              <option value="activo">Validados</option>
               <option value="all">Todos</option>
             </select>
             <input
@@ -838,50 +905,77 @@ export function PermisosVacacionesPanel({
         <ul className="max-h-[36rem] space-y-2 overflow-y-auto">
           {visible.map((l) => (
             <li key={l.id}>
-              <button
-                type="button"
-                onClick={() => setDetailLeave(l)}
-                className="group w-full rounded-xl border border-line bg-gradient-to-b from-white to-sand/20 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-md"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-navy group-hover:text-teal">
-                      {l.staffName}
-                    </p>
-                    <p className="text-[11px] text-muted">
-                      {LEAVE_KIND_LABEL[l.kind]} · clave{' '}
-                      <strong className="text-teal">{l.absenceCode}</strong> ·{' '}
-                      {l.startDate} → {l.endDate}
-                    </p>
-                    <p className="mt-0.5 text-xs text-ink">
-                      <strong>
-                        {formatLeaveDaysAndHours(
-                          l.authorizedHours,
-                          l.hoursPerDay,
-                          inclusiveDayCount(l.startDate, l.endDate),
-                        )}
-                      </strong>{' '}
-                      · {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
-                      {l.unitName}
-                      {l.status === 'cancelado' ? ' · cancelado' : ''}
-                      {l.createdByName ? ` · por ${l.createdByName}` : ''}
-                    </p>
-                    {l.notes ? (
-                      <p className="mt-1 line-clamp-1 text-[11px] text-muted">
-                        {l.notes}
+              <div className="rounded-xl border border-line bg-gradient-to-b from-white to-sand/20 transition hover:border-teal/40 hover:shadow-md">
+                <button
+                  type="button"
+                  onClick={() => setDetailLeave(l)}
+                  className="group w-full px-3 py-2.5 text-left"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-navy group-hover:text-teal">
+                          {l.staffName}
+                        </p>
+                        <span
+                          className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                            l.status === 'pendiente'
+                              ? 'bg-amber-100 text-amber-900'
+                              : l.status === 'cancelado'
+                                ? 'bg-rose-100 text-rose-900'
+                                : 'bg-teal/15 text-teal'
+                          }`}
+                        >
+                          {LEAVE_STATUS_LABEL[l.status]}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted">
+                        {LEAVE_KIND_LABEL[l.kind]} · clave{' '}
+                        <strong className="text-teal">{l.absenceCode}</strong> ·{' '}
+                        {l.startDate} → {l.endDate}
                       </p>
-                    ) : null}
+                      <p className="mt-0.5 text-xs text-ink">
+                        <strong>
+                          {formatLeaveDaysAndHours(
+                            l.authorizedHours,
+                            l.hoursPerDay,
+                            inclusiveDayCount(l.startDate, l.endDate),
+                          )}
+                        </strong>{' '}
+                        · {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
+                        {l.unitName}
+                        {l.createdByName ? ` · por ${l.createdByName}` : ''}
+                      </p>
+                      {l.notes ? (
+                        <p className="mt-1 line-clamp-1 text-[11px] text-muted">
+                          {l.notes}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 rounded-md bg-navy/5 px-2 py-1 text-[10px] font-semibold text-navy group-hover:bg-teal/15 group-hover:text-teal">
+                      Ver detalle →
+                    </span>
                   </div>
-                  <span className="shrink-0 rounded-md bg-navy/5 px-2 py-1 text-[10px] font-semibold text-navy group-hover:bg-teal/15 group-hover:text-teal">
-                    Ver detalle →
-                  </span>
-                </div>
-              </button>
+                </button>
+                {isTH && l.status === 'pendiente' ? (
+                  <div className="flex justify-end border-t border-line/70 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => approvePending(l)}
+                      className="rounded-lg bg-teal px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal/90"
+                    >
+                      Validar · avisar Jefe y Admisiones
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </li>
           ))}
           {visible.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-3 py-8 text-center text-sm text-muted">
-              Aún no hay permisos registrados para esta unidad.
+              {statusFilter === 'pendiente'
+                ? 'No hay permisos pendientes de validación.'
+                : 'Aún no hay permisos registrados para esta unidad.'}
             </p>
           ) : null}
         </ul>
@@ -1005,8 +1099,8 @@ export function PermisosVacacionesPanel({
                 <dt className="text-[10px] font-bold uppercase text-muted">
                   Estado
                 </dt>
-                <dd className="text-sm font-semibold capitalize text-navy">
-                  {detailLeave.status}
+                <dd className="text-sm font-semibold text-navy">
+                  {LEAVE_STATUS_LABEL[detailLeave.status]}
                 </dd>
               </div>
               <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
@@ -1017,6 +1111,19 @@ export function PermisosVacacionesPanel({
                   {detailLeave.createdByName || '—'}
                 </dd>
               </div>
+              {detailLeave.validatedByName ? (
+                <div className="rounded-xl border border-teal/25 bg-teal/5 px-3 py-2 sm:col-span-2">
+                  <dt className="text-[10px] font-bold uppercase text-teal">
+                    Validado por TH
+                  </dt>
+                  <dd className="text-sm font-semibold text-navy">
+                    {detailLeave.validatedByName}
+                    {detailLeave.validatedAt
+                      ? ` · ${new Date(detailLeave.validatedAt).toLocaleString('es-EC')}`
+                      : ''}
+                  </dd>
+                </div>
+              ) : null}
               <div className="rounded-xl border border-line bg-sand/20 px-3 py-2 sm:col-span-2">
                 <dt className="text-[10px] font-bold uppercase text-muted">
                   Observación
@@ -1044,6 +1151,15 @@ export function PermisosVacacionesPanel({
             </dl>
 
             <div className="mt-5 flex flex-wrap gap-2">
+              {isTH && detailLeave.status === 'pendiente' ? (
+                <button
+                  type="button"
+                  onClick={() => approvePending(detailLeave)}
+                  className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Validar · avisar Jefe y Admisiones
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
@@ -1055,7 +1171,8 @@ export function PermisosVacacionesPanel({
               >
                 Editar en formulario
               </button>
-              {detailLeave.status === 'activo' ? (
+              {detailLeave.status === 'activo' ||
+              detailLeave.status === 'pendiente' ? (
                 <button
                   type="button"
                   onClick={() => {

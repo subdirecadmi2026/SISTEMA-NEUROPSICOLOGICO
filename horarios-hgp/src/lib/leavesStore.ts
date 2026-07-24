@@ -13,7 +13,7 @@ export type LeaveKind =
   | 'capacitacion'
   | 'otro'
 
-export type LeaveStatus = 'activo' | 'cancelado'
+export type LeaveStatus = 'pendiente' | 'activo' | 'cancelado'
 
 export type StaffLeave = {
   id: string
@@ -38,6 +38,16 @@ export type StaffLeave = {
   updatedAt: string
   createdBy?: string
   createdByName?: string
+  /** Quién validó en Talento Humano (pasa a activo). */
+  validatedBy?: string
+  validatedByName?: string
+  validatedAt?: string
+}
+
+export const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
+  pendiente: 'Pendiente TH',
+  activo: 'Validado',
+  cancelado: 'Cancelado',
 }
 
 export const LEAVE_KIND_LABEL: Record<LeaveKind, string> = {
@@ -384,6 +394,35 @@ export function upsertLeave(
   return created
 }
 
+/** Talento Humano valida un permiso pendiente → queda activo. */
+export function validateLeave(
+  id: string,
+  actor?: AppUser | null,
+): StaffLeave {
+  const all = readAll()
+  const idx = all.findIndex((l) => l.id === id)
+  if (idx < 0) throw new Error('Permiso no encontrado')
+  const prev = all[idx]
+  if (prev.status === 'cancelado') {
+    throw new Error('No se puede validar un permiso cancelado')
+  }
+  if (prev.status === 'activo') {
+    return prev
+  }
+  const now = new Date().toISOString()
+  all[idx] = {
+    ...prev,
+    status: 'activo',
+    updatedAt: now,
+    validatedBy: actor?.id,
+    validatedByName: actor?.name,
+    validatedAt: now,
+  }
+  writeAll(all)
+  queueRemoteLeavesPush(all)
+  return all[idx]
+}
+
 export function cancelLeave(id: string): StaffLeave {
   const all = readAll()
   const idx = all.findIndex((l) => l.id === id)
@@ -417,7 +456,7 @@ export function findOverlappingLeaves(
   if (!start || !end) return []
   const nameKey = input.staffName.trim().toLowerCase()
   return readAll().filter((l) => {
-    if (l.status !== 'activo') return false
+    if (l.status !== 'activo' && l.status !== 'pendiente') return false
     if (input.id && l.id === input.id) return false
     if (l.unitName !== input.unitName) return false
     const samePerson =
@@ -438,6 +477,7 @@ export function leavesSummary(opts?: {
 }): {
   total: number
   activos: number
+  pendientes: number
   vacaciones: number
   permisos: number
   horasAutorizadas: number
@@ -450,9 +490,11 @@ export function leavesSummary(opts?: {
     status: opts?.status ?? 'all',
   })
   const activos = list.filter((l) => l.status === 'activo')
+  const pendientes = list.filter((l) => l.status === 'pendiente')
   return {
     total: list.length,
     activos: activos.length,
+    pendientes: pendientes.length,
     vacaciones: activos.filter((l) => l.kind === 'vacaciones').length,
     permisos: activos.filter((l) => l.kind !== 'vacaciones').length,
     horasAutorizadas: activos.reduce((s, l) => s + l.authorizedHours, 0),
