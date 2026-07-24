@@ -495,77 +495,85 @@ export function ValidadorWorkspace({
           variant="talento_humano"
         />
       ) : module === 'archivo' ? (
-        archivedBySpecialty.length === 0 ? (
+        archived.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-12 text-center text-sm text-muted">
             Aún no hay horarios validados. Valide desde Pendientes.
           </p>
         ) : (
-          <div className="space-y-5">
-            {archivedBySpecialty.map(([specialty, list]) => (
-              <section key={specialty}>
-                <div className="mb-2 flex items-end justify-between gap-2 border-b border-line/80 pb-1.5">
-                  <div>
-                    <h2 className="font-display text-lg leading-tight text-navy">
-                      {specialty}
-                    </h2>
-                    <p className="text-[11px] text-muted">
-                      Carpeta · {list.length} validado
-                      {list.length === 1 ? '' : 's'}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                  {list.map((s) => (
-                    <article
-                      key={s.id}
-                      className="group relative flex min-h-[7.25rem] flex-col overflow-hidden rounded-xl border border-line bg-gradient-to-b from-white to-sand/30 p-2.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-teal/45 hover:shadow-md"
+          <div>
+            <div className="mb-5 flex flex-wrap items-center gap-3">
+              <h2 className="font-display text-xl text-navy">Archivo validado</h2>
+              <span className="rounded-full bg-teal/15 px-2.5 py-0.5 text-xs font-bold text-teal">
+                {archived.length}
+              </span>
+              <div className="h-px min-w-[3rem] flex-1 bg-gradient-to-r from-teal/35 to-transparent" />
+              <p className="text-xs text-muted">
+                {archivedBySpecialty.length} especialidad
+                {archivedBySpecialty.length === 1 ? '' : 'es'} · firmados y sellados
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {archived.map((s) => (
+                <article
+                  key={s.id}
+                  className="group flex min-h-[12rem] flex-col overflow-hidden rounded-2xl border border-teal/20 bg-gradient-to-b from-white via-white to-teal/[0.06] shadow-sm transition duration-200 hover:-translate-y-1 hover:border-teal/45 hover:shadow-md"
+                >
+                  <div
+                    className="h-1.5 w-full bg-gradient-to-r from-navy via-teal to-teal-soft"
+                    aria-hidden
+                  />
+                  <div className="flex flex-1 flex-col p-4">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <span className="rounded-md bg-sand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-navy">
+                        {s.serviceType === 'enfermeria'
+                          ? 'Enfermería'
+                          : 'Médico'}
+                      </span>
+                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-100">
+                        Validado
+                      </span>
+                    </div>
+
+                    <h3
+                      className="font-display text-lg leading-snug text-navy line-clamp-2 transition group-hover:text-teal"
+                      title={s.unitName}
                     >
-                      <div
-                        className="absolute inset-x-0 top-0 h-0.5 bg-teal/70"
-                        aria-hidden
-                      />
-                      <div className="flex items-center justify-between gap-1 pt-0.5">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-teal">
-                          {s.serviceType === 'enfermeria' ? 'Enf' : 'Med'}
-                        </span>
-                        <span className="text-[9px] font-semibold text-emerald-800">
-                          ✓
-                        </span>
-                      </div>
-                      <h3 className="mt-1 truncate font-display text-[0.95rem] leading-snug text-navy">
-                        {MONTHS_ES[s.month - 1]}
-                        <span className="ml-1 font-sans text-[11px] font-semibold text-muted">
-                          {s.year}
-                        </span>
-                      </h3>
-                      <p className="mt-0.5 text-[10px] tabular-nums text-muted">
-                        {new Date(s.updatedAt).toLocaleDateString('es-EC', {
-                          day: '2-digit',
-                          month: 'short',
-                        })}
-                      </p>
-                      <div className="mt-auto flex gap-1 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => void openCard(s.id)}
-                          className="flex-1 rounded-md border border-line/90 bg-white px-1.5 py-1 text-[10px] font-semibold text-navy hover:bg-sand"
-                        >
-                          Ver
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void redownloadPdf(s.id)}
-                          className="flex-1 rounded-md bg-teal px-1.5 py-1 text-[10px] font-semibold text-white hover:brightness-110 disabled:opacity-50"
-                        >
-                          PDF
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ))}
+                      {s.unitName}
+                    </h3>
+                    <p className="mt-1.5 text-sm font-semibold text-ink">
+                      {MONTHS_ES[s.month - 1]} {s.year}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted">
+                      Actualizado{' '}
+                      {new Date(s.updatedAt).toLocaleDateString('es-EC', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+
+                    <div className="mt-auto flex gap-2 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => void openCard(s.id)}
+                        className="flex-1 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-navy transition hover:bg-sand"
+                      >
+                        Ver horario
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void redownloadPdf(s.id)}
+                        className="flex-1 rounded-xl bg-teal px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+                      >
+                        Descargar PDF
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         )
       ) : cards.length === 0 ? (
@@ -573,32 +581,36 @@ export function ValidadorWorkspace({
           No hay horarios pendientes de validación.
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((s, i) => (
             <button
               key={s.id}
               type="button"
               onClick={() => void openCard(s.id)}
-              className={`group rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-md ${
+              className={`group relative overflow-hidden rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-teal/40 hover:shadow-lg ${
                 selectedId === s.id
                   ? 'border-navy ring-2 ring-navy/15'
                   : 'border-line'
               }`}
             >
-              <span className="float-right rounded-full bg-sand px-2 py-0.5 text-[10px] font-bold text-muted">
+              <div
+                className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-navy to-teal"
+                aria-hidden
+              />
+              <span className="absolute right-3 top-4 rounded-full bg-sand px-2 py-0.5 text-[10px] font-bold text-muted">
                 #{i + 1}
               </span>
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
                 {s.serviceType === 'enfermeria' ? 'Enfermería' : 'Médico'}
               </p>
-              <h2 className="mt-1 font-display text-xl text-navy group-hover:text-teal">
+              <h2 className="mt-2 pr-8 font-display text-xl leading-snug text-navy group-hover:text-teal">
                 {s.unitName}
               </h2>
               <p className="mt-1 text-sm text-ink">
                 {MONTHS_ES[s.month - 1]} {s.year}
               </p>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-950">
+              <div className="mt-5 flex items-center justify-between">
+                <span className="rounded-md bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-100">
                   {s.status ? STATUS_LABEL[s.status] : '—'}
                 </span>
                 <span className="text-sm font-semibold text-navy">
