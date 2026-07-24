@@ -376,8 +376,8 @@ export function PermisosVacacionesPanel({
         </p>
         <p className="text-sm text-ink">
           {isTH
-            ? 'Visualice todos los permisos y vacaciones registrados por los servicios. Puede corregir o completar registros institucionales.'
-            : 'Registre aquí las vacaciones y permisos temporales de su personal. Al llenar el horario se validarán las horas. Talento Humano también los visualizará.'}
+            ? 'Visualice todos los permisos y vacaciones registrados por los servicios. Puede corregir o completar registros institucionales. Las horas/día siguen el turno del personal (hasta 24 h).'
+            : 'Registre aquí las vacaciones y permisos temporales de su personal. Al elegir a alguien se cargan las horas de su clave (8, 12, 13 o 24 h). Talento Humano también los visualizará.'}
         </p>
       </div>
 
