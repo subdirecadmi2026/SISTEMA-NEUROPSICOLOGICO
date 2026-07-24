@@ -15,9 +15,12 @@ import {
 } from '../lib/auth'
 import {
   ALL_ROLES,
+  ADMIN_CREATE_ROLES,
   type ManagedUser,
   deleteManagedUser,
+  isPrimaryLoginId,
   listManagedUsers,
+  loginPortalLabel,
   restoreDemoUsers,
   upsertManagedUser,
 } from '../lib/usersStore'
@@ -85,6 +88,7 @@ const emptyUserForm = () => ({
   role: 'lider_servicio' as UserRole,
   serviceUnitsText: '',
   password: '',
+  passwordConfirm: '',
 })
 
 /**
@@ -177,6 +181,7 @@ export function AdminWorkspace({
       role: u.role,
       serviceUnitsText: u.serviceUnits.join(', '),
       password: '',
+      passwordConfirm: '',
     })
     setTab('perfiles')
   }
@@ -187,7 +192,20 @@ export function AdminWorkspace({
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
-      upsertManagedUser({
+      if (!editingId) {
+        if (form.password.trim().length < 6) {
+          onFlash('La contraseña debe tener al menos 6 caracteres')
+          return
+        }
+        if (form.password !== form.passwordConfirm) {
+          onFlash('Las contraseñas no coinciden')
+          return
+        }
+      } else if (form.password.trim() && form.password !== form.passwordConfirm) {
+        onFlash('Las contraseñas no coinciden')
+        return
+      }
+      const saved = upsertManagedUser({
         id: editingId || undefined,
         name: form.name,
         email: form.email,
@@ -198,7 +216,13 @@ export function AdminWorkspace({
       refreshUsers()
       setForm(emptyUserForm())
       setEditingId(null)
-      onFlash(editingId ? 'Usuario actualizado' : 'Usuario creado')
+      if (editingId) {
+        onFlash('Usuario actualizado')
+      } else {
+        onFlash(
+          `Usuario creado: ${saved.email} · login con tarjeta «${loginPortalLabel(saved.role)}»`,
+        )
+      }
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo guardar')
     }
@@ -209,6 +233,10 @@ export function AdminWorkspace({
       onFlash('No puede eliminar su propia sesión activa')
       return
     }
+    if (isPrimaryLoginId(id)) {
+      onFlash('Los perfiles de acceso del sistema no se pueden eliminar')
+      return
+    }
     if (!window.confirm('¿Eliminar este usuario?')) return
     try {
       deleteManagedUser(id)
@@ -217,6 +245,17 @@ export function AdminWorkspace({
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo eliminar')
     }
+  }
+
+  function toggleUnitChip(unit: string) {
+    const cur = form.serviceUnitsText
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const next = cur.includes(unit)
+      ? cur.filter((u) => u !== unit)
+      : [...cur, unit]
+    setForm((f) => ({ ...f, serviceUnitsText: next.join(', ') }))
   }
 
   return (
@@ -267,7 +306,8 @@ export function AdminWorkspace({
           <div>
             <h2 className="font-display text-lg text-navy">Horarios</h2>
             <p className="text-xs text-muted">
-              Totales por estado del flujo Jefe → Revisor → Validador
+              Totales por estado del flujo Jefe → Admisiones + Revisor →
+              Validador
             </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {(
@@ -292,7 +332,7 @@ export function AdminWorkspace({
                   },
                   {
                     label: 'Revisados',
-                    hint: 'Aprobados por revisor',
+                    hint: 'Aprobados (Admisiones + Revisor)',
                     value: counts.revisados,
                     accent: 'border-sky-200 bg-sky-50',
                   },
@@ -322,7 +362,7 @@ export function AdminWorkspace({
             </div>
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
               <span className="rounded-lg border border-line bg-white px-2.5 py-1">
-                En revisión (revisor):{' '}
+                En revisión (Admisiones/Revisor):{' '}
                 <strong className="text-navy">{counts.enRevision}</strong>
               </span>
               <span className="rounded-lg border border-line bg-white px-2.5 py-1">
@@ -384,21 +424,26 @@ export function AdminWorkspace({
         <section className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
           <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
             <h2 className="font-display text-lg text-navy">
-              {editingId ? 'Editar perfil' : 'Nuevo perfil'}
+              {editingId ? 'Editar usuario' : 'Crear usuario'}
             </h2>
+            <p className="mt-1 text-xs text-muted">
+              Los usuarios se crean aquí. Al iniciar sesión deben elegir la
+              tarjeta de su rol e ingresar su correo y contraseña.
+            </p>
             <div className="mt-3 space-y-2">
               <label className="block text-xs font-semibold text-muted">
-                Nombre
+                Nombre completo
                 <input
                   className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
                   value={form.name}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
+                  placeholder="Lic. Nombre Apellido"
                 />
               </label>
               <label className="block text-xs font-semibold text-muted">
-                Correo
+                Correo institucional
                 <input
                   type="email"
                   className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
@@ -406,10 +451,11 @@ export function AdminWorkspace({
                   onChange={(e) =>
                     setForm((f) => ({ ...f, email: e.target.value }))
                   }
+                  placeholder="usuario@hgp.gob.ec"
                 />
               </label>
               <label className="block text-xs font-semibold text-muted">
-                Rol
+                Rol / perfil de acceso
                 <select
                   className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
                   value={form.role}
@@ -420,29 +466,64 @@ export function AdminWorkspace({
                     }))
                   }
                 >
-                  {ALL_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABEL[r]}
-                    </option>
-                  ))}
+                  <optgroup label="Roles principales">
+                    {ADMIN_CREATE_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Roles adicionales">
+                    {ALL_ROLES.filter((r) => !ADMIN_CREATE_ROLES.includes(r)).map(
+                      (r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABEL[r]}
+                        </option>
+                      ),
+                    )}
+                  </optgroup>
                 </select>
               </label>
+              <p className="text-[11px] text-muted">
+                Tarjeta de login:{' '}
+                <strong className="text-navy">
+                  {loginPortalLabel(form.role)}
+                </strong>
+              </p>
+              {(form.role === 'lider_servicio' || form.role === 'admin') && (
+                <div>
+                  <p className="text-xs font-semibold text-muted">
+                    Servicios a cargo
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {[...listUnits('medico'), ...listUnits('enfermeria')].map(
+                      (u) => {
+                        const on = form.serviceUnitsText
+                          .split(',')
+                          .map((s) => s.trim())
+                          .includes(u)
+                        return (
+                          <button
+                            key={u}
+                            type="button"
+                            onClick={() => toggleUnitChip(u)}
+                            className={`rounded-lg border px-2 py-1 text-[11px] font-semibold ${
+                              on
+                                ? 'border-navy bg-navy text-white'
+                                : 'border-line bg-white text-navy hover:bg-sand'
+                            }`}
+                          >
+                            {u}
+                          </button>
+                        )
+                      },
+                    )}
+                  </div>
+                </div>
+              )}
               <label className="block text-xs font-semibold text-muted">
-                Servicios a cargo (separados por coma)
-                <input
-                  className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
-                  value={form.serviceUnitsText}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      serviceUnitsText: e.target.value,
-                    }))
-                  }
-                  placeholder="Medicina interna, Pediatría"
-                />
-              </label>
-              <label className="block text-xs font-semibold text-muted">
-                Contraseña {editingId ? '(vacío = no cambiar)' : ''}
+                Contraseña{' '}
+                {editingId ? '(vacío = no cambiar)' : '(obligatoria)'}
                 <input
                   type="password"
                   className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
@@ -450,7 +531,21 @@ export function AdminWorkspace({
                   onChange={(e) =>
                     setForm((f) => ({ ...f, password: e.target.value }))
                   }
-                  placeholder={DEMO_PASSWORD}
+                  placeholder={editingId ? '••••••••' : 'Mínimo 6 caracteres'}
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-muted">
+                Confirmar contraseña
+                <input
+                  type="password"
+                  className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+                  value={form.passwordConfirm}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, passwordConfirm: e.target.value }))
+                  }
+                  placeholder="Repita la contraseña"
+                  autoComplete="new-password"
                 />
               </label>
               <div className="flex flex-wrap gap-2 pt-1">
@@ -459,7 +554,7 @@ export function AdminWorkspace({
                   onClick={saveUser}
                   className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white"
                 >
-                  {editingId ? 'Guardar cambios' : 'Crear perfil'}
+                  {editingId ? 'Guardar cambios' : 'Crear usuario'}
                 </button>
                 {editingId ? (
                   <button
@@ -480,54 +575,65 @@ export function AdminWorkspace({
           <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-lg text-navy">
-                Perfiles ({users.length})
+                Usuarios ({users.length})
               </h2>
               <button
                 type="button"
                 onClick={() => {
                   restoreDemoUsers()
                   refreshUsers()
-                  onFlash('Usuarios demo restaurados')
+                  onFlash('Perfiles de acceso demo restaurados')
                 }}
                 className="text-xs font-semibold text-teal underline"
               >
-                Restaurar demo
+                Restaurar perfiles demo
               </button>
             </div>
-            <ul className="max-h-[28rem] space-y-2 overflow-y-auto">
-              {users.map((u) => (
-                <li
-                  key={u.id}
-                  className="flex flex-wrap items-center gap-2 rounded-xl border border-line px-3 py-2"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">
-                    {userInitials(u.name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-navy">
-                      {u.name}
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      {u.email} · {roleLabel(u.role)}
-                      {u.source === 'demo' ? ' · demo' : ''}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(u)}
-                    className="rounded-lg border border-line px-2 py-1 text-xs font-semibold"
+            <ul className="max-h-[32rem] space-y-2 overflow-y-auto">
+              {users.map((u) => {
+                const primary = isPrimaryLoginId(u.id)
+                return (
+                  <li
+                    key={u.id}
+                    className="flex flex-wrap items-center gap-2 rounded-xl border border-line px-3 py-2"
                   >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeUser(u.id)}
-                    className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-900"
-                  >
-                    Eliminar
-                  </button>
-                </li>
-              ))}
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">
+                      {userInitials(u.name)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-navy">
+                        {u.name}
+                        {primary ? (
+                          <span className="ml-1 rounded bg-sand px-1.5 py-0.5 text-[10px] font-bold text-muted">
+                            Acceso
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="truncate text-xs text-muted">
+                        {u.email} · {roleLabel(u.role)} · tarjeta{' '}
+                        {loginPortalLabel(u.role)}
+                        {u.password ? ' · con clave' : ' · clave demo'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(u)}
+                      className="rounded-lg border border-line px-2 py-1 text-xs font-semibold"
+                    >
+                      Editar
+                    </button>
+                    {!primary ? (
+                      <button
+                        type="button"
+                        onClick={() => removeUser(u.id)}
+                        className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-900"
+                      >
+                        Eliminar
+                      </button>
+                    ) : null}
+                  </li>
+                )
+              })}
             </ul>
           </div>
         </section>

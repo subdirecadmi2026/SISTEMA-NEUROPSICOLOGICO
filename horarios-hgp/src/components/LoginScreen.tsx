@@ -274,11 +274,13 @@ export function LoginScreen({ onLogin }: Props) {
                     role:
                       role.id === 'u-jefe'
                         ? 'lider_servicio'
-                        : role.id === 'u-revisor'
-                          ? 'revisor'
-                          : role.id === 'u-validador'
-                            ? 'validador'
-                            : 'admin',
+                        : role.id === 'u-admisiones'
+                          ? 'admisiones'
+                          : role.id === 'u-revisor'
+                            ? 'revisor'
+                            : role.id === 'u-validador'
+                              ? 'validador'
+                              : 'admin',
                     serviceUnits: [],
                   } as AppUser)
                 const Illu = role.Illustration
@@ -350,8 +352,11 @@ export function LoginScreen({ onLogin }: Props) {
                 Validar acceso
               </h2>
               <p className="mt-1 text-xs text-muted">
-                Ingrese usuario y contraseña del perfil seleccionado.
-                Demo: <code className="rounded bg-sand px-1 font-semibold">{DEMO_PASSWORD}</code>
+                Use el correo del usuario creado por el administrador. Los
+                perfiles demo usan:{' '}
+                <code className="rounded bg-sand px-1 font-semibold">
+                  {DEMO_PASSWORD}
+                </code>
               </p>
 
               <label className="mt-4 block text-xs font-semibold uppercase tracking-wider text-muted">

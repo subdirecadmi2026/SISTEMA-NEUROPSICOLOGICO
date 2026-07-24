@@ -339,18 +339,20 @@ export function ReviewCardsModule({
             </h2>
             <p className="mb-3 text-sm text-muted">
               {mode === 'admisiones'
-                ? 'Revise horario y distribución. Al firmar aparecerá el cuadro «Validado por Admisiones» con el nombre del jefe de servicio.'
+                ? 'Revise horario y distribución. Al firmar aparecerá el cuadro «Validado por Admisiones» debajo de feriados.'
                 : 'Revise la grilla. Debe aprobar también Admisiones para que pase al validador.'}
             </p>
-            {mode === 'revisor' && (
-              <textarea
-                className="mb-3 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm"
-                rows={3}
-                placeholder="Ej.: Día 12 sin cobertura nocturna; complete N1…"
-                value={correction}
-                onChange={(e) => setCorrection(e.target.value)}
-              />
-            )}
+            <textarea
+              className="mb-3 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm"
+              rows={3}
+              placeholder={
+                mode === 'admisiones'
+                  ? 'Comentario si devuelve al jefe…'
+                  : 'Ej.: Día 12 sin cobertura nocturna; complete N1…'
+              }
+              value={correction}
+              onChange={(e) => setCorrection(e.target.value)}
+            />
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -368,40 +370,22 @@ export function ReviewCardsModule({
                   ? 'Firmar · Validado por Admisiones'
                   : 'Firmar y aprobar'}
               </button>
-              {(mode === 'revisor' || mode === 'admisiones') && (
-                <button
-                  type="button"
-                  disabled={
-                    mode === 'revisor'
-                      ? correction.trim().length < 5
-                      : correction.trim().length < 5
-                  }
-                  onClick={() => {
-                    if (mode === 'admisiones' && correction.trim().length < 5) {
-                      onFlash('Escriba un comentario de al menos 5 caracteres')
-                      return
-                    }
-                    applyTransition('BORRADOR', {
-                      comment:
-                        correction.trim() ||
-                        'Devuelto por Admisiones para corrección',
-                    })
-                  }}
-                  className="rounded-xl border border-amber-700 bg-white px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-40"
-                >
-                  Devolver con comentario
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={correction.trim().length < 5}
+                onClick={() =>
+                  applyTransition('BORRADOR', { comment: correction })
+                }
+                className="rounded-xl border border-amber-700 bg-white px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-40"
+                title={
+                  correction.trim().length < 5
+                    ? 'Escriba un comentario de al menos 5 caracteres'
+                    : undefined
+                }
+              >
+                Devolver con comentario
+              </button>
             </div>
-            {mode === 'admisiones' && (
-              <textarea
-                className="mt-3 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm"
-                rows={2}
-                placeholder="Comentario si devuelve al jefe…"
-                value={correction}
-                onChange={(e) => setCorrection(e.target.value)}
-              />
-            )}
           </section>
         )}
 

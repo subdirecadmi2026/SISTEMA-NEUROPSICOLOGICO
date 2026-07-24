@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { AppUser } from '../types'
 import {
-  getDemoUsers,
-  loginAs,
+  DEMO_PASSWORD,
+  authenticateDemo,
   primaryDemoUsers,
   roleLabel,
   roleMission,
@@ -21,7 +21,8 @@ type Props = {
 }
 
 /**
- * Panel «Mi perfil»: datos de sesión, FirmaEC y cambio de usuario.
+ * Panel «Mi perfil»: datos de sesión y FirmaEC.
+ * Cambio de perfil requiere contraseña (no bypass).
  */
 export function ProfilePanel({
   user,
@@ -33,9 +34,30 @@ export function ProfilePanel({
   onFlash,
 }: Props) {
   const [switchOpen, setSwitchOpen] = useState(false)
+  const [targetId, setTargetId] = useState('')
+  const [switchPassword, setSwitchPassword] = useState('')
   const primary = primaryDemoUsers()
 
   if (!open) return null
+
+  function trySwitch() {
+    const target = primary.find((u) => u.id === targetId)
+    if (!target) {
+      onFlash('Seleccione un perfil')
+      return
+    }
+    const res = authenticateDemo(target.email, switchPassword, {
+      expectedUserId: target.id,
+    })
+    if (!res.ok) {
+      onFlash(res.error)
+      return
+    }
+    onSwitchUser(res.user)
+    setSwitchPassword('')
+    setTargetId('')
+    onClose()
+  }
 
   return (
     <div
@@ -124,70 +146,50 @@ export function ProfilePanel({
                 onClick={() => setSwitchOpen((v) => !v)}
                 className="text-xs font-semibold text-teal underline"
               >
-                {switchOpen ? 'Ocultar' : 'Ver perfiles'}
+                {switchOpen ? 'Ocultar' : 'Requiere contraseña'}
               </button>
             </div>
             {switchOpen ? (
-              <ul className="space-y-1 rounded-xl border border-line p-2">
-                {primary.map((u) => (
-                  <li key={u.id}>
-                    <button
-                      type="button"
-                      disabled={u.id === user.id}
-                      onClick={() => {
-                        onSwitchUser(loginAs(u))
-                        onClose()
-                      }}
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-sand disabled:opacity-40"
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-xs font-bold text-white">
-                        {userInitials(u.name)}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-navy">
-                          {roleLabel(u.role).replace(' (visualización)', '')}
-                        </span>
-                        <span className="block truncate text-xs text-muted">
-                          {u.name}
-                        </span>
-                      </span>
-                      {u.id === user.id ? (
-                        <span className="text-[10px] font-bold text-teal">
-                          Actual
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-                <li className="border-t border-line pt-1">
-                  <label className="block px-2 py-1 text-[10px] font-semibold uppercase text-muted">
-                    Otro usuario
-                    <select
-                      className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs"
-                      defaultValue=""
-                      onChange={(e) => {
-                        const u = getDemoUsers().find((x) => x.id === e.target.value)
-                        if (u) {
-                          onSwitchUser(loginAs(u))
-                          onClose()
-                        }
-                      }}
-                    >
-                      <option value="" disabled>
-                        Elegir…
-                      </option>
-                      {getDemoUsers()
-                        .filter(
-                        (u) => !primary.some((p) => p.id === u.id),
-                      ).map((u) => (
+              <div className="space-y-2 rounded-xl border border-line p-3">
+                <p className="text-[11px] text-muted">
+                  Debe validar la contraseña del perfil destino (demo:{' '}
+                  {DEMO_PASSWORD}).
+                </p>
+                <label className="block text-xs font-semibold text-muted">
+                  Perfil
+                  <select
+                    className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm"
+                    value={targetId}
+                    onChange={(e) => setTargetId(e.target.value)}
+                  >
+                    <option value="">Elegir…</option>
+                    {primary
+                      .filter((u) => u.id !== user.id)
+                      .map((u) => (
                         <option key={u.id} value={u.id}>
-                          {u.name} · {roleLabel(u.role)}
+                          {roleLabel(u.role)} · {u.name}
                         </option>
                       ))}
-                    </select>
-                  </label>
-                </li>
-              </ul>
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-muted">
+                  Contraseña
+                  <input
+                    type="password"
+                    className="mt-1 w-full rounded-lg border border-line px-2 py-1.5 text-sm"
+                    value={switchPassword}
+                    onChange={(e) => setSwitchPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={trySwitch}
+                  className="w-full rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white"
+                >
+                  Cambiar sesión
+                </button>
+              </div>
             ) : null}
           </section>
         </div>

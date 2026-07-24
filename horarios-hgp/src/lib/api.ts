@@ -235,18 +235,21 @@ export async function listRemoteSchedules(): Promise<SavedIndexItem[]> {
       return !unit.startsWith('__SYSTEM__/') && !id.startsWith('sys-hgp-')
     })
     .map((r) => {
-    const st = (r.service_type as ServiceType) ?? 'medico'
-    return {
-      id: r.id as string,
-      label: `${st === 'enfermeria' ? 'Enf' : 'Med'} · ${r.unit_name} · ${r.month}/${r.year}`,
-      serviceType: st,
-      unitName: r.unit_name as string,
-      month: r.month as number,
-      year: r.year as number,
-      updatedAt: (r.updated_at as string) ?? new Date().toISOString(),
-      status: r.status as SavedIndexItem['status'],
-    }
-  })
+      if (r.payload && typeof r.payload === 'object') {
+        return toIndexItem(migratePayload(r.payload as ScheduleDoc))
+      }
+      const st = (r.service_type as ServiceType) ?? 'medico'
+      return {
+        id: r.id as string,
+        label: `${st === 'enfermeria' ? 'Enf' : 'Med'} · ${r.unit_name} · ${r.month}/${r.year}`,
+        serviceType: st,
+        unitName: r.unit_name as string,
+        month: r.month as number,
+        year: r.year as number,
+        updatedAt: (r.updated_at as string) ?? new Date().toISOString(),
+        status: r.status as SavedIndexItem['status'],
+      }
+    })
 }
 
 /** Une local + remoto (remoto gana si mismo id). */

@@ -63,15 +63,23 @@ export function ApprovalPanel({
   )
 
   const canSend = !!user && isJefeRole(user.role)
-  const canAdmisiones =
-    !!user && isAdmisionesRole(user.role) && user.role === 'admisiones'
+  const canAdmisiones = !!user && isAdmisionesRole(user.role)
   const canReview = !!user && isRevisorRole(user.role)
   const canValidate = !!user && isValidadorRole(user.role)
-  const approvalAs: 'admisiones' | 'revisor' | null = canAdmisiones
-    ? 'admisiones'
-    : canReview
-      ? 'revisor'
-      : null
+  /** Admin puede firmar como cualquiera; prioriza lo que falte. */
+  const approvalAs: 'admisiones' | 'revisor' | null = (() => {
+    if (!user || doc.status !== 'EN_REVISION') return null
+    if (user.role === 'admisiones') return 'admisiones'
+    if (user.role === 'admin') {
+      if (!hasAdmisionesApproval(doc)) return 'admisiones'
+      if (!hasRevisorApproval(doc)) return 'revisor'
+      return null
+    }
+    if (isRevisorRole(user.role) && !hasRevisorApproval(doc)) return 'revisor'
+    if (isAdmisionesRole(user.role) && !hasAdmisionesApproval(doc))
+      return 'admisiones'
+    return null
+  })()
 
   function requestSend() {
     if (!user) {
@@ -284,7 +292,8 @@ export function ApprovalPanel({
           )}
           {doc.status === 'EN_REVISION' &&
             canAdmisiones &&
-            !hasAdmisionesApproval(doc) && (
+            !hasAdmisionesApproval(doc) &&
+            (user?.role === 'admisiones' || user?.role === 'admin') && (
               <button
                 type="button"
                 onClick={() => setSignIntent({ next: 'APROBADO' })}
@@ -295,7 +304,8 @@ export function ApprovalPanel({
             )}
           {doc.status === 'EN_REVISION' &&
             canReview &&
-            !hasRevisorApproval(doc) && (
+            !hasRevisorApproval(doc) &&
+            (user?.role !== 'admin' || hasAdmisionesApproval(doc)) && (
               <button
                 type="button"
                 onClick={() => setSignIntent({ next: 'APROBADO' })}
@@ -348,12 +358,12 @@ export function ApprovalPanel({
       </ol>
 
       <p className="mb-3 text-xs text-muted">
-        <strong>Jefe</strong> firma y envía → <strong>Revisor</strong> firma y
-        aprueba (o pide corrección) → <strong>Validador</strong> firma y
-        aprueba; el jefe recibe aviso de horario aprobado.
+        <strong>Jefe</strong> envía → <strong>Admisiones</strong> y{' '}
+        <strong>Revisor</strong> dan visto bueno → <strong>Validador</strong>{' '}
+        firma y archiva.
       </p>
 
-      {doc.status === 'EN_REVISION' && canReview && (
+      {doc.status === 'EN_REVISION' && (canReview || canAdmisiones) && (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 p-3">
           <p className="mb-1 text-sm font-semibold text-navy">
             Pedir corrección (devolver al jefe)

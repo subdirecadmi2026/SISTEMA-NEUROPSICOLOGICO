@@ -1,5 +1,5 @@
 import type { AppUser, UserRole } from '../types'
-import { uid } from '../types'
+import { ROLE_LABEL, uid } from '../types'
 
 const USERS_KEY = 'hgp-users-v1'
 const DELETED_DEMO_KEY = 'hgp-users-deleted-demo-v1'
@@ -226,6 +226,7 @@ export function upsertManagedUser(input: UserInput): ManagedUser {
   const email = input.email.trim().toLowerCase()
   const name = input.name.trim()
   if (!email || !name) throw new Error('Nombre y correo son obligatorios')
+  if (!email.includes('@')) throw new Error('Indique un correo válido')
 
   const blob = readBlob()
   const now = new Date().toISOString()
@@ -233,6 +234,26 @@ export function upsertManagedUser(input: UserInput): ManagedUser {
   const clash = findUserByEmail(email)
   if (clash && clash.id !== existing?.id) {
     throw new Error('Ya existe un usuario con ese correo')
+  }
+
+  if (
+    existing &&
+    existing.role === 'admin' &&
+    input.role !== 'admin'
+  ) {
+    const otherAdmins = listManagedUsers().filter(
+      (u) => u.role === 'admin' && u.active !== false && u.id !== existing.id,
+    )
+    if (otherAdmins.length === 0) {
+      throw new Error('Debe quedar al menos un administrador activo')
+    }
+  }
+
+  if (!existing) {
+    const pwd = input.password?.trim() ?? ''
+    if (pwd.length < 6) {
+      throw new Error('La contraseña debe tener al menos 6 caracteres')
+    }
   }
 
   if (existing?.source === 'demo') {
@@ -264,6 +285,9 @@ export function upsertManagedUser(input: UserInput): ManagedUser {
       active: input.active !== false,
       updatedAt: now,
     }
+    if (!next.password) {
+      throw new Error('El usuario debe tener una contraseña asignada')
+    }
     blob.custom = blob.custom.map((u) => (u.id === next.id ? next : u))
     writeBlob(blob)
     return next
@@ -275,7 +299,7 @@ export function upsertManagedUser(input: UserInput): ManagedUser {
     name,
     role: input.role,
     serviceUnits: [...input.serviceUnits],
-    password: input.password?.trim() || undefined,
+    password: input.password!.trim(),
     active: input.active !== false,
     source: 'custom',
     createdAt: now,
@@ -331,8 +355,45 @@ export function checkUserPassword(
   demoFallback: string,
 ): boolean {
   if (user.password) return user.password === password
+  // Usuarios creados por admin deben tener contraseña propia
+  if (user.source === 'custom') return false
   return password === demoFallback
 }
+
+/** Portal de login (tarjeta) que debe elegir el usuario según su rol. */
+export function loginPortalLabel(role: UserRole): string {
+  switch (role) {
+    case 'lider_servicio':
+      return 'Jefe de servicio'
+    case 'admisiones':
+      return 'Admisiones'
+    case 'revisor':
+    case 'gestion_enfermeria':
+    case 'subdireccion':
+    case 'direccion_asistencial':
+      return 'Revisor'
+    case 'validador':
+    case 'talento_humano':
+      return 'Validador'
+    case 'admin':
+      return 'Administrador'
+    default:
+      return ROLE_LABEL[role]
+  }
+}
+
+export function isPrimaryLoginId(id: string): boolean {
+  return (PRIMARY_LOGIN_IDS as readonly string[]).includes(id)
+}
+
+/** Roles principales que el admin crea habitualmente. */
+export const ADMIN_CREATE_ROLES: UserRole[] = [
+  'lider_servicio',
+  'admisiones',
+  'revisor',
+  'validador',
+  'admin',
+]
 
 export const ALL_ROLES: UserRole[] = [
   'lider_servicio',

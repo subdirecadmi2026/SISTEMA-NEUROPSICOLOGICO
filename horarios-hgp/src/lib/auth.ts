@@ -87,8 +87,8 @@ export function loadSession(): AppUser | null {
         serviceUnits: fresh.serviceUnits,
       }
     }
-    if (!fresh) return null
-    return user
+    // Usuario eliminado o desactivado → cerrar sesión
+    return null
   } catch {
     return null
   }

@@ -439,7 +439,7 @@ export function createOrUpdateUserFromSigner(
     email: signer.email.trim().toLowerCase(),
     role,
     serviceUnits: existing?.serviceUnits ?? [],
-    password: password?.trim() || undefined,
+    password: password?.trim() || existing?.password || 'hgp2026',
     active: true,
   })
 
