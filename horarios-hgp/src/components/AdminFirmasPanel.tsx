@@ -23,10 +23,10 @@ type Props = {
 }
 
 const KINDS: AuthorityKind[] = [
-  'revisado',
-  'aprobado',
-  'validado',
-  'visto_bueno',
+  'direccion_asistencial',
+  'direccion_medica',
+  'gerencia',
+  'talento_humano',
 ]
 
 /**
@@ -208,19 +208,15 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                   />
                 </label>
                 <label className="text-xs font-semibold text-muted">
-                  Función
+                  Tipo de responsabilidad
                   <select
-                    className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm font-semibold text-navy"
                     value={s.kind}
                     onChange={(e) => {
                       const kind = e.target.value as AuthorityKind
                       patch(s.id, {
                         kind,
-                        cargo:
-                          s.cargo.trim() &&
-                          s.cargo !== AUTHORITY_KIND_DEFAULT_CARGO[s.kind]
-                            ? s.cargo
-                            : AUTHORITY_KIND_DEFAULT_CARGO[kind],
+                        cargo: AUTHORITY_KIND_DEFAULT_CARGO[kind],
                       })
                     }}
                   >

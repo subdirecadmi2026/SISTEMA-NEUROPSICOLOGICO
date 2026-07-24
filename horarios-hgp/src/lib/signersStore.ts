@@ -7,16 +7,14 @@ const KEY = 'hgp-hospital-signers-v1'
 
 /**
  * Autoridades que respaldan / validan el horario.
- * La 1.ª firma (Jefe de servicio · Elaborado) NO se configura aquí:
- * toma datos del horario (jefeServicio / elaboradoPor / firma electrónica).
+ * La 1.ª firma (Jefe de servicio · Elaborado) NO se configura aquí.
  */
 export type AuthorityKind =
-  | 'revisado'
-  | 'aprobado'
-  | 'validado'
-  | 'visto_bueno'
+  | 'direccion_asistencial'
+  | 'direccion_medica'
+  | 'gerencia'
+  | 'talento_humano'
 
-/** @deprecated use AuthorityKind — se mantiene por compatibilidad de datos viejos */
 export type SignerKind = AuthorityKind | 'elaborado'
 
 export type HospitalSigner = {
@@ -34,29 +32,27 @@ export type HospitalSigner = {
 
 export type SignersConfig = {
   /**
-   * Total de casillas en el horario (incluye la del jefe).
+   * Total de casillas (incluye el jefe).
    * 3 = jefe + 2 autoridades; 4 = jefe + 3; 5 = jefe + 4.
    */
   count: 3 | 4 | 5
-  /** Solo autoridades (sin el jefe). */
   signers: HospitalSigner[]
 }
 
 export const AUTHORITY_KIND_LABEL: Record<AuthorityKind, string> = {
-  revisado: 'Revisa / respalda',
-  aprobado: 'Aprueba',
-  validado: 'Valida (Talento Humano)',
-  visto_bueno: 'Visto bueno',
+  direccion_asistencial: 'Dirección Asistencial',
+  direccion_medica: 'Dirección Médica',
+  gerencia: 'Gerencia',
+  talento_humano: 'Talento Humano',
 }
 
 export const AUTHORITY_KIND_DEFAULT_CARGO: Record<AuthorityKind, string> = {
-  revisado: 'Revisor',
-  aprobado: 'Director / Subdirector',
-  validado: 'Talento Humano',
-  visto_bueno: 'Visto bueno institucional',
+  direccion_asistencial: 'Dirección Asistencial',
+  direccion_medica: 'Dirección Médica',
+  gerencia: 'Gerencia',
+  talento_humano: 'Talento Humano',
 }
 
-/** Alias para UI antigua. */
 export const SIGNER_KIND_LABEL: Record<SignerKind, string> = {
   elaborado: 'Jefe de servicio (automático)',
   ...AUTHORITY_KIND_LABEL,
@@ -68,17 +64,38 @@ export const SIGNER_KIND_DEFAULT_CARGO: Record<SignerKind, string> = {
 }
 
 const AUTHORITY_KINDS: AuthorityKind[] = [
-  'revisado',
-  'aprobado',
-  'validado',
-  'visto_bueno',
+  'direccion_asistencial',
+  'direccion_medica',
+  'gerencia',
+  'talento_humano',
 ]
 
-/** Autoridades según total de firmas (sin contar el jefe). */
 const AUTHORITIES_BY_TOTAL: Record<3 | 4 | 5, AuthorityKind[]> = {
-  3: ['revisado', 'validado'],
-  4: ['revisado', 'aprobado', 'validado'],
-  5: ['revisado', 'aprobado', 'visto_bueno', 'validado'],
+  3: ['direccion_asistencial', 'talento_humano'],
+  4: ['direccion_asistencial', 'direccion_medica', 'talento_humano'],
+  5: [
+    'direccion_asistencial',
+    'direccion_medica',
+    'gerencia',
+    'talento_humano',
+  ],
+}
+
+/** Migra tipos antiguos de localStorage. */
+function migrateAuthorityKind(raw: string): AuthorityKind | null {
+  if ((AUTHORITY_KINDS as string[]).includes(raw)) return raw as AuthorityKind
+  switch (raw) {
+    case 'revisado':
+      return 'direccion_asistencial'
+    case 'aprobado':
+      return 'direccion_medica'
+    case 'visto_bueno':
+      return 'gerencia'
+    case 'validado':
+      return 'talento_humano'
+    default:
+      return null
+  }
 }
 
 export function fullSignerName(
@@ -91,13 +108,13 @@ export function roleForSignerKind(kind: SignerKind): UserRole {
   switch (kind) {
     case 'elaborado':
       return 'lider_servicio'
-    case 'revisado':
-      return 'revisor'
-    case 'aprobado':
+    case 'direccion_asistencial':
       return 'direccion_asistencial'
-    case 'visto_bueno':
+    case 'direccion_medica':
       return 'subdireccion'
-    case 'validado':
+    case 'gerencia':
+      return 'revisor'
+    case 'talento_humano':
       return 'validador'
     default:
       return 'revisor'
@@ -108,18 +125,19 @@ export function electronicSlotForKind(kind: SignerKind): FirmaEcSlot | null {
   switch (kind) {
     case 'elaborado':
       return 'jefe'
-    case 'revisado':
-    case 'aprobado':
+    case 'direccion_asistencial':
+    case 'direccion_medica':
+    case 'gerencia':
       return 'revisor'
-    case 'validado':
+    case 'talento_humano':
       return 'validador'
     default:
       return null
   }
 }
 
-function isAuthorityKind(k: string): k is AuthorityKind {
-  return (AUTHORITY_KINDS as string[]).includes(k)
+function isAuthorityKind(k: string): boolean {
+  return migrateAuthorityKind(k) != null
 }
 
 function emptyAuthority(order: number, kind: AuthorityKind): HospitalSigner {
@@ -148,19 +166,37 @@ function normalizeList(
   count: 3 | 4 | 5,
 ): HospitalSigner[] {
   const kinds = AUTHORITIES_BY_TOTAL[count]
-  // Ignora entradas viejas de tipo "elaborado" (ahora es automático)
   const filtered = [...list]
-    .filter((s) => s && isAuthorityKind(String(s.kind)))
+    .map((s) => {
+      if (!s) return null
+      const kind = migrateAuthorityKind(String(s.kind))
+      if (!kind) return null
+      return { ...s, kind }
+    })
+    .filter((s): s is HospitalSigner => !!s)
     .sort((a, b) => a.order - b.order)
+
   const out: HospitalSigner[] = []
   for (let i = 0; i < kinds.length; i++) {
     const prev = filtered[i]
-    const kind = prev?.kind && kinds.includes(prev.kind) ? prev.kind : kinds[i]
+    const kind =
+      prev?.kind && kinds.includes(prev.kind) ? prev.kind : kinds[i]
+    const defaultCargo = AUTHORITY_KIND_DEFAULT_CARGO[kind]
+    const prevCargo = (prev?.cargo ?? '').trim()
+    // Si el cargo era el default del tipo viejo, usa el nuevo default
+    const cargo =
+      prevCargo &&
+      prevCargo !== 'Revisor' &&
+      prevCargo !== 'Director / Subdirector' &&
+      prevCargo !== 'Visto bueno institucional' &&
+      prevCargo !== 'Valida (Talento Humano)'
+        ? prevCargo
+        : defaultCargo
     out.push({
       id: prev?.id || uid('sgn'),
       nombres: prev?.nombres ?? '',
       apellidos: prev?.apellidos ?? '',
-      cargo: (prev?.cargo || AUTHORITY_KIND_DEFAULT_CARGO[kind]).trim(),
+      cargo,
       kind,
       email: prev?.email ?? '',
       linkedUserId: prev?.linkedUserId,
@@ -229,8 +265,8 @@ export function updateSigner(
   const cfg = getSignersConfig()
   const signers = cfg.signers.map((s) => {
     if (s.id !== id) return s
-    const kind =
-      patch.kind && isAuthorityKind(patch.kind) ? patch.kind : s.kind
+    const kindRaw = patch.kind ? migrateAuthorityKind(patch.kind) : s.kind
+    const kind = kindRaw ?? s.kind
     return {
       ...s,
       ...patch,
@@ -246,7 +282,6 @@ export function updateSigner(
   return saveSignersConfig({ ...cfg, signers })
 }
 
-/** Solo autoridades configuradas (sin el jefe). */
 export function listActiveSigners(): HospitalSigner[] {
   return getSignersConfig()
     .signers.filter((s) => s.active !== false && isAuthorityKind(s.kind))
@@ -286,9 +321,6 @@ export type PrintSignatureBox = {
   kind: SignerKind
 }
 
-/**
- * Casillas de impresión: 1.ª = Jefe de servicio (automática) + autoridades.
- */
 export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] {
   const jefeName =
     doc.elaboradoPor?.split('\n')[0]?.split('—')[0]?.trim() ||
@@ -314,13 +346,9 @@ export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] 
     if (slot) usedSlots.add(slot)
 
     const stamp =
-      s.kind === 'revisado'
-        ? doc.revisadoPor || doc.aprobadoPor
-        : s.kind === 'aprobado'
-          ? doc.aprobadoPor || doc.revisadoPor
-          : s.kind === 'validado'
-            ? doc.talentoHumano
-            : ''
+      s.kind === 'talento_humano'
+        ? doc.talentoHumano
+        : doc.revisadoPor || doc.aprobadoPor
 
     return {
       key: s.id,

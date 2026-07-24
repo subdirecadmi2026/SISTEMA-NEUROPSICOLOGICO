@@ -3,6 +3,7 @@ import { createBlankSchedule } from '../data/demo'
 import { createEmptyStaff } from './staffLibrary'
 import {
   authorityCount,
+  AUTHORITY_KIND_LABEL,
   buildPrintSignatureBoxes,
   createOrUpdateUserFromSigner,
   fullSignerName,
@@ -79,12 +80,24 @@ describe('autoridades de firma', () => {
       apellidos: 'Vega Ruiz',
       cargo: 'Talento Humano',
       email: 'patricia.vega.firmas@hgp.gob.ec',
-      kind: 'validado',
+      kind: 'talento_humano',
     })
     const s = listActiveSigners().find((x) => x.id === id)!
     expect(fullSignerName(s)).toBe('Patricia Vega Ruiz')
+    expect(s.kind).toBe('talento_humano')
+    expect(AUTHORITY_KIND_LABEL[s.kind]).toBe('Talento Humano')
     const { userId, signer } = createOrUpdateUserFromSigner(id, 'hgp2026')
     expect(userId).toBeTruthy()
     expect(signer.linkedUserId).toBe(userId)
+  })
+
+  it('ofrece Dirección Asistencial, Dirección Médica, Gerencia y Talento Humano', () => {
+    const kinds = setSignersCount(5).signers.map((s) => s.kind)
+    expect(kinds).toEqual([
+      'direccion_asistencial',
+      'direccion_medica',
+      'gerencia',
+      'talento_humano',
+    ])
   })
 })
