@@ -5,6 +5,9 @@ import type { FirmaEcSlot } from './firmaEc'
 
 const KEY = 'hgp-hospital-signers-v1'
 
+/** Máximo de autoridades además del jefe (impresión A4). */
+export const MAX_AUTHORITIES = 6
+
 /**
  * Autoridades que respaldan / validan el horario.
  * La 1.ª firma (Jefe de servicio · Elaborado) NO se configura aquí.
@@ -33,9 +36,9 @@ export type HospitalSigner = {
 export type SignersConfig = {
   /**
    * Total de casillas (incluye el jefe).
-   * 3 = jefe + 2 autoridades; 4 = jefe + 3; 5 = jefe + 4.
+   * Se deriva de 1 + autoridades; se guarda por compatibilidad.
    */
-  count: 3 | 4 | 5
+  count: number
   signers: HospitalSigner[]
 }
 
@@ -70,6 +73,7 @@ const AUTHORITY_KINDS: AuthorityKind[] = [
   'talento_humano',
 ]
 
+/** Plantillas rápidas (atajos), no obligatorias. */
 const AUTHORITIES_BY_TOTAL: Record<3 | 4 | 5, AuthorityKind[]> = {
   3: ['direccion_asistencial', 'talento_humano'],
   4: ['direccion_asistencial', 'direccion_medica', 'talento_humano'],
@@ -153,58 +157,53 @@ function emptyAuthority(order: number, kind: AuthorityKind): HospitalSigner {
   }
 }
 
-export function defaultSignersConfig(count: 3 | 4 | 5 = 3): SignersConfig {
-  const kinds = AUTHORITIES_BY_TOTAL[count]
-  return {
-    count,
-    signers: kinds.map((kind, i) => emptyAuthority(i + 1, kind)),
+function sanitizeCargo(cargo: string, kind: AuthorityKind): string {
+  const t = cargo.trim()
+  if (
+    !t ||
+    t === 'Revisor' ||
+    t === 'Director / Subdirector' ||
+    t === 'Visto bueno institucional' ||
+    t === 'Valida (Talento Humano)'
+  ) {
+    return AUTHORITY_KIND_DEFAULT_CARGO[kind]
   }
+  return t
 }
 
-function normalizeList(
-  list: HospitalSigner[],
-  count: 3 | 4 | 5,
-): HospitalSigner[] {
-  const kinds = AUTHORITIES_BY_TOTAL[count]
-  const filtered = [...list]
-    .map((s) => {
-      if (!s) return null
-      const kind = migrateAuthorityKind(String(s.kind))
-      if (!kind) return null
-      return { ...s, kind }
-    })
-    .filter((s): s is HospitalSigner => !!s)
-    .sort((a, b) => a.order - b.order)
-
-  const out: HospitalSigner[] = []
-  for (let i = 0; i < kinds.length; i++) {
-    const prev = filtered[i]
-    const kind =
-      prev?.kind && kinds.includes(prev.kind) ? prev.kind : kinds[i]
-    const defaultCargo = AUTHORITY_KIND_DEFAULT_CARGO[kind]
-    const prevCargo = (prev?.cargo ?? '').trim()
-    // Si el cargo era el default del tipo viejo, usa el nuevo default
-    const cargo =
-      prevCargo &&
-      prevCargo !== 'Revisor' &&
-      prevCargo !== 'Director / Subdirector' &&
-      prevCargo !== 'Visto bueno institucional' &&
-      prevCargo !== 'Valida (Talento Humano)'
-        ? prevCargo
-        : defaultCargo
-    out.push({
-      id: prev?.id || uid('sgn'),
-      nombres: prev?.nombres ?? '',
-      apellidos: prev?.apellidos ?? '',
-      cargo,
+/** Conserva la lista tal cual (CRUD libre); solo migra tipos y reordena. */
+function normalizeList(list: HospitalSigner[]): HospitalSigner[] {
+  const cleaned: HospitalSigner[] = []
+  for (const s of list) {
+    if (!s) continue
+    const kind = migrateAuthorityKind(String(s.kind))
+    if (!kind) continue
+    cleaned.push({
+      id: s.id || uid('sgn'),
+      nombres: (s.nombres ?? '').trim(),
+      apellidos: (s.apellidos ?? '').trim(),
+      cargo: sanitizeCargo(s.cargo ?? '', kind),
       kind,
-      email: prev?.email ?? '',
-      linkedUserId: prev?.linkedUserId,
-      order: i + 1,
-      active: prev?.active !== false,
+      email: (s.email ?? '').trim().toLowerCase(),
+      linkedUserId: s.linkedUserId,
+      order: Number(s.order) || 0,
+      active: s.active !== false,
     })
   }
-  return out
+  return cleaned
+    .sort((a, b) => a.order - b.order)
+    .slice(0, MAX_AUTHORITIES)
+    .map((s, i) => ({ ...s, order: i + 1 }))
+}
+
+function totalCount(authorities: number): number {
+  return 1 + Math.max(0, Math.min(MAX_AUTHORITIES, authorities))
+}
+
+export function defaultSignersConfig(preset: 3 | 4 | 5 = 3): SignersConfig {
+  const kinds = AUTHORITIES_BY_TOTAL[preset]
+  const signers = kinds.map((kind, i) => emptyAuthority(i + 1, kind))
+  return { count: totalCount(signers.length), signers }
 }
 
 function readRaw(): SignersConfig | null {
@@ -213,11 +212,10 @@ function readRaw(): SignersConfig | null {
     const raw = localStorage.getItem(KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<SignersConfig>
-    const count = ([3, 4, 5] as const).includes(parsed.count as 3 | 4 | 5)
-      ? (parsed.count as 3 | 4 | 5)
-      : 3
-    const signers = Array.isArray(parsed.signers) ? parsed.signers : []
-    return { count, signers: normalizeList(signers as HospitalSigner[], count) }
+    const signers = normalizeList(
+      Array.isArray(parsed.signers) ? (parsed.signers as HospitalSigner[]) : [],
+    )
+    return { count: totalCount(signers.length), signers }
   } catch {
     return null
   }
@@ -228,14 +226,16 @@ export function getSignersConfig(): SignersConfig {
 }
 
 export function saveSignersConfig(cfg: SignersConfig): SignersConfig {
+  const signers = normalizeList(cfg.signers)
   const next: SignersConfig = {
-    count: cfg.count,
-    signers: normalizeList(cfg.signers, cfg.count),
+    count: totalCount(signers.length),
+    signers,
   }
   localStorage.setItem(KEY, JSON.stringify(next))
   return next
 }
 
+/** Atajo: plantilla de 3 / 4 / 5 firmas totales (jefe + autoridades). */
 export function setSignersCount(count: 3 | 4 | 5): SignersConfig {
   const cur = getSignersConfig()
   const kinds = AUTHORITIES_BY_TOTAL[count]
@@ -248,7 +248,7 @@ export function setSignersCount(count: 3 | 4 | 5): SignersConfig {
       return {
         ...p,
         kind,
-        cargo: p.cargo?.trim() || AUTHORITY_KIND_DEFAULT_CARGO[kind],
+        cargo: sanitizeCargo(p.cargo ?? '', kind),
         order: i + 1,
         active: true,
       }
@@ -256,6 +256,26 @@ export function setSignersCount(count: 3 | 4 | 5): SignersConfig {
     return emptyAuthority(i + 1, kind)
   })
   return saveSignersConfig({ count, signers })
+}
+
+export function addAuthority(
+  kind: AuthorityKind = 'direccion_asistencial',
+): SignersConfig {
+  const cfg = getSignersConfig()
+  if (cfg.signers.length >= MAX_AUTHORITIES) {
+    throw new Error(
+      `Máximo ${MAX_AUTHORITIES} autoridades además del jefe de servicio`,
+    )
+  }
+  const order = cfg.signers.length + 1
+  const signers = [...cfg.signers, emptyAuthority(order, kind)]
+  return saveSignersConfig({ ...cfg, signers })
+}
+
+export function removeAuthority(id: string): SignersConfig {
+  const cfg = getSignersConfig()
+  const signers = cfg.signers.filter((s) => s.id !== id)
+  return saveSignersConfig({ ...cfg, signers })
 }
 
 export function updateSigner(
@@ -290,7 +310,7 @@ export function listActiveSigners(): HospitalSigner[] {
 
 export function authorityCount(cfg?: SignersConfig): number {
   const c = cfg ?? getSignersConfig()
-  return Math.max(0, c.count - 1)
+  return c.signers.filter((s) => s.active !== false).length
 }
 
 export function findSignerByUserId(userId: string): HospitalSigner | undefined {

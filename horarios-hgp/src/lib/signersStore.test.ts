@@ -4,11 +4,13 @@ import { createEmptyStaff } from './staffLibrary'
 import {
   authorityCount,
   AUTHORITY_KIND_LABEL,
+  addAuthority,
   buildPrintSignatureBoxes,
   createOrUpdateUserFromSigner,
   fullSignerName,
   getSignersConfig,
   listActiveSigners,
+  removeAuthority,
   resetSignersToDefaults,
   setSignersCount,
   updateSigner,
@@ -46,9 +48,9 @@ describe('autoridades de firma', () => {
     expect(getSignersConfig().count).toBe(3)
     expect(authorityCount()).toBe(2)
     expect(listActiveSigners()).toHaveLength(2)
-    expect(listActiveSigners().every((s) => s.kind !== 'elaborado' as never)).toBe(
-      true,
-    )
+    expect(
+      listActiveSigners().every((s) => s.kind !== ('elaborado' as never)),
+    ).toBe(true)
 
     expect(setSignersCount(5).signers).toHaveLength(4)
     expect(authorityCount(setSignersCount(4))).toBe(3)
@@ -99,5 +101,36 @@ describe('autoridades de firma', () => {
       'gerencia',
       'talento_humano',
     ])
+  })
+
+  it('permite crear y eliminar autoridades según se necesiten', () => {
+    resetSignersToDefaults()
+    expect(authorityCount()).toBe(2)
+
+    const added = addAuthority('gerencia')
+    expect(authorityCount(added)).toBe(3)
+    expect(added.signers.at(-1)?.kind).toBe('gerencia')
+    expect(added.count).toBe(4)
+
+    const id = added.signers[0].id
+    const afterDel = removeAuthority(id)
+    expect(authorityCount(afterDel)).toBe(2)
+    expect(afterDel.signers.find((s) => s.id === id)).toBeUndefined()
+    expect(afterDel.count).toBe(3)
+
+    // Puede dejar solo el jefe
+    let cfg = getSignersConfig()
+    for (const s of [...cfg.signers]) {
+      cfg = removeAuthority(s.id)
+    }
+    expect(authorityCount(cfg)).toBe(0)
+    expect(cfg.count).toBe(1)
+    expect(buildPrintSignatureBoxes(
+      createBlankSchedule('medico', 2026, 7, {
+        withDemo: false,
+        unitName: 'UCI',
+        staff: [],
+      }),
+    )).toHaveLength(1)
   })
 })

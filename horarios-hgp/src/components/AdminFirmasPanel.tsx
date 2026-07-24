@@ -3,13 +3,16 @@ import { DEMO_PASSWORD, roleLabel } from '../lib/auth'
 import {
   AUTHORITY_KIND_DEFAULT_CARGO,
   AUTHORITY_KIND_LABEL,
+  MAX_AUTHORITIES,
   type AuthorityKind,
   type HospitalSigner,
   type SignersConfig,
+  addAuthority,
   authorityCount,
   createOrUpdateUserFromSigner,
   fullSignerName,
   getSignersConfig,
+  removeAuthority,
   resetSignersToDefaults,
   roleForSignerKind,
   saveSignersConfig,
@@ -32,10 +35,12 @@ const KINDS: AuthorityKind[] = [
 /**
  * Admin: autoridades que respaldan y validan el horario.
  * La 1.ª firma (Jefe de servicio) es automática desde el horario.
+ * Puede crear, editar o eliminar autoridades según necesite.
  */
 export function AdminFirmasPanel({ onFlash }: Props) {
   const [cfg, setCfg] = useState<SignersConfig>(() => getSignersConfig())
   const [passwords, setPasswords] = useState<Record<string, string>>({})
+  const [newKind, setNewKind] = useState<AuthorityKind>('direccion_asistencial')
   const [tick, setTick] = useState(0)
 
   const ordered = useMemo(
@@ -43,6 +48,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
     [cfg.signers, tick],
   )
   const authorities = authorityCount(cfg)
+  const canAdd = authorities < MAX_AUTHORITIES
 
   function refresh(next?: SignersConfig) {
     setCfg(next ?? getSignersConfig())
@@ -56,8 +62,35 @@ export function AdminFirmasPanel({ onFlash }: Props) {
   function changeCount(count: 3 | 4 | 5) {
     refresh(setSignersCount(count))
     onFlash(
-      `Total ${count} firmas = 1 jefe (automático) + ${count - 1} autoridad(es)`,
+      `Plantilla ${count} firmas = 1 jefe + ${count - 1} autoridad(es)`,
     )
+  }
+
+  function onAdd() {
+    try {
+      refresh(addAuthority(newKind))
+      onFlash(`Autoridad agregada: ${AUTHORITY_KIND_LABEL[newKind]}`)
+    } catch (e) {
+      onFlash(e instanceof Error ? e.message : 'No se pudo agregar')
+    }
+  }
+
+  function onRemove(s: HospitalSigner) {
+    const name = fullSignerName(s) || AUTHORITY_KIND_LABEL[s.kind]
+    if (
+      !window.confirm(
+        `¿Eliminar la autoridad «${name}»?\nYa no aparecerá en el cuadro de firmas.`,
+      )
+    ) {
+      return
+    }
+    refresh(removeAuthority(s.id))
+    setPasswords((p) => {
+      const next = { ...p }
+      delete next[s.id]
+      return next
+    })
+    onFlash(`Autoridad eliminada · quedan ${Math.max(0, authorities - 1)}`)
   }
 
   function saveAll() {
@@ -90,9 +123,9 @@ export function AdminFirmasPanel({ onFlash }: Props) {
         </h2>
         <p className="mt-1 text-sm text-muted">
           La <strong>primera firma</strong> siempre es el{' '}
-          <strong>Jefe de servicio</strong> y se completa sola con los datos del
-          horario. Aquí solo elige las autoridades que revisan, aprueban o
-          validan (2, 3 o 4 según el hospital).
+          <strong>Jefe de servicio</strong> (automática). Aquí puede{' '}
+          <strong>crear, editar o eliminar</strong> las autoridades que necesite
+          (Dirección Asistencial, Dirección Médica, Gerencia, Talento Humano).
         </p>
       </div>
 
@@ -111,14 +144,22 @@ export function AdminFirmasPanel({ onFlash }: Props) {
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-white p-3 shadow-sm">
         <span className="text-xs font-semibold text-muted">
-          Total de firmas en el cuadro
+          Cuadro actual
         </span>
+        <span className="rounded-lg bg-navy/10 px-2.5 py-1 text-sm font-bold text-navy">
+          {1 + authorities} firmas
+        </span>
+        <span className="text-xs text-muted">
+          = 1 jefe + <strong>{authorities}</strong> autoridad(es)
+        </span>
+        <span className="mx-1 hidden h-5 w-px bg-line sm:block" />
+        <span className="text-xs text-muted">Atajo plantilla:</span>
         {([3, 4, 5] as const).map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => changeCount(n)}
-            className={`rounded-lg border px-3 py-1.5 text-sm font-bold ${
+            className={`rounded-lg border px-2.5 py-1 text-sm font-bold ${
               cfg.count === n
                 ? 'border-teal bg-teal text-white'
                 : 'border-line text-ink hover:border-teal/40'
@@ -127,9 +168,6 @@ export function AdminFirmasPanel({ onFlash }: Props) {
             {n}
           </button>
         ))}
-        <span className="text-xs text-muted">
-          = 1 jefe + <strong>{authorities}</strong> autoridad(es)
-        </span>
         <button
           type="button"
           onClick={saveAll}
@@ -140,7 +178,11 @@ export function AdminFirmasPanel({ onFlash }: Props) {
         <button
           type="button"
           onClick={() => {
-            if (!window.confirm('¿Restablecer a 3 firmas (jefe + 2 autoridades)?'))
+            if (
+              !window.confirm(
+                '¿Restablecer a plantilla de 3 firmas (jefe + 2 autoridades)?',
+              )
+            )
               return
             refresh(resetSignersToDefaults())
             onFlash('Firmas restablecidas')
@@ -150,6 +192,50 @@ export function AdminFirmasPanel({ onFlash }: Props) {
           Restablecer
         </button>
       </div>
+
+      <div className="flex flex-wrap items-end gap-2 rounded-2xl border border-dashed border-teal/40 bg-teal/5 p-3">
+        <label className="min-w-[12rem] flex-1 text-xs font-semibold text-muted">
+          Nueva autoridad · tipo de responsabilidad
+          <select
+            className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm font-semibold text-navy"
+            value={newKind}
+            onChange={(e) => setNewKind(e.target.value as AuthorityKind)}
+          >
+            {KINDS.map((k) => (
+              <option key={k} value={k}>
+                {AUTHORITY_KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={!canAdd}
+          onClick={onAdd}
+          className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          + Crear autoridad
+        </button>
+        {!canAdd ? (
+          <p className="w-full text-xs text-amber-800">
+            Máximo {MAX_AUTHORITIES} autoridades. Elimine una si ya no la
+            necesita.
+          </p>
+        ) : null}
+      </div>
+
+      {ordered.length === 0 ? (
+        <div className="rounded-2xl border border-line bg-sand/40 px-4 py-8 text-center">
+          <p className="font-display text-lg text-navy">
+            Sin autoridades todavía
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Solo se imprimirá la firma del jefe. Use «Crear autoridad» para
+            agregar Dirección Asistencial, Dirección Médica, Gerencia o Talento
+            Humano.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         {ordered.map((s, idx) => {
@@ -174,9 +260,18 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                     </span>
                   ) : null}
                 </p>
-                <span className="rounded-md bg-sand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-                  {AUTHORITY_KIND_LABEL[s.kind]}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-sand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                    {AUTHORITY_KIND_LABEL[s.kind]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(s)}
+                    className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+                  >
+                    Eliminar
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

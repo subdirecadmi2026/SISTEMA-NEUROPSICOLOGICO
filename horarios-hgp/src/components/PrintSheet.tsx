@@ -53,7 +53,11 @@ export function InstitutionalPrintBody({ doc }: Props) {
       ? 'grid-cols-5'
       : signatures.length === 4
         ? 'grid-cols-4'
-        : 'grid-cols-3'
+        : signatures.length === 2
+          ? 'grid-cols-2'
+          : signatures.length === 1
+            ? 'grid-cols-1'
+            : 'grid-cols-3'
 
   return (
     <div className="print-capture-root bg-white text-ink">
