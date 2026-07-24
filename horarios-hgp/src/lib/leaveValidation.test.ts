@@ -52,6 +52,20 @@ describe('permisos / vacaciones', () => {
     expect(estimateAuthorizedHours('2026-07-01', '2026-07-02', 24)).toBe(48)
   })
 
+  it('convierte horas autorizadas a días según jornada', async () => {
+    const {
+      equivalentDaysFromHours,
+      formatLeaveDaysAndHours,
+    } = await import('./leavesStore')
+    expect(equivalentDaysFromHours(40, 8)).toBe(5)
+    expect(equivalentDaysFromHours(26, 13)).toBe(2)
+    expect(equivalentDaysFromHours(24, 24)).toBe(1)
+    expect(equivalentDaysFromHours(20, 8)).toBe(2.5)
+    expect(formatLeaveDaysAndHours(40, 8, 5)).toContain('5 días')
+    expect(formatLeaveDaysAndHours(40, 8, 5)).toContain('40 h')
+    expect(formatLeaveDaysAndHours(40, 8, 5)).toContain('8 h/día')
+  })
+
   it('usa horas de clave habitual (X=24, HE=13) y no fija 8 h', () => {
     expect(defaultHoursPerDay('medico', 'X')).toBe(24)
     expect(defaultHoursPerDay('medico', 'HE')).toBe(13)

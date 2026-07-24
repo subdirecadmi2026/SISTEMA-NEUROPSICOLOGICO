@@ -13,8 +13,10 @@ import {
   defaultAbsenceCode,
   defaultHoursPerDay,
   deleteLeave,
+  equivalentDaysFromHours,
   estimateAuthorizedHours,
   findOverlappingLeaves,
+  formatLeaveDaysAndHours,
   inclusiveDayCount,
   leavesSummary,
   listLeaves,
@@ -378,6 +380,15 @@ export function PermisosVacacionesPanel({
   }
 
   const days = inclusiveDayCount(form.startDate, form.endDate)
+  const equivDays = equivalentDaysFromHours(
+    form.authorizedHours,
+    form.hoursPerDay,
+  )
+  const calcHours = estimateAuthorizedHours(
+    form.startDate,
+    form.endDate,
+    form.hoursPerDay,
+  )
 
   return (
     <div className="space-y-4">
@@ -393,16 +404,20 @@ export function PermisosVacacionesPanel({
         </p>
         <p className="text-sm text-ink">
           {isTH
-            ? 'Visualice todos los permisos y vacaciones registrados por los servicios. Puede corregir o completar registros institucionales. Las horas/día siguen el turno del personal (hasta 24 h).'
-            : 'Registre aquí las vacaciones y permisos temporales de su personal. Al elegir a alguien se cargan las horas de su clave (8, 12, 13 o 24 h). Talento Humano también los visualizará.'}
+            ? 'Visualice permisos y vacaciones por días y horas según la jornada del personal (hasta 24 h). Puede corregir registros institucionales.'
+            : 'Registre vacaciones y permisos. Se calculan días del rango y horas = días × jornada (8, 12, 13 o 24 h según la clave).'}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {[
           { label: 'Activos', value: String(summary.activos) },
           { label: 'Vacaciones', value: String(summary.vacaciones) },
           { label: 'Permisos', value: String(summary.permisos) },
+          {
+            label: 'Días (por horas)',
+            value: String(summary.diasAutorizados),
+          },
           {
             label: 'Horas autorizadas',
             value: `${summary.horasAutorizadas} h`,
@@ -640,6 +655,48 @@ export function PermisosVacacionesPanel({
               />
             </label>
           </div>
+
+          <div className="sm:col-span-2 rounded-xl border border-teal/25 bg-teal/5 px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-teal">
+              Cálculo días y horas
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div>
+                <p className="text-[10px] font-semibold uppercase text-muted">
+                  Días calendario
+                </p>
+                <p className="font-display text-xl text-navy">{days}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase text-muted">
+                  Jornada
+                </p>
+                <p className="font-display text-xl text-navy">
+                  {form.hoursPerDay} h
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase text-muted">
+                  Horas (= días × jornada)
+                </p>
+                <p className="font-display text-xl text-navy">{calcHours} h</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase text-muted">
+                  Días por horas
+                </p>
+                <p className="font-display text-xl text-navy">{equivDays}</p>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-muted">
+              {days} día{days === 1 ? '' : 's'} × {form.hoursPerDay} h/día ={' '}
+              <strong className="text-navy">{calcHours} h</strong>
+              {!form.autoHours && form.authorizedHours !== calcHours
+                ? ` · autorizado manual: ${form.authorizedHours} h ≈ ${equivDays} día(s)`
+                : ''}
+            </p>
+          </div>
+
           <label className="block text-xs font-semibold text-muted">
             Horas autorizadas
             <input
@@ -656,7 +713,7 @@ export function PermisosVacacionesPanel({
                 }))
               }
             />
-            <span className="mt-1 flex items-center gap-2 text-[11px] font-normal text-muted">
+            <span className="mt-1 flex flex-col gap-1 text-[11px] font-normal text-muted">
               <label className="inline-flex items-center gap-1">
                 <input
                   type="checkbox"
@@ -667,8 +724,12 @@ export function PermisosVacacionesPanel({
                     )
                   }
                 />
-                Calcular = {days} día(s) × {form.hoursPerDay} h
+                Calcular automáticamente = {days} día(s) × {form.hoursPerDay} h
               </label>
+              <span>
+                Equivale a <strong>{equivDays}</strong> día
+                {equivDays === 1 ? '' : 's'} con jornada de {form.hoursPerDay} h
+              </span>
             </span>
           </label>
           <label className="block text-xs font-semibold text-muted sm:col-span-2">
@@ -760,9 +821,14 @@ export function PermisosVacacionesPanel({
                     {l.startDate} → {l.endDate}
                   </p>
                   <p className="mt-0.5 text-xs text-ink">
-                    <strong>{l.authorizedHours} h</strong> autorizadas (
-                    {l.hoursPerDay} h/día) ·{' '}
-                    {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
+                    <strong>
+                      {formatLeaveDaysAndHours(
+                        l.authorizedHours,
+                        l.hoursPerDay,
+                        inclusiveDayCount(l.startDate, l.endDate),
+                      )}
+                    </strong>{' '}
+                    · {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
                     {l.unitName}
                     {l.status === 'cancelado' ? ' · cancelado' : ''}
                     {l.createdByName ? ` · por ${l.createdByName}` : ''}

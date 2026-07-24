@@ -145,6 +145,16 @@ export function LeaveBalancePanel({
                   resto {u.remainingHours} h
                 </span>
               </div>
+              <p className="mt-0.5 text-[10px] text-muted">
+                {u.markedDays.length} día(s) × {u.leave.hoursPerDay} h ={' '}
+                {u.usedHours} h usadas · autorizadas ≈{' '}
+                {u.leave.hoursPerDay > 0
+                  ? Math.round(
+                      (u.authorizedHours / u.leave.hoursPerDay) * 100,
+                    ) / 100
+                  : 0}{' '}
+                día(s)
+              </p>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/80 ring-1 ring-line/60">
                 <div
                   className={`h-full rounded-full transition-all ${

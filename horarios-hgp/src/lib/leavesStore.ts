@@ -121,12 +121,47 @@ export function estimateAuthorizedHours(
   return Math.max(0, days * h)
 }
 
+/** Días calendario del rango (inclusive). */
 export function inclusiveDayCount(startDate: string, endDate: string): number {
   const a = parseYmd(startDate)
   const b = parseYmd(endDate)
   if (!a || !b || b.getTime() < a.getTime()) return 0
   const ms = b.getTime() - a.getTime()
   return Math.floor(ms / 86_400_000) + 1
+}
+
+/**
+ * Días equivalentes según horas autorizadas ÷ jornada.
+ * Ej.: 40 h ÷ 8 h/día = 5 días; 26 h ÷ 13 h/día = 2 días.
+ */
+export function equivalentDaysFromHours(
+  authorizedHours: number,
+  hoursPerDay: number,
+): number {
+  const h = Number.isFinite(hoursPerDay) && hoursPerDay > 0 ? hoursPerDay : 0
+  if (h <= 0) return 0
+  const auth =
+    Number.isFinite(authorizedHours) && authorizedHours > 0
+      ? authorizedHours
+      : 0
+  return Math.round((auth / h) * 100) / 100
+}
+
+/** Resumen legible: «5 días · 40 h (8 h/día)». */
+export function formatLeaveDaysAndHours(
+  authorizedHours: number,
+  hoursPerDay: number,
+  calendarDays?: number,
+): string {
+  const equiv = equivalentDaysFromHours(authorizedHours, hoursPerDay)
+  const daysLabel =
+    calendarDays != null && calendarDays > 0
+      ? calendarDays === equiv
+        ? `${calendarDays} día${calendarDays === 1 ? '' : 's'}`
+        : `${calendarDays} día${calendarDays === 1 ? '' : 's'} (≈ ${equiv} por horas)`
+      : `${equiv} día${equiv === 1 ? '' : 's'}`
+  const hDay = Number.isFinite(hoursPerDay) ? hoursPerDay : 0
+  return `${daysLabel} · ${authorizedHours} h (${hDay} h/día)`
 }
 
 export function parseYmd(ymd: string): Date | null {
@@ -406,6 +441,8 @@ export function leavesSummary(opts?: {
   vacaciones: number
   permisos: number
   horasAutorizadas: number
+  diasAutorizados: number
+  diasCalendario: number
 } {
   const list = listLeaves({
     serviceType: opts?.serviceType,
@@ -419,6 +456,16 @@ export function leavesSummary(opts?: {
     vacaciones: activos.filter((l) => l.kind === 'vacaciones').length,
     permisos: activos.filter((l) => l.kind !== 'vacaciones').length,
     horasAutorizadas: activos.reduce((s, l) => s + l.authorizedHours, 0),
+    diasAutorizados: Math.round(
+      activos.reduce(
+        (s, l) => s + equivalentDaysFromHours(l.authorizedHours, l.hoursPerDay),
+        0,
+      ) * 100,
+    ) / 100,
+    diasCalendario: activos.reduce(
+      (s, l) => s + inclusiveDayCount(l.startDate, l.endDate),
+      0,
+    ),
   }
 }
 
