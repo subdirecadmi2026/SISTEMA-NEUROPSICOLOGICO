@@ -122,6 +122,40 @@ function writeDeletedDemo(ids: Set<string>) {
   localStorage.setItem(DELETED_DEMO_KEY, JSON.stringify([...ids]))
 }
 
+/** Perfiles del login (jefe, revisor, validador, admin) no deben desaparecer. */
+export const PRIMARY_LOGIN_IDS = [
+  'u-jefe',
+  'u-revisor',
+  'u-validador',
+  'u-admin',
+] as const
+
+/**
+ * Si se eliminaron por error, se restauran al abrir el acceso.
+ */
+export function ensurePrimaryLoginUsers(): void {
+  const deleted = readDeletedDemo()
+  let changed = false
+  for (const id of PRIMARY_LOGIN_IDS) {
+    if (deleted.has(id)) {
+      deleted.delete(id)
+      changed = true
+    }
+  }
+  if (changed) writeDeletedDemo(deleted)
+
+  const blob = readBlob()
+  let overrideChanged = false
+  for (const id of PRIMARY_LOGIN_IDS) {
+    const ov = blob.overrides[id]
+    if (ov && ov.active === false) {
+      blob.overrides[id] = { ...ov, active: true }
+      overrideChanged = true
+    }
+  }
+  if (overrideChanged) writeBlob(blob)
+}
+
 function asManaged(seed: AppUser, override?: Partial<ManagedUser>): ManagedUser {
   const now = new Date().toISOString()
   return {
@@ -247,6 +281,12 @@ export function upsertManagedUser(input: UserInput): ManagedUser {
 export function deleteManagedUser(id: string): void {
   const user = getManagedUser(id)
   if (!user) return
+
+  if ((PRIMARY_LOGIN_IDS as readonly string[]).includes(id)) {
+    throw new Error(
+      'No se puede eliminar el perfil de login (Jefe, Revisor, Validador o Administrador). Desactívelo solo si es otro usuario.',
+    )
+  }
 
   const admins = listManagedUsers().filter(
     (u) => u.role === 'admin' && u.active !== false && u.id !== id,

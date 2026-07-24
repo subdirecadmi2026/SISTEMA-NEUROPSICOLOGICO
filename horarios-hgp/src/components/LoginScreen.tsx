@@ -110,8 +110,8 @@ const ROLE_VISUALS: RoleVisual[] = [
   },
   {
     id: 'u-validador',
-    title: 'Talento Humano',
-    action: 'Validar horarios y ver permisos',
+    title: 'Validador',
+    action: 'Validar horarios (Talento Humano)',
     accent: 'border-teal-soft/40 bg-teal-soft/10',
     selected: 'border-teal-soft ring-2 ring-teal-soft/50 bg-teal-soft/15',
     Illustration: IlluValidador,
@@ -234,8 +234,23 @@ export function LoginScreen({ onLogin }: Props) {
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {ROLE_VISUALS.map((role) => {
-                const u = primary.find((x) => x.id === role.id)
-                if (!u) return null
+                // Siempre mostrar Jefe, Revisor, Validador y Admin
+                const u =
+                  primary.find((x) => x.id === role.id) ??
+                  ({
+                    id: role.id,
+                    email: '',
+                    name: role.title,
+                    role:
+                      role.id === 'u-jefe'
+                        ? 'lider_servicio'
+                        : role.id === 'u-revisor'
+                          ? 'revisor'
+                          : role.id === 'u-validador'
+                            ? 'validador'
+                            : 'admin',
+                    serviceUnits: [],
+                  } as AppUser)
                 const Illu = role.Illustration
                 return (
                   <button

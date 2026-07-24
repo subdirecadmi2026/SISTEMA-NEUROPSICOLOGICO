@@ -65,6 +65,20 @@ describe('login y perfiles demo', () => {
     expect(ids).toEqual(['u-jefe', 'u-revisor', 'u-validador', 'u-admin'])
   })
 
+  it('restaurar perfiles revisor y validador si se borraron del login', () => {
+    localStorage.setItem(
+      'hgp-users-deleted-demo-v1',
+      JSON.stringify(['u-revisor', 'u-validador']),
+    )
+    const ids = primaryDemoUsers().map((u) => u.id)
+    expect(ids).toContain('u-revisor')
+    expect(ids).toContain('u-validador')
+    expect(authenticateDemo('revisor@hgp.gob.ec', DEMO_PASSWORD).ok).toBe(true)
+    expect(authenticateDemo('validador@hgp.gob.ec', DEMO_PASSWORD).ok).toBe(
+      true,
+    )
+  })
+
   it('loginAs persiste sesión y logout la limpia', () => {
     const u = DEMO_USERS[0]
     loginAs(u)

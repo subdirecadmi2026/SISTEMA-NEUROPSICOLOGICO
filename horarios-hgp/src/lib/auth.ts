@@ -12,6 +12,7 @@ import { canEditSchedule } from './validation'
 import {
   SEED_USERS,
   checkUserPassword,
+  ensurePrimaryLoginUsers,
   findUserByEmail,
   getManagedUser,
   listAppUsers,
@@ -101,10 +102,14 @@ export const PRIMARY_DEMO_IDS = [
 ] as const
 
 export function primaryDemoUsers(): AppUser[] {
+  ensurePrimaryLoginUsers()
   const all = listAppUsers()
-  return PRIMARY_DEMO_IDS.map((id) => all.find((u) => u.id === id)).filter(
-    (u): u is AppUser => !!u,
-  )
+  return PRIMARY_DEMO_IDS.map((id) => {
+    const found = all.find((u) => u.id === id)
+    if (found) return found
+    const seed = SEED_USERS.find((u) => u.id === id)
+    return seed ?? null
+  }).filter((u): u is AppUser => !!u)
 }
 
 export function otherDemoUsers(): AppUser[] {
