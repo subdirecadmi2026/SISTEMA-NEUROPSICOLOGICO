@@ -9,9 +9,9 @@ import {
 } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
 import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/notifications'
-import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
 import { InstitutionalPreview } from './InstitutionalPreview'
+import { ReadOnlySchedulePanels } from './ReadOnlySchedulePanels'
 import { runAllValidations, blockingValidationErrors } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
 import { SignatureGate } from './SignatureGate'
@@ -300,28 +300,12 @@ export function ReviewCardsModule({
 
         <MonthSummary doc={detail} />
         <InstitutionalPreview doc={detail} onFlash={onFlash} defaultOpen />
-
         {errors > 0 && (
           <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
             {errors} alerta(s) de cobertura/validación en este mes.
           </p>
         )}
-
-        <div className="mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-          <div className="border-b border-line bg-sand/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted">
-            Planilla (solo visualización)
-          </div>
-          <ScheduleTable
-            doc={detail}
-            readOnly
-            paintMode={false}
-            activeCode=""
-            compact
-            onChange={() => undefined}
-            onAddStaff={() => undefined}
-            onNewDemo={() => undefined}
-          />
-        </div>
+        <ReadOnlySchedulePanels doc={detail} />
       </div>
     )
   }

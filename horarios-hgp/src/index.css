@@ -97,15 +97,24 @@ textarea {
     visibility: hidden !important;
   }
 
+  .print-stack,
+  .print-stack *,
   .print-area,
   .print-area * {
     visibility: visible !important;
   }
 
+  .print-stack {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    background: white !important;
+  }
+
   .print-area {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -117,10 +126,16 @@ textarea {
     overflow: hidden !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    page-break-after: avoid !important;
-    page-break-before: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  .print-area.print-sheet-page:last-child,
+  .print-stack > .print-area:last-of-type {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   .print-fit-one-page {

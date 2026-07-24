@@ -39,7 +39,6 @@ function waitFrames(ms = 120): Promise<void> {
 
 async function enrichSigns(doc: ScheduleDoc): Promise<ScheduleDoc> {
   const signs = doc.electronicSigns ?? []
-  // Solo QR de firmas reales del encargado (no inventar desde texto).
   if (!signs.length) return doc
   const withQr = await Promise.all(
     signs.map((s) =>
@@ -49,12 +48,46 @@ async function enrichSigns(doc: ScheduleDoc): Promise<ScheduleDoc> {
   return { ...doc, electronicSigns: withQr }
 }
 
+async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
+  const target =
+    (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host
+  return html2canvas(target, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    windowWidth: 1123,
+  })
+}
+
+function addCanvasPage(
+  pdf: jsPDF,
+  canvas: HTMLCanvasElement,
+  isFirst: boolean,
+) {
+  if (!isFirst) pdf.addPage()
+  const pageW = pdf.internal.pageSize.getWidth()
+  const pageH = pdf.internal.pageSize.getHeight()
+  const imgData = canvas.toDataURL('image/jpeg', 0.93)
+  const ratio = Math.min(pageW / canvas.width, pageH / canvas.height)
+  const w = canvas.width * ratio
+  const h = canvas.height * ratio
+  const x = (pageW - w) / 2
+  const y = (pageH - h) / 2
+  pdf.addImage(imgData, 'JPEG', x, y, w, h)
+}
+
 /**
- * Genera PDF A4 horizontal con el mismo formato institucional que imprime el médico
- * (encabezado MSP, grilla, firmas de Jefe / Revisor / Validador con QR).
+ * Genera PDF A4 horizontal institucional.
+ * Médico: página 1 = horario (turnos), página 2 = distribución (áreas).
  */
 export async function buildSchedulePdfBlob(doc: ScheduleDoc): Promise<Blob> {
   const enriched = await enrichSigns(doc)
+  const includeAreas = doc.serviceType === 'medico'
+  const modes: Array<'turno' | 'area'> = includeAreas
+    ? ['turno', 'area']
+    : ['turno']
 
   const host = document.createElement('div')
   host.setAttribute('data-pdf-capture', '1')
@@ -70,39 +103,25 @@ export async function buildSchedulePdfBlob(doc: ScheduleDoc): Promise<Blob> {
   document.body.appendChild(host)
 
   const root = createRoot(host)
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4',
+  })
+
   try {
-    root.render(createElement(InstitutionalPrintBody, { doc: enriched }))
-    // Esperar pintado de imágenes QR
-    await waitFrames(350)
-
-    const target =
-      (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host
-
-    const canvas = await html2canvas(target, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      windowWidth: 1123,
-    })
-
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4',
-    })
-    const pageW = pdf.internal.pageSize.getWidth()
-    const pageH = pdf.internal.pageSize.getHeight()
-    const imgData = canvas.toDataURL('image/jpeg', 0.93)
-
-    const ratio = Math.min(pageW / canvas.width, pageH / canvas.height)
-    const w = canvas.width * ratio
-    const h = canvas.height * ratio
-    const x = (pageW - w) / 2
-    const y = (pageH - h) / 2
-    pdf.addImage(imgData, 'JPEG', x, y, w, h)
-
+    for (let i = 0; i < modes.length; i++) {
+      const mode = modes[i]
+      root.render(
+        createElement(InstitutionalPrintBody, {
+          doc: enriched,
+          gridMode: mode,
+        }),
+      )
+      await waitFrames(i === 0 ? 350 : 280)
+      const canvas = await captureRoot(host)
+      addCanvasPage(pdf, canvas, i === 0)
+    }
     return pdf.output('blob')
   } finally {
     root.unmount()

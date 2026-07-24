@@ -1319,10 +1319,12 @@ export default function App() {
           }
           aria-hidden={tab !== 'imprimir'}
         >
-          <PrintSheet doc={doc} gridMode="turno" />
-          {doc.serviceType === 'medico' ? (
-            <PrintSheet doc={doc} gridMode="area" />
-          ) : null}
+          <div className="print-stack space-y-6">
+            <PrintSheet doc={doc} gridMode="turno" />
+            {doc.serviceType === 'medico' ? (
+              <PrintSheet doc={doc} gridMode="area" />
+            ) : null}
+          </div>
         </div>
 
         {/* Vista móvil: resumen consultable */}

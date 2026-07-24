@@ -5,7 +5,6 @@ import { roleLabel, transitionStatus } from '../lib/auth'
 import { loadAnySchedule } from '../lib/api'
 import { notifyJefeScheduleValidated } from '../lib/notifications'
 import { blockingValidationErrors } from '../lib/validation'
-import { ScheduleTable } from './ScheduleTable'
 import { MonthSummary } from './MonthSummary'
 import { SERVICE_LABEL } from '../data/templates'
 import {
@@ -24,6 +23,7 @@ import {
 } from '../lib/archiveFolder'
 import { SignatureGate } from './SignatureGate'
 import { InstitutionalPreview } from './InstitutionalPreview'
+import { ReadOnlySchedulePanels } from './ReadOnlySchedulePanels'
 import { PermisosVacacionesPanel } from './PermisosVacacionesPanel'
 
 type Props = {
@@ -366,21 +366,7 @@ export function ValidadorWorkspace({
 
         <MonthSummary doc={detail} />
         <InstitutionalPreview doc={detail} onFlash={onFlash} defaultOpen />
-        <div className="mb-6 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-          <div className="border-b border-line bg-sand/40 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted">
-            Planilla (solo visualización)
-          </div>
-          <ScheduleTable
-            doc={detail}
-            readOnly
-            paintMode={false}
-            activeCode=""
-            compact
-            onChange={() => undefined}
-            onAddStaff={() => undefined}
-            onNewDemo={() => undefined}
-          />
-        </div>
+        <ReadOnlySchedulePanels doc={detail} />
       </div>
     )
   }

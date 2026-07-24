@@ -42,8 +42,7 @@ async function waitForQrImages(root: HTMLElement | null, ms = 800) {
 
 /**
  * Vista institucional + PDF + impresión (revisor / validador).
- * El área imprimible siempre está montada (visible u offscreen).
- * Importante: no envolver el print-area con `.no-print` (rompe la impresión).
+ * Médico: muestra Horario y Distribución por separado, cada uno con su formato.
  */
 export function InstitutionalPreview({
   doc,
@@ -53,13 +52,20 @@ export function InstitutionalPreview({
   const [open, setOpen] = useState(defaultOpen)
   const [busy, setBusy] = useState(false)
   const printWrapRef = useRef<HTMLDivElement>(null)
+  const isMedico = doc.serviceType === 'medico'
+  const showDistribution =
+    isMedico && Object.keys(doc.areaCells ?? {}).length >= 0
 
   async function downloadPdf() {
     setBusy(true)
     try {
       const blob = await buildSchedulePdfBlob(doc)
       downloadBlob(blob, pdfFileName(doc))
-      onFlash?.('PDF institucional descargado')
+      onFlash?.(
+        isMedico
+          ? 'PDF institucional (horario + distribución) descargado'
+          : 'PDF institucional descargado',
+      )
     } catch (e) {
       onFlash?.(
         e instanceof Error ? e.message : 'No se pudo generar el PDF',
@@ -88,7 +94,9 @@ export function InstitutionalPreview({
             Formato institucional
           </h2>
           <p className="text-xs text-muted">
-            Firmas con código QR · mismo formato que imprime el médico
+            {isMedico
+              ? 'Horario y Distribución por separado · firmas con QR'
+              : 'Firmas con código QR · mismo formato que imprime el médico'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -117,16 +125,37 @@ export function InstitutionalPreview({
         </div>
       </div>
 
-      {/* Siempre montado: en pantalla offscreen si está cerrado; al imprimir se ve */}
       <div
         ref={printWrapRef}
         className={open ? undefined : 'print-sheet-offscreen'}
         aria-hidden={!open}
       >
-        <div className="print-area overflow-x-auto bg-white p-2">
-          <div className="print-fit-one-page min-w-[900px]">
-            <InstitutionalPrintBody doc={doc} />
+        <div className="print-stack space-y-6 bg-white p-2">
+          <div className="no-print mb-1 px-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
+              {isMedico ? '1 · Horario (consulta / jornada)' : 'Planilla'}
+            </p>
           </div>
+          <div className="print-area print-sheet-page overflow-x-auto bg-white">
+            <div className="print-fit-one-page min-w-[900px]">
+              <InstitutionalPrintBody doc={doc} gridMode="turno" />
+            </div>
+          </div>
+
+          {showDistribution ? (
+            <>
+              <div className="no-print mb-1 px-1 pt-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-teal">
+                  2 · Distribución (áreas de servicio)
+                </p>
+              </div>
+              <div className="print-area print-sheet-page overflow-x-auto bg-white">
+                <div className="print-fit-one-page min-w-[900px]">
+                  <InstitutionalPrintBody doc={doc} gridMode="area" />
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </section>
