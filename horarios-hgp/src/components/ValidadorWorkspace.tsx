@@ -24,7 +24,6 @@ import {
 } from '../lib/archiveFolder'
 import { SignatureGate } from './SignatureGate'
 import { InstitutionalPreview } from './InstitutionalPreview'
-import { PermisosVacacionesPanel } from './PermisosVacacionesPanel'
 
 type Props = {
   user: AppUser
@@ -36,7 +35,7 @@ type Props = {
   onNotify?: () => void
 }
 
-type ModuleTab = 'pendientes' | 'archivo' | 'permisos'
+type ModuleTab = 'pendientes' | 'archivo'
 
 /**
  * Validador: 1) tarjetas pendientes de todas las especialidades
@@ -389,9 +388,7 @@ export function ValidadorWorkspace({
   return (
     <div
       className={`mx-auto px-3 py-6 sm:px-6 ${
-        module === 'archivo' || module === 'permisos'
-          ? 'max-w-[1400px]'
-          : 'max-w-5xl'
+        module === 'archivo' ? 'max-w-[1400px]' : 'max-w-5xl'
       }`}
     >
       <header className="mb-5">
@@ -400,9 +397,8 @@ export function ValidadorWorkspace({
         </p>
         <h1 className="font-display text-3xl text-navy">Validación HGP</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Pendientes de todas las especialidades, archivo de horarios ya
-          validados, y registro de vacaciones / permisos temporales del
-          personal (médico o enfermería).
+          Pendientes de todas las especialidades y archivo de horarios ya
+          validados (PDF en carpeta por especialidad).
         </p>
       </header>
 
@@ -431,43 +427,28 @@ export function ValidadorWorkspace({
                 : 'text-muted hover:bg-sand'
             }`}
           >
-            2. Archivo
+            2. Archivo validado
             <span className="ml-2 rounded-full bg-white/20 px-1.5 text-xs">
               {archived.length}
             </span>
           </button>
-          <button
-            type="button"
-            onClick={() => setModule('permisos')}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              module === 'permisos'
-                ? 'bg-navy text-white'
-                : 'text-muted hover:bg-sand'
-            }`}
-          >
-            3. Permisos
-          </button>
         </div>
-        {module !== 'permisos' ? (
-          <>
-            <input
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Buscar especialidad o mes…"
-              className="min-w-[180px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold hover:bg-sand"
-            >
-              Actualizar
-            </button>
-          </>
-        ) : null}
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Buscar especialidad o mes…"
+          className="min-w-[180px] flex-1 rounded-xl border border-line bg-white px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold hover:bg-sand"
+        >
+          Actualizar
+        </button>
       </div>
 
-      {module !== 'permisos' && supportsDirectoryPicker() && (
+      {supportsDirectoryPicker() && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-white/90 px-3 py-2 text-sm">
           <p className="text-muted">
             Carpeta raíz del archivo:{' '}
@@ -498,7 +479,7 @@ export function ValidadorWorkspace({
         </div>
       )}
 
-      {!supportsDirectoryPicker() && module !== 'permisos' && (
+      {!supportsDirectoryPicker() && (
         <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           Su navegador no permite crear carpetas en disco. Al validar se
           descargará un <strong>ZIP</strong> con la carpeta de la especialidad.
@@ -510,12 +491,6 @@ export function ValidadorWorkspace({
         <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-10 text-center text-sm text-muted">
           Cargando…
         </p>
-      ) : module === 'permisos' ? (
-        <PermisosVacacionesPanel
-          user={user}
-          onFlash={onFlash}
-          onNotify={onNotify}
-        />
       ) : module === 'archivo' ? (
         archivedBySpecialty.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-12 text-center text-sm text-muted">
