@@ -83,6 +83,67 @@ export const LEAVE_HOUR_PRESETS: Array<{ hours: number; label: string }> = [
   { hours: 24, label: '24 h' },
 ]
 
+/**
+ * Permiso temporal corto: desde minutos hasta máximo 3 horas.
+ * Si supera 3 h, corresponde elaborar la hoja de permiso formal.
+ */
+export const TEMPORAL_MAX_HOURS = 3
+
+/** Días de vacaciones por año calendario (entitlement institucional). */
+export const ANNUAL_VACATION_DAYS = 30
+
+export const HOJA_PERMISO_MESSAGE =
+  'Debe elaborar la hoja de permiso. Los permisos temporales solo cubren hasta 3 horas (desde minutos). Si la ausencia es mayor, use el trámite formal de hoja de permiso.'
+
+/** Duraciones típicas de permiso temporal (minutos). */
+export const TEMPORAL_DURATION_PRESETS: Array<{
+  minutes: number
+  label: string
+}> = [
+  { minutes: 15, label: '15 min' },
+  { minutes: 30, label: '30 min' },
+  { minutes: 45, label: '45 min' },
+  { minutes: 60, label: '1 h' },
+  { minutes: 90, label: '1 h 30' },
+  { minutes: 120, label: '2 h' },
+  { minutes: 150, label: '2 h 30' },
+  { minutes: 180, label: '3 h' },
+]
+
+export function hoursFromMinutes(minutes: number): number {
+  const m = Number.isFinite(minutes) ? Math.max(0, minutes) : 0
+  return Math.round((m / 60) * 1000) / 1000
+}
+
+export function minutesFromHours(hours: number): number {
+  const h = Number.isFinite(hours) ? Math.max(0, hours) : 0
+  return Math.round(h * 60)
+}
+
+/** «45 min», «1 h», «2 h 15 min». */
+export function formatHoursMinutes(hours: number): string {
+  const totalMin = minutesFromHours(hours)
+  if (totalMin <= 0) return '0 min'
+  if (totalMin < 60) return `${totalMin} min`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (m === 0) return `${h} h`
+  return `${h} h ${m} min`
+}
+
+export function isTemporalOverLimit(authorizedHours: number): boolean {
+  return (
+    Number.isFinite(authorizedHours) && authorizedHours > TEMPORAL_MAX_HOURS + 1e-9
+  )
+}
+
+export function requiresHojaPermiso(
+  kind: LeaveKind,
+  authorizedHours: number,
+): boolean {
+  return kind === 'permiso_temporal' && isTemporalOverLimit(authorizedHours)
+}
+
 export function defaultAbsenceCode(
   kind: LeaveKind,
   serviceType: ServiceType,
@@ -157,12 +218,16 @@ export function equivalentDaysFromHours(
   return Math.round((auth / h) * 100) / 100
 }
 
-/** Resumen legible: «5 días · 40 h (8 h/día)». */
+/** Resumen legible: «5 días · 40 h (8 h/día)» o duración corta en temporal. */
 export function formatLeaveDaysAndHours(
   authorizedHours: number,
   hoursPerDay: number,
   calendarDays?: number,
+  kind?: LeaveKind,
 ): string {
+  if (kind === 'permiso_temporal') {
+    return formatHoursMinutes(authorizedHours)
+  }
   const equiv = equivalentDaysFromHours(authorizedHours, hoursPerDay)
   const daysLabel =
     calendarDays != null && calendarDays > 0
@@ -327,6 +392,19 @@ function validateInput(input: LeaveInput) {
     estimateAuthorizedHours(input.startDate, input.endDate, hoursPerDay)
   if (!Number.isFinite(auth) || auth < 0) {
     throw new Error('Horas autorizadas inválidas')
+  }
+  if (input.kind === 'permiso_temporal') {
+    if (auth <= 0) {
+      throw new Error('Indique la duración del permiso temporal (minutos u horas)')
+    }
+    if (isTemporalOverLimit(auth)) {
+      throw new Error(HOJA_PERMISO_MESSAGE)
+    }
+    if (input.startDate !== input.endDate) {
+      throw new Error(
+        'El permiso temporal es del mismo día (máximo 3 horas). Si necesita más días, elabore la hoja de permiso.',
+      )
+    }
   }
   return { start, end, hoursPerDay, auth }
 }
@@ -546,4 +624,167 @@ export function activeLeavesForSchedule(opts: {
     year: opts.year,
     month: opts.month,
   }).filter((l) => (set ? set.has(l.staffId) : true))
+}
+
+function sameStaff(a: StaffLeave, staffId: string, nameKey: string): boolean {
+  if (staffId && a.staffId === staffId) return true
+  return a.staffName.trim().toLowerCase() === nameKey
+}
+
+function leaveInYear(leave: StaffLeave, year: number): boolean {
+  const s = parseYmd(leave.startDate)
+  const e = parseYmd(leave.endDate)
+  if (!s || !e) return false
+  return s.getFullYear() === year || e.getFullYear() === year
+}
+
+/**
+ * Vacaciones usadas en el año: suma de días equivalentes (horas ÷ jornada)
+ * de registros vacaciones activos o pendientes (no cancelados).
+ */
+export function vacationDaysUsedInYear(
+  leaves: StaffLeave[],
+  year: number,
+): number {
+  const used = leaves
+    .filter(
+      (l) =>
+        l.kind === 'vacaciones' &&
+        (l.status === 'activo' || l.status === 'pendiente') &&
+        leaveInYear(l, year),
+    )
+    .reduce(
+      (s, l) => s + equivalentDaysFromHours(l.authorizedHours, l.hoursPerDay),
+      0,
+    )
+  return Math.round(used * 100) / 100
+}
+
+export type StaffLeaveReport = {
+  staffId: string
+  staffName: string
+  year: number
+  /** Todos los registros del profesional en el año (cualquier situación). */
+  leaves: StaffLeave[]
+  vacationDaysEntitled: number
+  vacationDaysUsed: number
+  vacationDaysRemaining: number
+  vacationHoursEntitled: number
+  vacationHoursUsed: number
+  vacationHoursRemaining: number
+  hoursPerDay: number
+  countsByKind: Partial<Record<LeaveKind, number>>
+  temporalHoursUsed: number
+}
+
+/** Historial + saldo de vacaciones (30 días/año) de un profesional. */
+export function buildStaffLeaveReport(opts: {
+  staffId?: string
+  staffName: string
+  year?: number
+  hoursPerDay?: number
+}): StaffLeaveReport {
+  const year = opts.year ?? new Date().getFullYear()
+  const nameKey = opts.staffName.trim().toLowerCase()
+  const staffId = (opts.staffId ?? '').trim()
+  const all = readAll()
+    .filter((l) => sameStaff(l, staffId, nameKey) && leaveInYear(l, year))
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+
+  const vacLeaves = all.filter(
+    (l) =>
+      l.kind === 'vacaciones' &&
+      (l.status === 'activo' || l.status === 'pendiente'),
+  )
+  const hoursPerDay =
+    opts.hoursPerDay ??
+    vacLeaves[0]?.hoursPerDay ??
+    all[0]?.hoursPerDay ??
+    DEFAULT_HOURS_MED
+
+  const vacationDaysUsed = vacationDaysUsedInYear(all, year)
+  const vacationDaysRemaining = Math.max(
+    0,
+    Math.round((ANNUAL_VACATION_DAYS - vacationDaysUsed) * 100) / 100,
+  )
+  const vacationHoursEntitled = ANNUAL_VACATION_DAYS * hoursPerDay
+  const vacationHoursUsed = Math.round(
+    vacLeaves.reduce((s, l) => s + l.authorizedHours, 0) * 100,
+  ) / 100
+  const vacationHoursRemaining = Math.max(
+    0,
+    Math.round((vacationHoursEntitled - vacationHoursUsed) * 100) / 100,
+  )
+
+  const countsByKind: Partial<Record<LeaveKind, number>> = {}
+  for (const l of all) {
+    countsByKind[l.kind] = (countsByKind[l.kind] ?? 0) + 1
+  }
+
+  const temporalHoursUsed = Math.round(
+    all
+      .filter(
+        (l) =>
+          l.kind === 'permiso_temporal' &&
+          (l.status === 'activo' || l.status === 'pendiente'),
+      )
+      .reduce((s, l) => s + l.authorizedHours, 0) * 100,
+  ) / 100
+
+  return {
+    staffId: staffId || all[0]?.staffId || '',
+    staffName: opts.staffName.trim() || all[0]?.staffName || '',
+    year,
+    leaves: all,
+    vacationDaysEntitled: ANNUAL_VACATION_DAYS,
+    vacationDaysUsed,
+    vacationDaysRemaining,
+    vacationHoursEntitled,
+    vacationHoursUsed,
+    vacationHoursRemaining,
+    hoursPerDay,
+    countsByKind,
+    temporalHoursUsed,
+  }
+}
+
+/** Profesionales con historial que coinciden con la búsqueda por nombre. */
+export function searchStaffWithLeaves(query: string): Array<{
+  staffId: string
+  staffName: string
+  unitName: string
+  serviceType: ServiceType
+  totalLeaves: number
+}> {
+  const q = query.trim().toLowerCase()
+  if (q.length < 2) return []
+  const map = new Map<
+    string,
+    {
+      staffId: string
+      staffName: string
+      unitName: string
+      serviceType: ServiceType
+      totalLeaves: number
+    }
+  >()
+  for (const l of readAll()) {
+    if (!l.staffName.toLowerCase().includes(q)) continue
+    const key = `${l.staffId}|${l.staffName.trim().toLowerCase()}`
+    const prev = map.get(key)
+    if (prev) {
+      prev.totalLeaves += 1
+    } else {
+      map.set(key, {
+        staffId: l.staffId,
+        staffName: l.staffName,
+        unitName: l.unitName,
+        serviceType: l.serviceType,
+        totalLeaves: 1,
+      })
+    }
+  }
+  return [...map.values()].sort((a, b) =>
+    a.staffName.localeCompare(b.staffName, 'es'),
+  )
 }

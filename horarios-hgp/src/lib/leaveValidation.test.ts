@@ -78,7 +78,7 @@ describe('permisos / vacaciones', () => {
       staffName: 'Dr. Guardia',
       serviceType: 'medico',
       unitName: 'UCI',
-      kind: 'permiso_temporal',
+      kind: 'otro',
       startDate: '2026-07-10',
       endDate: '2026-07-10',
       hoursPerDay: 24,
@@ -92,13 +92,93 @@ describe('permisos / vacaciones', () => {
       staffName: 'Dra. HE',
       serviceType: 'medico',
       unitName: 'UCI',
-      kind: 'permiso_temporal',
+      kind: 'otro',
       startDate: '2026-07-11',
       endDate: '2026-07-12',
       hoursPerDay: 13,
     })
     expect(he.hoursPerDay).toBe(13)
     expect(he.authorizedHours).toBe(26)
+  })
+
+  it('permiso temporal solo hasta 3 h; más requiere hoja de permiso', async () => {
+    const {
+      TEMPORAL_MAX_HOURS,
+      HOJA_PERMISO_MESSAGE,
+      hoursFromMinutes,
+      formatHoursMinutes,
+      requiresHojaPermiso,
+      buildStaffLeaveReport,
+      ANNUAL_VACATION_DAYS,
+    } = await import('./leavesStore')
+
+    expect(TEMPORAL_MAX_HOURS).toBe(3)
+    expect(hoursFromMinutes(90)).toBe(1.5)
+    expect(formatHoursMinutes(1.5)).toBe('1 h 30 min')
+    expect(requiresHojaPermiso('permiso_temporal', 3.5)).toBe(true)
+    expect(requiresHojaPermiso('permiso_temporal', 3)).toBe(false)
+
+    const short = upsertLeave({
+      staffId: 'med-t',
+      staffName: 'Dr. Temporal',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'permiso_temporal',
+      startDate: '2026-07-10',
+      endDate: '2026-07-10',
+      hoursPerDay: 8,
+      authorizedHours: hoursFromMinutes(90),
+    })
+    expect(short.authorizedHours).toBe(1.5)
+
+    expect(() =>
+      upsertLeave({
+        staffId: 'med-t',
+        staffName: 'Dr. Temporal',
+        serviceType: 'medico',
+        unitName: 'UCI',
+        kind: 'permiso_temporal',
+        startDate: '2026-07-11',
+        endDate: '2026-07-11',
+        hoursPerDay: 8,
+        authorizedHours: 4,
+      }),
+    ).toThrow(HOJA_PERMISO_MESSAGE)
+
+    upsertLeave({
+      staffId: 'med-vac',
+      staffName: 'Dra. Vacaciones',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'vacaciones',
+      startDate: '2026-03-01',
+      endDate: '2026-03-10',
+      hoursPerDay: 8,
+      authorizedHours: 80,
+    })
+    upsertLeave({
+      staffId: 'med-vac',
+      staffName: 'Dra. Vacaciones',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'permiso_temporal',
+      startDate: '2026-04-01',
+      endDate: '2026-04-01',
+      hoursPerDay: 8,
+      authorizedHours: 2,
+    })
+    const report = buildStaffLeaveReport({
+      staffId: 'med-vac',
+      staffName: 'Dra. Vacaciones',
+      year: 2026,
+      hoursPerDay: 8,
+    })
+    expect(report.vacationDaysEntitled).toBe(ANNUAL_VACATION_DAYS)
+    expect(report.vacationDaysUsed).toBe(10)
+    expect(report.vacationDaysRemaining).toBe(20)
+    expect(report.vacationHoursRemaining).toBe(160)
+    expect(report.leaves.length).toBe(2)
+    expect(report.temporalHoursUsed).toBe(2)
   })
 
   it('rechaza jornada mayor a 24 h', () => {
@@ -183,7 +263,7 @@ describe('permisos / vacaciones', () => {
       staffName: 'Enf. Ruiz',
       serviceType: 'enfermeria',
       unitName: 'Emergencia',
-      kind: 'permiso_temporal',
+      kind: 'otro',
       startDate: '2026-07-01',
       endDate: '2026-07-10',
       authorizedHours: 16,
