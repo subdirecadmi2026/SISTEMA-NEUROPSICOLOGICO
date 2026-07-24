@@ -158,17 +158,18 @@ function emptyAuthority(order: number, kind: AuthorityKind): HospitalSigner {
 }
 
 function sanitizeCargo(cargo: string, kind: AuthorityKind): string {
-  const t = cargo.trim()
+  const legacy = cargo.trim()
   if (
-    !t ||
-    t === 'Revisor' ||
-    t === 'Director / Subdirector' ||
-    t === 'Visto bueno institucional' ||
-    t === 'Valida (Talento Humano)'
+    legacy === 'Revisor' ||
+    legacy === 'Director / Subdirector' ||
+    legacy === 'Visto bueno institucional' ||
+    legacy === 'Valida (Talento Humano)'
   ) {
     return AUTHORITY_KIND_DEFAULT_CARGO[kind]
   }
-  return t
+  // Vacío real → default; espacios al escribir se conservan.
+  if (cargo === '') return AUTHORITY_KIND_DEFAULT_CARGO[kind]
+  return cargo
 }
 
 /** Conserva la lista tal cual (CRUD libre); solo migra tipos y reordena. */
@@ -178,13 +179,17 @@ function normalizeList(list: HospitalSigner[]): HospitalSigner[] {
     if (!s) continue
     const kind = migrateAuthorityKind(String(s.kind))
     if (!kind) continue
+    // No hacer .trim() en nombres/apellidos/cargo aquí: al editar en vivo
+    // el trim borra el espacio y no deja separar palabras (ej. "María ").
     cleaned.push({
       id: s.id || uid('sgn'),
-      nombres: (s.nombres ?? '').trim(),
-      apellidos: (s.apellidos ?? '').trim(),
-      cargo: sanitizeCargo(s.cargo ?? '', kind),
+      nombres: String(s.nombres ?? ''),
+      apellidos: String(s.apellidos ?? ''),
+      cargo: sanitizeCargo(String(s.cargo ?? ''), kind),
       kind,
-      email: (s.email ?? '').trim().toLowerCase(),
+      email: String(s.email ?? '')
+        .trim()
+        .toLowerCase(),
       linkedUserId: s.linkedUserId,
       order: Number(s.order) || 0,
       active: s.active !== false,
@@ -293,9 +298,10 @@ export function updateSigner(
       id: s.id,
       order: s.order,
       kind,
-      nombres: (patch.nombres ?? s.nombres).trim(),
-      apellidos: (patch.apellidos ?? s.apellidos).trim(),
-      cargo: (patch.cargo ?? s.cargo).trim(),
+      // Sin trim en nombres/apellidos/cargo: permite espacios al escribir.
+      nombres: patch.nombres ?? s.nombres,
+      apellidos: patch.apellidos ?? s.apellidos,
+      cargo: patch.cargo ?? s.cargo,
       email: (patch.email ?? s.email).trim().toLowerCase(),
     }
   })

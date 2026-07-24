@@ -133,4 +133,19 @@ describe('autoridades de firma', () => {
       }),
     )).toHaveLength(1)
   })
+
+  it('permite espacios al escribir nombres y apellidos', () => {
+    const id = getSignersConfig().signers[0].id
+    updateSigner(id, { nombres: 'María ' })
+    expect(getSignersConfig().signers.find((s) => s.id === id)?.nombres).toBe(
+      'María ',
+    )
+    updateSigner(id, { nombres: 'María Fernanda', apellidos: 'Pérez ' })
+    const s = getSignersConfig().signers.find((x) => x.id === id)!
+    expect(s.nombres).toBe('María Fernanda')
+    expect(s.apellidos).toBe('Pérez ')
+    expect(fullSignerName({ ...s, apellidos: 'Pérez Guatatuca' })).toBe(
+      'María Fernanda Pérez Guatatuca',
+    )
+  })
 })
