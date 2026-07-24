@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { ScheduleDoc, StaffMember } from '../types'
-import { createEmptyStaff } from '../lib/staffLibrary'
+import { createEmptyStaff, syncScheduleStaffToLibrary } from '../lib/staffLibrary'
 import { uid } from '../types'
 import {
   addStaffFromNameList,
+  duplicateStaffRow,
+  moveStaffOrder,
   sortStaffByName,
 } from '../lib/scheduleOps'
 import { HabitualCodeSelect } from './HabitualCodeSelect'
@@ -22,13 +24,20 @@ type Props = {
   onChange: (doc: ScheduleDoc) => void
   /** Resalta el panel (p. ej. tras crear horario) */
   highlight?: boolean
+  onFlash?: (msg: string) => void
 }
 
 /**
  * Configuración de personal del horario.
  * En médicos: nombre, cargo, relación, sección y clave habitual (8–24 h).
  */
-export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
+export function NamesEditor({
+  doc,
+  readOnly,
+  onChange,
+  highlight,
+  onFlash,
+}: Props) {
   const isMed = doc.serviceType === 'medico'
   const title = isMed
     ? 'Configuración de médicos / especialistas'
@@ -38,6 +47,12 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [bulkCode, setBulkCode] = useState('')
+
+  const missingCode = useMemo(
+    () =>
+      doc.staff.filter((s) => s.name.trim() && !s.codigoPersonal.trim()).length,
+    [doc.staff],
+  )
 
   const codeSummary = useMemo(() => {
     const map = new Map<string, number>()
@@ -56,20 +71,26 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
     })
   }
 
-  function addRow() {
-    const base = createEmptyStaff(doc.serviceType, doc.unitName)
-    onChange({
-      ...doc,
-      staff: [
-        ...doc.staff,
-        {
-          ...base,
-          id: uid(isMed ? 'med' : 'enf'),
-          name: '',
-          order: doc.staff.length + 1,
-        },
-      ],
+  function addRows(n: number) {
+    const extras = Array.from({ length: n }, (_, i) => {
+      const base = createEmptyStaff(doc.serviceType, doc.unitName)
+      return {
+        ...base,
+        id: uid(isMed ? 'med' : 'enf'),
+        name: '',
+        order: doc.staff.length + i + 1,
+      }
     })
+    onChange({ ...doc, staff: [...doc.staff, ...extras] })
+    onFlash?.(
+      n === 1
+        ? `Agregada 1 plaza ${isMed ? 'médica' : ''}`
+        : `Agregadas ${n} plazas`,
+    )
+  }
+
+  function addRow() {
+    addRows(1)
   }
 
   function remove(id: string) {
@@ -104,6 +125,20 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
         s.name.trim() ? { ...s, codigoPersonal: code } : s,
       ),
     })
+    onFlash?.(`Clave ${code} aplicada a ${named} médico(s)`)
+  }
+
+  function saveToLibrary() {
+    const n = syncScheduleStaffToLibrary(
+      doc.serviceType,
+      doc.unitName,
+      doc.staff,
+    )
+    onFlash?.(
+      n > 0
+        ? `${n} médico(s) guardados en biblioteca de ${doc.unitName}`
+        : 'No hay nombres para guardar en biblioteca',
+    )
   }
 
   return (
@@ -142,10 +177,24 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
                 · Falta al menos 1 nombre
               </span>
             )}
+            {isMed && missingCode > 0 && (
+              <span className="ml-2 font-semibold text-amber-800">
+                · {missingCode} sin clave habitual
+              </span>
+            )}
           </p>
         </div>
         {!readOnly && (
           <div className="flex flex-wrap gap-2">
+            {isMed && (
+              <button
+                type="button"
+                onClick={saveToLibrary}
+                className="rounded-lg border border-teal/40 bg-teal/10 px-3 py-2 text-sm font-semibold text-teal hover:bg-teal/20"
+              >
+                Guardar en biblioteca
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onChange(sortStaffByName(doc))}
@@ -160,6 +209,15 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
             >
               Pegar lista
             </button>
+            {isMed && (
+              <button
+                type="button"
+                onClick={() => addRows(5)}
+                className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-sand"
+              >
+                + 5 plazas
+              </button>
+            )}
             <button
               type="button"
               onClick={addRow}
@@ -261,6 +319,7 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
             <thead className="bg-navy text-left text-white">
               <tr>
                 <th className="px-2 py-2 font-semibold">N°</th>
+                <th className="px-2 py-2 font-semibold">Orden</th>
                 <th className="px-2 py-2 font-semibold">Nombres y apellidos *</th>
                 <th className="px-2 py-2 font-semibold">Cargo</th>
                 <th className="px-2 py-2 font-semibold">Relación</th>
@@ -279,6 +338,36 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
                 >
                   <td className="px-2 py-1.5 text-center text-muted">
                     {idx + 1}
+                  </td>
+                  <td className="px-1 py-1">
+                    {!readOnly ? (
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          className="rounded border border-line px-1 text-[10px] font-bold hover:bg-sand disabled:opacity-30"
+                          disabled={idx === 0}
+                          onClick={() =>
+                            onChange(moveStaffOrder(doc, s.id, -1))
+                          }
+                          title="Subir"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded border border-line px-1 text-[10px] font-bold hover:bg-sand disabled:opacity-30"
+                          disabled={idx === sorted.length - 1}
+                          onClick={() =>
+                            onChange(moveStaffOrder(doc, s.id, 1))
+                          }
+                          title="Bajar"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
                   </td>
                   <td className="px-1 py-1">
                     <input
@@ -368,14 +457,26 @@ export function NamesEditor({ doc, readOnly, onChange, highlight }: Props) {
                   </td>
                   {!readOnly && (
                     <td className="px-2 py-1 text-center">
-                      <button
-                        type="button"
-                        className="text-xs text-red-700 hover:underline disabled:opacity-40"
-                        disabled={doc.staff.length <= 1}
-                        onClick={() => remove(s.id)}
-                      >
-                        Quitar
-                      </button>
+                      <div className="flex flex-col items-center gap-1">
+                        <button
+                          type="button"
+                          className="text-xs text-navy underline"
+                          onClick={() => {
+                            onChange(duplicateStaffRow(doc, s.id))
+                            onFlash?.('Fila duplicada')
+                          }}
+                        >
+                          Duplicar
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-red-700 hover:underline disabled:opacity-40"
+                          disabled={doc.staff.length <= 1}
+                          onClick={() => remove(s.id)}
+                        >
+                          Quitar
+                        </button>
+                      </div>
                     </td>
                   )}
                 </tr>

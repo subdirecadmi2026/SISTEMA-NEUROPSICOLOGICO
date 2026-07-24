@@ -5,6 +5,7 @@ import {
   listStaff,
   renameStaffLibraryUnit,
   saveStaffList,
+  syncScheduleStaffToLibrary,
 } from './staffLibrary'
 import { habitualTurnoOptions } from './staffOptions'
 
@@ -64,5 +65,26 @@ describe('configuración médicos', () => {
     expect(moved[0].name).toBe('Dr. Pérez')
     expect(moved[0].serviceUnit).toBe('Cirugía general')
     expect(localStorage.getItem(STAFF_KEY)).toBeTruthy()
+  })
+
+  it('sincroniza médicos del horario a la biblioteca', () => {
+    const schedule = [
+      {
+        ...createEmptyStaff('medico', 'UCI'),
+        name: 'Dra. Vega',
+        codigoPersonal: 'X',
+        role: 'Médico de planta',
+      },
+      {
+        ...createEmptyStaff('medico', 'UCI'),
+        name: 'Dr. León',
+        codigoPersonal: 'HE',
+      },
+    ]
+    const n = syncScheduleStaffToLibrary('medico', 'UCI', schedule)
+    expect(n).toBe(2)
+    const lib = listStaff('medico', 'UCI')
+    expect(lib).toHaveLength(2)
+    expect(lib.find((s) => s.name === 'Dra. Vega')?.codigoPersonal).toBe('X')
   })
 })

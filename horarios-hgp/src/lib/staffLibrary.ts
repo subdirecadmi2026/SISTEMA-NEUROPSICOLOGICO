@@ -133,6 +133,43 @@ export function cloneStaffForSchedule(staff: StaffMember[]): StaffMember[] {
     }))
 }
 
+/**
+ * Guarda/actualiza en biblioteca los médicos del horario (por nombre).
+ * Conserva IDs de biblioteca cuando el nombre coincide.
+ */
+export function syncScheduleStaffToLibrary(
+  serviceType: ServiceType,
+  unitName: string,
+  scheduleStaff: StaffMember[],
+): number {
+  const named = scheduleStaff.filter((s) => s.name.trim())
+  if (named.length === 0) return 0
+  const existing = listStaff(serviceType, unitName)
+  const byName = new Map(
+    existing.map((s) => [s.name.trim().toLowerCase(), s] as const),
+  )
+  const next: StaffMember[] = []
+  const seen = new Set<string>()
+  for (const s of named) {
+    const key = s.name.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    const prev = byName.get(key)
+    next.push({
+      ...s,
+      id: prev?.id ?? s.id,
+      serviceUnit: unitName,
+      active: true,
+      fun: serviceType === 'medico' ? 'MED' : s.fun,
+    })
+    byName.delete(key)
+  }
+  // Conserva otros de biblioteca no presentes en el horario
+  for (const s of byName.values()) next.push(s)
+  saveStaffList(serviceType, unitName, next)
+  return named.length
+}
+
 export function listStaffLibraryBuckets(): Array<{
   serviceType: ServiceType
   unitName: string

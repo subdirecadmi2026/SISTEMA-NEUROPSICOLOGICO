@@ -14,6 +14,13 @@ type Props = {
 
 type Tab = 'tipo' | 'periodo' | 'notas'
 
+const COVERAGE_PRESETS_MED = [
+  { label: 'Consulta (2 / 16 h)', minStaff: 2, minHours: 16 },
+  { label: 'Guardia (1 / 24 h)', minStaff: 1, minHours: 24 },
+  { label: 'Mixto (2 / 24 h)', minStaff: 2, minHours: 24 },
+  { label: 'UCI (3 / 36 h)', minStaff: 3, minHours: 36 },
+] as const
+
 /** Configuración del horario en un solo módulo. */
 export function ConfigModule({
   doc,
@@ -25,6 +32,8 @@ export function ConfigModule({
 }: Props) {
   const [tab, setTab] = useState<Tab>('periodo')
   const [open, setOpen] = useState(false)
+  const isMed = doc.serviceType === 'medico'
+  const named = doc.staff.filter((s) => s.name.trim()).length
 
   return (
     <section className="no-print mb-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
@@ -35,15 +44,17 @@ export function ConfigModule({
       >
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-            Configuración
+            Configuración {isMed ? 'médica' : ''}
           </p>
           <h2 className="font-display text-lg text-navy">
             {SERVICE_LABEL[doc.serviceType]} · {MONTHS_ES[doc.month - 1]}{' '}
             {doc.year}
           </h2>
           <p className="text-xs text-muted">
+            {isMed ? 'Especialidad: ' : ''}
             {doc.unitName}
             {doc.jefeServicio ? ` · ${doc.jefeServicio}` : ''}
+            {isMed ? ` · ${named}/${doc.staff.length} médicos` : ''}
           </p>
         </div>
         <span className="rounded-lg bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted ring-1 ring-line">
@@ -103,7 +114,7 @@ export function ConfigModule({
                       >
                         {t === 'enfermeria'
                           ? 'Plantilla Gestión de Enfermería'
-                          : 'Cuadro de trabajo médico'}
+                          : 'Cuadro de trabajo médico · claves hasta 24 h'}
                       </p>
                     </button>
                   )
@@ -146,7 +157,7 @@ export function ConfigModule({
                   />
                 </label>
                 <label className="col-span-2 text-xs text-muted sm:col-span-1">
-                  Servicio
+                  {isMed ? 'Especialidad' : 'Servicio'}
                   <select
                     disabled={readOnly}
                     className="mt-1 w-full rounded-xl border border-line bg-white px-2 py-2 text-sm disabled:opacity-70"
@@ -163,13 +174,18 @@ export function ConfigModule({
                   </select>
                 </label>
                 <label className="col-span-2 text-xs text-muted sm:col-span-3">
-                  Jefe / líder de servicio
+                  {isMed
+                    ? 'Jefe / líder de especialidad'
+                    : 'Jefe / líder de servicio'}
                   <input
                     disabled={readOnly}
                     className="mt-1 w-full rounded-xl border border-line bg-white px-2 py-2 text-sm disabled:opacity-70"
                     value={doc.jefeServicio}
                     onChange={(e) =>
                       onPatch({ ...doc, jefeServicio: e.target.value })
+                    }
+                    placeholder={
+                      isMed ? 'Ej. Dr. Juan Pérez — jefe de servicio' : undefined
                     }
                   />
                 </label>
@@ -231,7 +247,41 @@ export function ConfigModule({
                       }
                     />
                   </div>
+                  {isMed && !readOnly ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {COVERAGE_PRESETS_MED.map((p) => (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() =>
+                            onPatch({
+                              ...doc,
+                              coverageRule: {
+                                minStaffPerDay: p.minStaff,
+                                minHoursPerDay: p.minHours,
+                              },
+                            })
+                          }
+                          className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+                            doc.coverageRule.minStaffPerDay === p.minStaff &&
+                            doc.coverageRule.minHoursPerDay === p.minHours
+                              ? 'border-teal bg-teal/10 text-teal'
+                              : 'border-line text-muted hover:border-teal/40'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </label>
+                {isMed ? (
+                  <p className="col-span-2 rounded-xl border border-navy/15 bg-navy/5 px-3 py-2 text-xs text-ink sm:col-span-3">
+                    Los turnos médicos varían: CE 8 h, PT 12 h, HE 13 h, X 24 h.
+                    Configure la clave habitual de cada médico en la pestaña{' '}
+                    <strong>Personal</strong>.
+                  </p>
+                ) : null}
               </div>
             )}
 

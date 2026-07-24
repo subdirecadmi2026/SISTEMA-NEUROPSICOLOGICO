@@ -15,6 +15,7 @@ import {
 import { formatHolidaysLabel, holidayDatesInMonth } from '../lib/holidays'
 import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, clearStaffRowCells, copyCellsBetweenStaff } from '../lib/scheduleOps'
 import { leaveConflictIfPaint, leaveDayMapForDoc, countLeaveConflictsForDay } from '../lib/leaveValidation'
+import { HabitualCodeSelect } from './HabitualCodeSelect'
 
 type Props = {
   doc: ScheduleDoc
@@ -278,7 +279,18 @@ export function ScheduleTable({
               <th className="min-w-[100px] border border-line px-1 py-2 text-left">
                 Rel. laboral
               </th>
-              <th className="min-w-[50px] border border-line px-1 py-2">Cód.</th>
+              <th
+                className={`border border-line px-1 py-2 ${
+                  isEnf ? 'min-w-[50px]' : 'min-w-[78px]'
+                }`}
+                title={
+                  isEnf
+                    ? 'Código habitual'
+                    : 'Clave habitual del médico (CE 8h, PT 12h, HE 13h, X 24h)'
+                }
+              >
+                {isEnf ? 'Cód.' : 'Clave'}
+              </th>
               {Array.from({ length: days }, (_, i) => {
                 const d = i + 1
                 const weekend = isWeekend(doc.year, doc.month, d)
@@ -450,16 +462,28 @@ export function ScheduleTable({
                       />
                     </td>
                     <td className="border border-line px-0.5 py-0.5 text-center">
-                      <input
-                        disabled={readOnly}
-                        className="w-11 rounded border-0 bg-transparent px-0.5 py-1 text-center font-bold text-navy outline-none focus:bg-sand/60 disabled:opacity-70"
-                        value={s.codigoPersonal}
-                        onChange={(e) =>
-                          updateStaff(s.id, {
-                            codigoPersonal: e.target.value.toUpperCase(),
-                          })
-                        }
-                      />
+                      {isEnf ? (
+                        <input
+                          disabled={readOnly}
+                          className="w-11 rounded border-0 bg-transparent px-0.5 py-1 text-center font-bold text-navy outline-none focus:bg-sand/60 disabled:opacity-70"
+                          value={s.codigoPersonal}
+                          onChange={(e) =>
+                            updateStaff(s.id, {
+                              codigoPersonal: e.target.value.toUpperCase(),
+                            })
+                          }
+                        />
+                      ) : (
+                        <HabitualCodeSelect
+                          compact
+                          serviceType="medico"
+                          value={s.codigoPersonal}
+                          disabled={readOnly}
+                          onChange={(codigoPersonal) =>
+                            updateStaff(s.id, { codigoPersonal })
+                          }
+                        />
+                      )}
                     </td>
                     {Array.from({ length: days }, (_, i) => {
                       const d = i + 1

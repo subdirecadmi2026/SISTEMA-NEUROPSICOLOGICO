@@ -1009,6 +1009,7 @@ export default function App() {
               readOnly={readOnly}
               onChange={patchDoc}
               highlight={highlightNames}
+              onFlash={flash}
             />
             {/* Médico: NamesEditor con cargo/relación/clave. Enfermería: editor con secciones/FUN. */}
             {doc.serviceType === 'enfermeria' && (

@@ -6,6 +6,7 @@ import { SERVICE_LABEL } from '../data/templates'
 import { createEmptyStaff, listStaff } from '../lib/staffLibrary'
 import { copyStaffFromPreviousMonth } from '../lib/scheduleOps'
 import { addUnit, listUnits } from '../lib/unitsStore'
+import { habitualTurnoOptions } from '../lib/staffOptions'
 
 export type CreateScheduleInput = {
   serviceType: ServiceType
@@ -32,6 +33,7 @@ function makeSlots(
   serviceType: ServiceType,
   unitName: string,
   count: number,
+  codigoPersonal?: string,
 ): StaffMember[] {
   return Array.from({ length: count }, (_, i) => {
     const base = createEmptyStaff(serviceType, unitName)
@@ -40,6 +42,9 @@ function makeSlots(
       id: uid(serviceType === 'enfermeria' ? 'enf' : 'med'),
       name: '',
       order: i + 1,
+      ...(codigoPersonal
+        ? { codigoPersonal: codigoPersonal.toUpperCase() }
+        : {}),
     }
   })
 }
@@ -63,6 +68,7 @@ export function CreateScheduleWizard({
   const [useLibrary, setUseLibrary] = useState(true)
   const [copyPrevStaff, setCopyPrevStaff] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [defaultHabitual, setDefaultHabitual] = useState('CE')
 
   const resolvedUnit = useCustomUnit
     ? customUnit.trim()
@@ -81,6 +87,7 @@ export function CreateScheduleWizard({
     setUseCustomUnit(false)
     setCustomUnit('')
     setUnitName(listUnits(t)[0] ?? '')
+    setDefaultHabitual(t === 'medico' ? 'CE' : 'D1')
   }
 
   async function handleCreate() {
@@ -101,6 +108,8 @@ export function CreateScheduleWizard({
       )
 
       let staff: StaffMember[]
+      const emptyCode =
+        serviceType === 'medico' ? defaultHabitual : undefined
       if (copyPrevStaff) {
         const probe = createBlankSchedule(serviceType, year, month, {
           withDemo: false,
@@ -117,11 +126,17 @@ export function CreateScheduleWizard({
               id: uid(serviceType === 'enfermeria' ? 'enf' : 'med'),
               name: '',
               order: staff.length + 1,
+              ...(emptyCode ? { codigoPersonal: emptyCode } : {}),
             })
           }
           if (staff.length > staffCount) staff = staff.slice(0, staffCount)
         } else {
-          staff = makeSlots(serviceType, resolvedUnit, staffCount)
+          staff = makeSlots(
+            serviceType,
+            resolvedUnit,
+            staffCount,
+            emptyCode,
+          )
         }
       } else if (useLibrary && lib.length > 0) {
         staff = lib.slice(0, staffCount).map((s, i) => ({ ...s, order: i + 1 }))
@@ -132,10 +147,11 @@ export function CreateScheduleWizard({
             id: uid(serviceType === 'enfermeria' ? 'enf' : 'med'),
             name: '',
             order: staff.length + 1,
+            ...(emptyCode ? { codigoPersonal: emptyCode } : {}),
           })
         }
       } else {
-        staff = makeSlots(serviceType, resolvedUnit, staffCount)
+        staff = makeSlots(serviceType, resolvedUnit, staffCount, emptyCode)
       }
 
       const doc = createBlankSchedule(serviceType, year, month, {
@@ -368,6 +384,26 @@ export function CreateScheduleWizard({
               />
               Traer nombres del mes anterior (mismo servicio), si existe
             </label>
+            {serviceType === 'medico' && (
+              <label className="mt-3 block text-xs font-semibold text-muted">
+                Clave habitual por defecto (plazas nuevas)
+                <select
+                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm font-bold text-navy"
+                  value={defaultHabitual}
+                  onChange={(e) => setDefaultHabitual(e.target.value)}
+                >
+                  {habitualTurnoOptions('medico').map((o) => (
+                    <option key={o.code} value={o.code}>
+                      {o.code} · {o.hours} h — {o.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-[11px] font-normal text-muted">
+                  Se aplica a plazas vacías. Puede cambiarla después por médico
+                  (CE 8 h, PT 12 h, HE 13 h, X 24 h).
+                </span>
+              </label>
+            )}
           </section>
         </div>
 
