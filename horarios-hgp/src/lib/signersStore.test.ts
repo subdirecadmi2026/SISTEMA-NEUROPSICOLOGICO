@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { createBlankSchedule } from '../data/demo'
+import { createEmptyStaff } from './staffLibrary'
 import {
+  authorityCount,
+  buildPrintSignatureBoxes,
   createOrUpdateUserFromSigner,
   fullSignerName,
   getSignersConfig,
@@ -31,43 +35,54 @@ function installMemoryStorage() {
   })
 }
 
-describe('responsables de firma', () => {
+describe('autoridades de firma', () => {
   beforeEach(() => {
     installMemoryStorage()
     resetSignersToDefaults()
   })
 
-  it('permite 3, 4 o 5 casillas', () => {
+  it('la 1.ª firma es el jefe automático; admin solo configura autoridades', () => {
     expect(getSignersConfig().count).toBe(3)
-    expect(listActiveSigners()).toHaveLength(3)
-    expect(setSignersCount(5).signers).toHaveLength(5)
-    expect(setSignersCount(4).count).toBe(4)
+    expect(authorityCount()).toBe(2)
+    expect(listActiveSigners()).toHaveLength(2)
+    expect(listActiveSigners().every((s) => s.kind !== 'elaborado' as never)).toBe(
+      true,
+    )
+
+    expect(setSignersCount(5).signers).toHaveLength(4)
+    expect(authorityCount(setSignersCount(4))).toBe(3)
   })
 
-  it('guarda nombres, apellidos y responsabilidad', () => {
-    const cfg = getSignersConfig()
-    const id = cfg.signers[0].id
-    updateSigner(id, {
-      nombres: 'María Fernanda',
-      apellidos: 'Pérez Guatatuca',
-      cargo: 'Jefa de Medicina Interna',
-      email: 'maria.perez@hgp.gob.ec',
+  it('impresión antepone al jefe con datos del horario', () => {
+    const doc = createBlankSchedule('medico', 2026, 7, {
+      withDemo: false,
+      unitName: 'Medicina interna',
+      staff: [
+        {
+          ...createEmptyStaff('medico', 'Medicina interna'),
+          name: 'Dr. Pérez',
+        },
+      ],
     })
-    const s = listActiveSigners()[0]
-    expect(fullSignerName(s)).toBe('María Fernanda Pérez Guatatuca')
-    expect(s.cargo).toBe('Jefa de Medicina Interna')
+    doc.jefeServicio = 'Dra. Ana López'
+    const boxes = buildPrintSignatureBoxes(doc)
+    expect(boxes[0].kind).toBe('elaborado')
+    expect(boxes[0].label).toMatch(/Jefe de servicio/i)
+    expect(boxes[0].designatedName).toBe('Dra. Ana López')
+    expect(boxes.length).toBe(1 + listActiveSigners().length)
   })
 
-  it('crea usuario vinculado desde el responsable', () => {
-    const cfg = getSignersConfig()
-    const id = cfg.signers[0].id
+  it('crea usuario de autoridad con nombres y responsabilidad', () => {
+    const id = getSignersConfig().signers[0].id
     updateSigner(id, {
-      nombres: 'Carlos',
-      apellidos: 'Mendoza',
-      cargo: 'Jefe de servicio',
-      email: 'carlos.mendoza.firmas@hgp.gob.ec',
-      kind: 'elaborado',
+      nombres: 'Patricia',
+      apellidos: 'Vega Ruiz',
+      cargo: 'Talento Humano',
+      email: 'patricia.vega.firmas@hgp.gob.ec',
+      kind: 'validado',
     })
+    const s = listActiveSigners().find((x) => x.id === id)!
+    expect(fullSignerName(s)).toBe('Patricia Vega Ruiz')
     const { userId, signer } = createOrUpdateUserFromSigner(id, 'hgp2026')
     expect(userId).toBeTruthy()
     expect(signer.linkedUserId).toBe(userId)

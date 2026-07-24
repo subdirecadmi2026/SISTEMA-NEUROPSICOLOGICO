@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
+import { DEMO_PASSWORD, roleLabel } from '../lib/auth'
 import {
-  DEMO_PASSWORD,
-  roleLabel,
-} from '../lib/auth'
-import {
-  SIGNER_KIND_DEFAULT_CARGO,
-  SIGNER_KIND_LABEL,
+  AUTHORITY_KIND_DEFAULT_CARGO,
+  AUTHORITY_KIND_LABEL,
+  type AuthorityKind,
   type HospitalSigner,
-  type SignerKind,
   type SignersConfig,
+  authorityCount,
   createOrUpdateUserFromSigner,
   fullSignerName,
   getSignersConfig,
@@ -24,8 +22,7 @@ type Props = {
   onFlash: (msg: string) => void
 }
 
-const KINDS: SignerKind[] = [
-  'elaborado',
+const KINDS: AuthorityKind[] = [
   'revisado',
   'aprobado',
   'validado',
@@ -33,8 +30,8 @@ const KINDS: SignerKind[] = [
 ]
 
 /**
- * Admin: define 3–5 responsables de firma del horario hospitalario,
- * con nombres/apellidos, responsabilidad y creación de usuarios.
+ * Admin: autoridades que respaldan y validan el horario.
+ * La 1.ª firma (Jefe de servicio) es automática desde el horario.
  */
 export function AdminFirmasPanel({ onFlash }: Props) {
   const [cfg, setCfg] = useState<SignersConfig>(() => getSignersConfig())
@@ -45,6 +42,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
     () => [...cfg.signers].sort((a, b) => a.order - b.order),
     [cfg.signers, tick],
   )
+  const authorities = authorityCount(cfg)
 
   function refresh(next?: SignersConfig) {
     setCfg(next ?? getSignersConfig())
@@ -57,12 +55,14 @@ export function AdminFirmasPanel({ onFlash }: Props) {
 
   function changeCount(count: 3 | 4 | 5) {
     refresh(setSignersCount(count))
-    onFlash(`Casillas de firma: ${count}`)
+    onFlash(
+      `Total ${count} firmas = 1 jefe (automático) + ${count - 1} autoridad(es)`,
+    )
   }
 
   function saveAll() {
     refresh(saveSignersConfig(cfg))
-    onFlash('Responsables de firma guardados')
+    onFlash('Autoridades de firma guardadas')
   }
 
   function createUser(s: HospitalSigner) {
@@ -72,7 +72,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
       refresh()
       const u = getManagedUser(userId)
       onFlash(
-        `Usuario ${u?.email ?? signer.email} listo · rol ${roleLabel(roleForSignerKind(signer.kind))} · firma: ${signer.cargo}`,
+        `Usuario ${u?.email ?? signer.email} listo · rol ${roleLabel(roleForSignerKind(signer.kind))} · ${signer.cargo}`,
       )
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo crear el usuario')
@@ -86,17 +86,33 @@ export function AdminFirmasPanel({ onFlash }: Props) {
           Firmas institucionales
         </p>
         <h2 className="font-display text-xl text-navy">
-          Responsables de firmar el horario
+          Autoridades que respaldan y validan
         </h2>
         <p className="mt-1 text-sm text-muted">
-          Defina 3, 4 o 5 responsables según la necesidad del hospital. Registre
-          nombres y apellidos, la responsabilidad que saldrá en la casilla de
-          firma, y cree el usuario del sistema.
+          La <strong>primera firma</strong> siempre es el{' '}
+          <strong>Jefe de servicio</strong> y se completa sola con los datos del
+          horario. Aquí solo elige las autoridades que revisan, aprueban o
+          validan (2, 3 o 4 según el hospital).
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3">
+        <p className="text-xs font-bold uppercase tracking-wide text-teal">
+          Firma 1 · automática
+        </p>
+        <p className="font-display text-lg text-navy">
+          Jefe de servicio (Elaborado)
+        </p>
+        <p className="text-sm text-muted">
+          Nombre y cargo salen del horario: campo «Jefe / líder» y la firma al
+          enviar a revisión. No se configura en este módulo.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-white p-3 shadow-sm">
-        <span className="text-xs font-semibold text-muted">Cantidad de firmas</span>
+        <span className="text-xs font-semibold text-muted">
+          Total de firmas en el cuadro
+        </span>
         {([3, 4, 5] as const).map((n) => (
           <button
             key={n}
@@ -111,17 +127,20 @@ export function AdminFirmasPanel({ onFlash }: Props) {
             {n}
           </button>
         ))}
+        <span className="text-xs text-muted">
+          = 1 jefe + <strong>{authorities}</strong> autoridad(es)
+        </span>
         <button
           type="button"
           onClick={saveAll}
           className="ml-auto rounded-lg bg-navy px-3 py-1.5 text-sm font-semibold text-white"
         >
-          Guardar configuración
+          Guardar
         </button>
         <button
           type="button"
           onClick={() => {
-            if (!window.confirm('¿Restablecer a 3 firmas vacías por defecto?'))
+            if (!window.confirm('¿Restablecer a 3 firmas (jefe + 2 autoridades)?'))
               return
             refresh(resetSignersToDefaults())
             onFlash('Firmas restablecidas')
@@ -145,7 +164,10 @@ export function AdminFirmasPanel({ onFlash }: Props) {
             >
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="font-display text-lg text-navy">
-                  Firma {idx + 1}
+                  Firma {idx + 2}
+                  <span className="ml-2 text-sm font-sans font-normal text-muted">
+                    (autoridad)
+                  </span>
                   {full ? (
                     <span className="ml-2 text-sm font-sans font-semibold text-teal">
                       · {full}
@@ -153,7 +175,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                   ) : null}
                 </p>
                 <span className="rounded-md bg-sand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-                  {SIGNER_KIND_LABEL[s.kind]}
+                  {AUTHORITY_KIND_LABEL[s.kind]}
                 </span>
               </div>
 
@@ -181,30 +203,30 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                   <input
                     className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm font-semibold text-navy"
                     value={s.cargo}
-                    placeholder={SIGNER_KIND_DEFAULT_CARGO[s.kind]}
+                    placeholder={AUTHORITY_KIND_DEFAULT_CARGO[s.kind]}
                     onChange={(e) => patch(s.id, { cargo: e.target.value })}
                   />
                 </label>
                 <label className="text-xs font-semibold text-muted">
-                  Tipo de responsabilidad
+                  Función
                   <select
                     className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
                     value={s.kind}
                     onChange={(e) => {
-                      const kind = e.target.value as SignerKind
+                      const kind = e.target.value as AuthorityKind
                       patch(s.id, {
                         kind,
                         cargo:
                           s.cargo.trim() &&
-                          s.cargo !== SIGNER_KIND_DEFAULT_CARGO[s.kind]
+                          s.cargo !== AUTHORITY_KIND_DEFAULT_CARGO[s.kind]
                             ? s.cargo
-                            : SIGNER_KIND_DEFAULT_CARGO[kind],
+                            : AUTHORITY_KIND_DEFAULT_CARGO[kind],
                       })
                     }}
                   >
                     {KINDS.map((k) => (
                       <option key={k} value={k}>
-                        {SIGNER_KIND_LABEL[k]}
+                        {AUTHORITY_KIND_LABEL[k]}
                       </option>
                     ))}
                   </select>
@@ -215,7 +237,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                     type="email"
                     className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
                     value={s.email}
-                    placeholder="nombre.apellido@hgp.gob.ec"
+                    placeholder="autoridad@hgp.gob.ec"
                     onChange={(e) => patch(s.id, { email: e.target.value })}
                   />
                 </label>
@@ -242,7 +264,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                   {linked ? (
                     <>
                       {' '}
-                      · Usuario vinculado:{' '}
+                      · Usuario:{' '}
                       <strong className="text-teal">{linked.email}</strong>
                     </>
                   ) : (
@@ -263,7 +285,7 @@ export function AdminFirmasPanel({ onFlash }: Props) {
                   Vista previa casilla
                 </p>
                 <p className="text-xs font-semibold uppercase tracking-wide text-navy">
-                  {s.cargo || SIGNER_KIND_DEFAULT_CARGO[s.kind]}
+                  {s.cargo || AUTHORITY_KIND_DEFAULT_CARGO[s.kind]}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-ink">
                   {full || '— Nombres y apellidos —'}

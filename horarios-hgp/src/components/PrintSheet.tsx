@@ -13,11 +13,7 @@ import {
 import { shiftMeta } from '../data/templates'
 import { formatHolidaysLabel } from '../lib/holidays'
 import { SignatureStampBox } from './SignatureStampBox'
-import {
-  electronicSlotForKind,
-  fullSignerName,
-  listActiveSigners,
-} from '../lib/signersStore'
+import { buildPrintSignatureBoxes } from '../lib/signersStore'
 
 type Props = {
   doc: ScheduleDoc
@@ -33,24 +29,6 @@ function paperSize() {
   return { w: mmToPx(297 - m * 2), h: mmToPx(210 - m * 2) }
 }
 
-function stampValueForKind(
-  doc: ScheduleDoc,
-  kind: string,
-): string {
-  switch (kind) {
-    case 'elaborado':
-      return doc.elaboradoPor
-    case 'revisado':
-      return doc.revisadoPor || doc.aprobadoPor
-    case 'aprobado':
-      return doc.aprobadoPor || doc.revisadoPor
-    case 'validado':
-      return doc.talentoHumano
-    default:
-      return ''
-  }
-}
-
 /**
  * Cuerpo institucional del horario (encabezado MSP + grilla + firmas).
  * Usado por impresión del médico y por el PDF del validador.
@@ -62,58 +40,13 @@ export function InstitutionalPrintBody({ doc }: Props) {
     .filter((s) => s.name.trim())
     .sort((a, b) => a.order - b.order)
 
-  const roster = listActiveSigners()
-  const usedElectronicSlots = new Set<string>()
-  const signatures =
-    roster.length > 0
-      ? roster.map((s) => {
-          const slot = electronicSlotForKind(s.kind)
-          let electronic =
-            slot && !usedElectronicSlots.has(slot)
-              ? (doc.electronicSigns ?? []).find((e) => e.slot === slot)
-              : undefined
-          if (slot && electronic) usedElectronicSlots.add(slot)
-          // Si dos casillas comparten slot (revisado/aprobado), solo la primera
-          // toma el sello electrónico; la otra muestra el nombre designado.
-          return {
-            key: s.id,
-            label: s.cargo || s.kind,
-            value: stampValueForKind(doc, s.kind),
-            designatedName: fullSignerName(s) || undefined,
-            slot: slot ?? undefined,
-            electronic,
-          }
-        })
-      : [
-          {
-            key: 'jefe',
-            label: 'Jefe de servicio (Elaborado)',
-            value: doc.elaboradoPor,
-            designatedName: undefined as string | undefined,
-            slot: 'jefe' as const,
-            electronic: (doc.electronicSigns ?? []).find((e) => e.slot === 'jefe'),
-          },
-          {
-            key: 'revisor',
-            label: 'Revisor (Aprobado)',
-            value: doc.revisadoPor || doc.aprobadoPor,
-            designatedName: undefined,
-            slot: 'revisor' as const,
-            electronic: (doc.electronicSigns ?? []).find(
-              (e) => e.slot === 'revisor',
-            ),
-          },
-          {
-            key: 'validador',
-            label: 'Validador (Validado)',
-            value: doc.talentoHumano,
-            designatedName: undefined,
-            slot: 'validador' as const,
-            electronic: (doc.electronicSigns ?? []).find(
-              (e) => e.slot === 'validador',
-            ),
-          },
-        ]
+  const boxes = buildPrintSignatureBoxes(doc)
+  const signatures = boxes.map((s) => ({
+    ...s,
+    electronic: s.slot
+      ? (doc.electronicSigns ?? []).find((e) => e.slot === s.slot)
+      : undefined,
+  }))
 
   const cols =
     signatures.length >= 5
