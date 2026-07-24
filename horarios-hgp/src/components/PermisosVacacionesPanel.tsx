@@ -107,6 +107,7 @@ export function PermisosVacacionesPanel({
   const [statusFilter, setStatusFilter] = useState<'activo' | 'all'>('activo')
   /** TH puede ver todas las unidades; servicio queda en su unidad. */
   const [scopeAll, setScopeAll] = useState(isTH)
+  const [detailLeave, setDetailLeave] = useState<StaffLeave | null>(null)
   const [form, setForm] = useState<FormState>(() =>
     emptyForm(
       defaultServiceType,
@@ -127,6 +128,15 @@ export function PermisosVacacionesPanel({
   useEffect(() => {
     setScopeAll(isTH)
   }, [isTH])
+
+  useEffect(() => {
+    if (!detailLeave) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDetailLeave(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [detailLeave])
 
   const units = listUnits(form.serviceType)
   const libraryStaff = useMemo(() => {
@@ -808,61 +818,46 @@ export function PermisosVacacionesPanel({
 
         <ul className="max-h-[36rem] space-y-2 overflow-y-auto">
           {visible.map((l) => (
-            <li
-              key={l.id}
-              className="rounded-xl border border-line bg-gradient-to-b from-white to-sand/20 px-3 py-2.5"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-navy">{l.staffName}</p>
-                  <p className="text-[11px] text-muted">
-                    {LEAVE_KIND_LABEL[l.kind]} · clave{' '}
-                    <strong className="text-teal">{l.absenceCode}</strong> ·{' '}
-                    {l.startDate} → {l.endDate}
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink">
-                    <strong>
-                      {formatLeaveDaysAndHours(
-                        l.authorizedHours,
-                        l.hoursPerDay,
-                        inclusiveDayCount(l.startDate, l.endDate),
-                      )}
-                    </strong>{' '}
-                    · {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
-                    {l.unitName}
-                    {l.status === 'cancelado' ? ' · cancelado' : ''}
-                    {l.createdByName ? ` · por ${l.createdByName}` : ''}
-                  </p>
-                  {l.notes ? (
-                    <p className="mt-1 text-[11px] text-muted">{l.notes}</p>
-                  ) : null}
+            <li key={l.id}>
+              <button
+                type="button"
+                onClick={() => setDetailLeave(l)}
+                className="group w-full rounded-xl border border-line bg-gradient-to-b from-white to-sand/20 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-md"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-navy group-hover:text-teal">
+                      {l.staffName}
+                    </p>
+                    <p className="text-[11px] text-muted">
+                      {LEAVE_KIND_LABEL[l.kind]} · clave{' '}
+                      <strong className="text-teal">{l.absenceCode}</strong> ·{' '}
+                      {l.startDate} → {l.endDate}
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink">
+                      <strong>
+                        {formatLeaveDaysAndHours(
+                          l.authorizedHours,
+                          l.hoursPerDay,
+                          inclusiveDayCount(l.startDate, l.endDate),
+                        )}
+                      </strong>{' '}
+                      · {l.serviceType === 'medico' ? 'Médico' : 'Enf.'} ·{' '}
+                      {l.unitName}
+                      {l.status === 'cancelado' ? ' · cancelado' : ''}
+                      {l.createdByName ? ` · por ${l.createdByName}` : ''}
+                    </p>
+                    {l.notes ? (
+                      <p className="mt-1 line-clamp-1 text-[11px] text-muted">
+                        {l.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="shrink-0 rounded-md bg-navy/5 px-2 py-1 text-[10px] font-semibold text-navy group-hover:bg-teal/15 group-hover:text-teal">
+                    Ver detalle →
+                  </span>
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    type="button"
-                    onClick={() => startEdit(l)}
-                    className="rounded-md border border-line px-2 py-1 text-[10px] font-semibold"
-                  >
-                    Editar
-                  </button>
-                  {l.status === 'activo' ? (
-                    <button
-                      type="button"
-                      onClick={() => softCancel(l)}
-                      className="rounded-md border border-amber-200 px-2 py-1 text-[10px] font-semibold text-amber-900"
-                    >
-                      Cancelar
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => remove(l)}
-                    className="rounded-md border border-rose-200 px-2 py-1 text-[10px] font-semibold text-rose-900"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </div>
+              </button>
             </li>
           ))}
           {visible.length === 0 ? (
@@ -873,6 +868,207 @@ export function PermisosVacacionesPanel({
         </ul>
       </div>
     </section>
+
+      {detailLeave ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-navy/50 p-3 sm:items-center sm:p-6"
+          role="presentation"
+          onClick={() => setDetailLeave(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="leave-detail-title"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+                  Detalle del permiso
+                </p>
+                <h3
+                  id="leave-detail-title"
+                  className="font-display text-2xl text-navy"
+                >
+                  {detailLeave.staffName}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailLeave(null)}
+                className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:bg-sand"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Tipo
+                </dt>
+                <dd className="text-sm font-semibold text-navy">
+                  {LEAVE_KIND_LABEL[detailLeave.kind]}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Clave planilla
+                </dt>
+                <dd className="text-sm font-semibold text-teal">
+                  {detailLeave.absenceCode}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Servicio
+                </dt>
+                <dd className="text-sm font-semibold text-navy">
+                  {detailLeave.serviceType === 'medico'
+                    ? 'Médico'
+                    : 'Enfermería'}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Unidad / especialidad
+                </dt>
+                <dd className="text-sm font-semibold text-navy">
+                  {detailLeave.unitName}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Desde
+                </dt>
+                <dd className="text-sm font-semibold text-navy">
+                  {detailLeave.startDate}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Hasta
+                </dt>
+                <dd className="text-sm font-semibold text-navy">
+                  {detailLeave.endDate}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-teal/25 bg-teal/5 px-3 py-2 sm:col-span-2">
+                <dt className="text-[10px] font-bold uppercase text-teal">
+                  Días y horas
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-navy">
+                  {formatLeaveDaysAndHours(
+                    detailLeave.authorizedHours,
+                    detailLeave.hoursPerDay,
+                    inclusiveDayCount(
+                      detailLeave.startDate,
+                      detailLeave.endDate,
+                    ),
+                  )}
+                </dd>
+                <dd className="mt-1 text-[11px] text-muted">
+                  {inclusiveDayCount(
+                    detailLeave.startDate,
+                    detailLeave.endDate,
+                  )}{' '}
+                  día(s) calendario · {detailLeave.hoursPerDay} h/día ·{' '}
+                  {detailLeave.authorizedHours} h autorizadas · ≈{' '}
+                  {equivalentDaysFromHours(
+                    detailLeave.authorizedHours,
+                    detailLeave.hoursPerDay,
+                  )}{' '}
+                  día(s) por horas
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Estado
+                </dt>
+                <dd className="text-sm font-semibold capitalize text-navy">
+                  {detailLeave.status}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Registrado por
+                </dt>
+                <dd className="text-sm font-semibold text-navy">
+                  {detailLeave.createdByName || '—'}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2 sm:col-span-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Observación
+                </dt>
+                <dd className="mt-0.5 whitespace-pre-wrap text-sm text-ink">
+                  {detailLeave.notes?.trim() || 'Sin observación'}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Creado
+                </dt>
+                <dd className="text-xs text-ink">
+                  {new Date(detailLeave.createdAt).toLocaleString('es-EC')}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-line bg-sand/20 px-3 py-2">
+                <dt className="text-[10px] font-bold uppercase text-muted">
+                  Actualizado
+                </dt>
+                <dd className="text-xs text-ink">
+                  {new Date(detailLeave.updatedAt).toLocaleString('es-EC')}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  startEdit(detailLeave)
+                  setDetailLeave(null)
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white"
+              >
+                Editar en formulario
+              </button>
+              {detailLeave.status === 'activo' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    softCancel(detailLeave)
+                    setDetailLeave(null)
+                  }}
+                  className="rounded-xl border border-amber-200 px-3 py-2 text-sm font-semibold text-amber-900"
+                >
+                  Cancelar permiso
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  remove(detailLeave)
+                  setDetailLeave(null)
+                }}
+                className="rounded-xl border border-rose-200 px-3 py-2 text-sm font-semibold text-rose-900"
+              >
+                Eliminar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailLeave(null)}
+                className="rounded-xl border border-line px-3 py-2 text-sm font-semibold"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
