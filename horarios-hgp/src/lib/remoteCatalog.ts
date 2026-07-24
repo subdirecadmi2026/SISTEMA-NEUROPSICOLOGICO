@@ -159,11 +159,14 @@ function notifToRow(n: HgpNotification) {
 }
 
 function rowToNotif(r: Record<string, unknown>): HgpNotification {
+  const roleRaw = String(r.to_role ?? 'lider_servicio')
+  const toRole =
+    roleRaw === 'admisiones' ? 'admisiones' : 'lider_servicio'
   return {
     id: String(r.id),
     createdAt: String(r.created_at ?? new Date().toISOString()),
     read: Boolean(r.read),
-    toRole: 'lider_servicio',
+    toRole,
     unitName: r.unit_name ? String(r.unit_name) : undefined,
     scheduleId: String(r.schedule_id),
     title: String(r.title),

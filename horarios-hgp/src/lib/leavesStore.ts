@@ -45,7 +45,7 @@ export const LEAVE_KIND_LABEL: Record<LeaveKind, string> = {
   permiso_temporal: 'Permiso temporal',
   permiso_medico: 'Permiso / certificado médico',
   calamidad: 'Calamidad doméstica',
-  capacitacion: 'Capacitación',
+  capacitacion: 'Capacitación / congreso',
   otro: 'Otro',
 }
 

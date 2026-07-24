@@ -15,6 +15,15 @@ type Props = {
   refreshKey?: number
 }
 
+function canSeeNotifications(user: AppUser | null): boolean {
+  if (!user) return false
+  return (
+    isJefeRole(user.role) ||
+    user.role === 'admin' ||
+    user.role === 'admisiones'
+  )
+}
+
 export function NotificationsBell({ user, refreshKey = 0 }: Props) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<HgpNotification[]>([])
@@ -36,7 +45,7 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
     return () => window.removeEventListener('storage', onStorage)
   }, [user])
 
-  if (!user || (!isJefeRole(user.role) && user.role !== 'admin')) {
+  if (!canSeeNotifications(user)) {
     return null
   }
 
@@ -44,6 +53,13 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
     setItems(listNotificationsFor(user))
     setUnread(unreadCountFor(user))
   }
+
+  const panelTitle =
+    user?.role === 'admisiones'
+      ? 'Avisos Admisiones'
+      : user?.role === 'admin'
+        ? 'Avisos'
+        : 'Avisos del servicio'
 
   return (
     <div className="relative">
@@ -67,13 +83,13 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-[min(22rem,90vw)] rounded-xl border border-line bg-white text-ink shadow-lg">
           <div className="flex items-center justify-between border-b border-line px-3 py-2">
-            <p className="text-sm font-semibold text-navy">Notificaciones</p>
+            <p className="text-sm font-semibold text-navy">{panelTitle}</p>
             {unread > 0 && (
               <button
                 type="button"
                 className="text-xs font-semibold text-teal hover:underline"
                 onClick={() => {
-                  markAllNotificationsRead(user)
+                  markAllNotificationsRead(user!)
                   reload()
                 }}
               >
@@ -84,7 +100,9 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
           <ul className="max-h-72 overflow-y-auto">
             {items.length === 0 ? (
               <li className="px-3 py-6 text-center text-sm text-muted">
-                Sin avisos
+                {user?.role === 'admisiones'
+                  ? 'Sin avisos de Talento Humano'
+                  : 'Sin avisos'}
               </li>
             ) : (
               items.slice(0, 20).map((n) => (
@@ -98,6 +116,7 @@ export function NotificationsBell({ user, refreshKey = 0 }: Props) {
                   <p className="mt-0.5 text-xs text-ink">{n.body}</p>
                   <p className="mt-1 text-[10px] text-muted">
                     {new Date(n.createdAt).toLocaleString('es-EC')}
+                    {n.toRole === 'admisiones' ? ' · Admisiones' : ''}
                   </p>
                   {!n.read && (
                     <button

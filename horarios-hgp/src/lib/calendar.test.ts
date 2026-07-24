@@ -770,6 +770,41 @@ describe('notificación al jefe al validar', () => {
     expect(list2.some((n) => n.title === 'Corrección solicitada')).toBe(true)
     expect(list2.some((n) => n.body.includes('Pediatría'))).toBe(true)
   })
+
+  it('avisa a Admisiones cuando TH registra permisos/vacaciones/congresos', async () => {
+    const {
+      notifyLeaveRegisteredForRoles,
+      listNotificationsFor,
+    } = await import('./notifications')
+    const { DEMO_USERS } = await import('./auth')
+    const admisiones = DEMO_USERS.find((u) => u.id === 'u-admisiones')!
+    const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+
+    const { jefe: jNotif, admisiones: aNotif } = notifyLeaveRegisteredForRoles({
+      unitName: 'Nefrología',
+      staffName: 'Dr. Pérez',
+      kindLabel: 'Capacitación / congreso',
+      startDate: '2026-08-01',
+      endDate: '2026-08-03',
+      authorizedHours: 24,
+      absenceCode: 'CAP',
+      registeredBy: 'Ing. Patricia Vega',
+      notifyAdmisiones: true,
+      daysLabel: '3 días · 24 h (8 h/día)',
+    })
+    expect(jNotif.toRole).toBe('lider_servicio')
+    expect(aNotif?.toRole).toBe('admisiones')
+    expect(aNotif?.title).toContain('Capacitación')
+
+    const forAdm = listNotificationsFor(admisiones)
+    expect(forAdm.some((n) => n.toRole === 'admisiones')).toBe(true)
+    expect(forAdm.some((n) => n.body.includes('Nefrología'))).toBe(true)
+    expect(forAdm.every((n) => n.toRole === 'admisiones')).toBe(true)
+
+    const forJefe = listNotificationsFor(jefe)
+    expect(forJefe.some((n) => n.toRole === 'lider_servicio')).toBe(true)
+    expect(forJefe.every((n) => n.toRole === 'lider_servicio')).toBe(true)
+  })
 })
 
 describe('FirmaEC PKCS#12 local', () => {

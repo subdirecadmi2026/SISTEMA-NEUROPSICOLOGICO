@@ -8,11 +8,13 @@ import {
 
 const KEY = 'hgp-notifications-v1'
 
+export type NotificationTargetRole = 'lider_servicio' | 'admisiones'
+
 export type HgpNotification = {
   id: string
   createdAt: string
   read: boolean
-  toRole: 'lider_servicio'
+  toRole: NotificationTargetRole
   /** Unidad / especialidad del horario (filtro para jefes). */
   unitName?: string
   scheduleId: string
@@ -125,6 +127,97 @@ export function notifyJefeLeaveRegistered(opts: {
   })
 }
 
+/**
+ * Aviso a Admisiones: Talento Humano registró/aprobó permiso, vacaciones,
+ * capacitación/congreso u otro tipo de ausencia.
+ */
+export function notifyAdmisionesLeaveApproved(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  startDate: string
+  endDate: string
+  authorizedHours: number
+  absenceCode: string
+  approvedBy: string
+  daysLabel?: string
+}): HgpNotification {
+  const days = opts.daysLabel ? ` · ${opts.daysLabel}` : ''
+  return addNotification({
+    toRole: 'admisiones',
+    unitName: opts.unitName,
+    scheduleId: `leave:${opts.unitName}`,
+    title: `TH · ${opts.kindLabel}`,
+    body: `${opts.staffName} (${opts.unitName}) · ${opts.startDate} → ${opts.endDate}${days} · ${opts.authorizedHours} h (clave ${opts.absenceCode}). Aprobado/registrado por Talento Humano: ${opts.approvedBy}.`,
+    kind: 'permiso',
+  })
+}
+
+/** Aviso a Admisiones: TH canceló, eliminó o actualizó un permiso. */
+export function notifyAdmisionesLeaveChanged(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  action: 'cancelado' | 'eliminado' | 'actualizado'
+  by: string
+}): HgpNotification {
+  return addNotification({
+    toRole: 'admisiones',
+    unitName: opts.unitName,
+    scheduleId: `leave:${opts.unitName}`,
+    title: `TH · permiso ${opts.action}`,
+    body: `${opts.kindLabel} de ${opts.staffName} (${opts.unitName}) fue ${opts.action} por Talento Humano (${opts.by}).`,
+    kind: 'permiso',
+  })
+}
+
+/**
+ * Notifica jefe + (si aplica) Admisiones cuando TH gestiona permisos/
+ * vacaciones / capacitación-congresos.
+ */
+export function notifyLeaveRegisteredForRoles(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  startDate: string
+  endDate: string
+  authorizedHours: number
+  absenceCode: string
+  registeredBy: string
+  /** Si true, también avisa al perfil de Admisiones. */
+  notifyAdmisiones?: boolean
+  daysLabel?: string
+}): { jefe: HgpNotification; admisiones?: HgpNotification } {
+  const jefe = notifyJefeLeaveRegistered(opts)
+  if (!opts.notifyAdmisiones) return { jefe }
+  const admisiones = notifyAdmisionesLeaveApproved({
+    unitName: opts.unitName,
+    staffName: opts.staffName,
+    kindLabel: opts.kindLabel,
+    startDate: opts.startDate,
+    endDate: opts.endDate,
+    authorizedHours: opts.authorizedHours,
+    absenceCode: opts.absenceCode,
+    approvedBy: opts.registeredBy,
+    daysLabel: opts.daysLabel,
+  })
+  return { jefe, admisiones }
+}
+
+export function notifyLeaveChangedForRoles(opts: {
+  unitName: string
+  staffName: string
+  kindLabel: string
+  action: 'cancelado' | 'eliminado' | 'actualizado'
+  by: string
+  notifyAdmisiones?: boolean
+}): { jefe: HgpNotification; admisiones?: HgpNotification } {
+  const jefe = notifyJefeLeaveChanged(opts)
+  if (!opts.notifyAdmisiones) return { jefe }
+  const admisiones = notifyAdmisionesLeaveChanged(opts)
+  return { jefe, admisiones }
+}
+
 /** Aviso al jefe: el horario choca o excede permisos/vacaciones. */
 export function notifyJefeLeaveScheduleAlert(opts: {
   doc: ScheduleDoc
@@ -161,14 +254,18 @@ export function notifyJefeLeaveChanged(opts: {
 
 export function listNotificationsFor(user: AppUser | null): HgpNotification[] {
   if (!user) return []
-  if (!isJefeRole(user.role) && user.role !== 'admin') return []
+
   return loadAll()
     .filter((n) => {
-      if (n.toRole !== 'lider_servicio') return false
       if (user.role === 'admin') return true
-      if (!n.unitName) return true
-      if (!user.serviceUnits?.length) return true
-      return user.serviceUnits.includes(n.unitName)
+      if (user.role === 'admisiones') return n.toRole === 'admisiones'
+      if (isJefeRole(user.role)) {
+        if (n.toRole !== 'lider_servicio') return false
+        if (!n.unitName) return true
+        if (!user.serviceUnits?.length) return true
+        return user.serviceUnits.includes(n.unitName)
+      }
+      return false
     })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
