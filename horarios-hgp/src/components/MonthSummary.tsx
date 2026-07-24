@@ -5,7 +5,6 @@ import {
   plannedHours,
 } from '../lib/calendar'
 import { holidayDatesInMonth } from '../lib/holidays'
-import { runAllValidations } from '../lib/validation'
 
 type Props = {
   doc: ScheduleDoc
@@ -27,7 +26,6 @@ export function MonthSummary({ doc }: Props) {
   const lowDays = cov.filter(
     (c) => c.count < doc.coverageRule.minStaffPerDay,
   ).length
-  const alerts = runAllValidations(doc)
 
   const items = [
     { label: 'Personal', value: String(named) },
@@ -35,11 +33,10 @@ export function MonthSummary({ doc }: Props) {
     { label: 'Celdas', value: `${fillPct}%` },
     { label: 'Feriados', value: String(holidays) },
     { label: 'Días bajos', value: String(lowDays) },
-    { label: 'Alertas', value: String(alerts.length) },
   ]
 
   return (
-    <section className="no-print mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+    <section className="no-print mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {items.map((it) => (
         <div
           key={it.label}

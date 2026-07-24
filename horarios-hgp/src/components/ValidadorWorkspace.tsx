@@ -483,14 +483,6 @@ export function ValidadorWorkspace({
         </div>
       )}
 
-      {!supportsDirectoryPicker() && module !== 'permisos' && (
-        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          Su navegador no permite crear carpetas en disco. Al validar se
-          descargará un <strong>ZIP</strong> con la carpeta de la especialidad.
-          En Chrome o Edge puede guardar directo en una carpeta.
-        </p>
-      )}
-
       {loading || loadingDetail ? (
         <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-10 text-center text-sm text-muted">
           Cargando…

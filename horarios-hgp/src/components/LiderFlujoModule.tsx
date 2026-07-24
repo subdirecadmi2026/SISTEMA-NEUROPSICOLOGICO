@@ -273,12 +273,6 @@ export function LiderFlujoModule({
           </div>
         </div>
 
-        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
-          Este horario ya cerró el flujo (enviado → revisado → validado). Queda
-          almacenado con las firmas; puede reimprimir o descargar el PDF
-          institucional completo en cualquier momento.
-        </div>
-
         <MonthSummary doc={detail} />
         <ReadOnlySchedulePanels doc={detail} />
         <InstitutionalPreview
@@ -359,17 +353,6 @@ export function LiderFlujoModule({
             placeholder="Buscar servicio o mes…"
             className="w-full max-w-md rounded-lg border border-line px-3 py-2 text-sm"
           />
-        </div>
-
-        <div className="mt-4 rounded-xl border border-dashed border-line bg-sand/40 px-3 py-2">
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted">
-            Flujo
-          </p>
-          <FlowStepper status="APROBADO" />
-          <p className="mt-1 text-[11px] text-muted">
-            Borrador → Enviado (revisión) → Revisado (aprobado) → Validado
-            (firmado y archivado)
-          </p>
         </div>
       </header>
 

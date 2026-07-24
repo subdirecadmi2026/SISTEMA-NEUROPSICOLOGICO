@@ -71,7 +71,6 @@ import { AuditTrail } from './components/AuditTrail'
 import { CellAdjustModule } from './components/CellAdjustModule'
 import { ToolsToolbar } from './components/ToolsToolbar'
 import { SubmissionChecklist } from './components/SubmissionChecklist'
-import { RoleModeBanner } from './components/RoleModeBanner'
 import { countPendingForRole } from './components/RoleInbox'
 import {
   ReviewCardsModule,
@@ -84,7 +83,6 @@ import { ConfigModule } from './components/ConfigModule'
 import { EditorTabs, type EditorTabId } from './components/EditorTabs'
 import {
   NotificationsBell,
-  ValidationNoticeBanner,
 } from './components/NotificationsBell'
 import { cloneStaffForSchedule, createEmptyStaff } from './lib/staffLibrary'
 import { downloadScheduleCsv } from './lib/exportCsv'
@@ -739,9 +737,6 @@ export default function App() {
           !user ||
           !isJefeRole(user.role)) && (
         <>
-      <RoleModeBanner user={user} doc={doc} canEdit={!readOnly} />
-      <ValidationNoticeBanner user={user} refreshKey={notifyTick} />
-
       <main className="mx-auto max-w-[1700px] px-3 py-4 sm:px-6 sm:py-6">
         <CorrectionsAlert
           doc={doc}

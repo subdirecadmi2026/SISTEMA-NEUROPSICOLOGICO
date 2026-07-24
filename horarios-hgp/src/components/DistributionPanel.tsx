@@ -9,7 +9,6 @@ import {
 } from '../lib/calendar'
 import { shiftMeta } from '../data/templates'
 import { holidayDatesInMonth } from '../lib/holidays'
-import { runAllValidations } from '../lib/validation'
 
 type Props = {
   doc: ScheduleDoc
@@ -21,9 +20,6 @@ export function DistributionPanel({ doc, onPaintDay }: Props) {
   const min = doc.coverageRule.minStaffPerDay
   const holidays = holidayDatesInMonth(doc.year, doc.month)
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
-  const alerts = runAllValidations(doc).filter(
-    (a) => a.code === 'cobertura_baja' || a.code === 'horas_bajas',
-  )
   const detail = selectedDay ? assignmentsOnDay(doc, selectedDay) : []
 
   return (
@@ -35,12 +31,6 @@ export function DistributionPanel({ doc, onPaintDay }: Props) {
         Umbral mínimo: {min} personas / {doc.coverageRule.minHoursPerDay} h por
         día. Rojo = cobertura baja. Clic en un día para ver quién trabaja.
       </p>
-
-      {alerts.length > 0 && (
-        <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {alerts.length} alerta(s) de cobertura/horas en el mes.
-        </p>
-      )}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px] border-collapse text-sm">

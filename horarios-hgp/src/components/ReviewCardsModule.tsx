@@ -12,7 +12,7 @@ import { notifyJefeScheduleValidated, notifyJefeScheduleReturned } from '../lib/
 import { MonthSummary } from './MonthSummary'
 import { InstitutionalPreview } from './InstitutionalPreview'
 import { ReadOnlySchedulePanels } from './ReadOnlySchedulePanels'
-import { runAllValidations, blockingValidationErrors } from '../lib/validation'
+import { blockingValidationErrors } from '../lib/validation'
 import { SERVICE_LABEL } from '../data/templates'
 import { SignatureGate } from './SignatureGate'
 import { slotForStatus } from '../lib/firmaEc'
@@ -167,8 +167,6 @@ export function ReviewCardsModule({
       : 'Abra una tarjeta y valide el horario aprobado'
 
   if (detail) {
-    const alerts = runAllValidations(detail)
-    const errors = alerts.filter((a) => a.level === 'error').length
     const others = pending.filter((p) => p.id !== detail.id).length
 
     return (
@@ -300,11 +298,6 @@ export function ReviewCardsModule({
 
         <MonthSummary doc={detail} />
         <InstitutionalPreview doc={detail} onFlash={onFlash} defaultOpen />
-        {errors > 0 && (
-          <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-            {errors} alerta(s) de cobertura/validación en este mes.
-          </p>
-        )}
         <ReadOnlySchedulePanels doc={detail} />
       </div>
     )

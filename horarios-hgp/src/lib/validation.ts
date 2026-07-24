@@ -165,8 +165,6 @@ export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
       if (!doc.cells[cellKey(s.id, d)]) empty += 1
     }
   }
-  const alerts = runAllValidations(doc)
-  const warnings = alerts.filter((a) => a.level === 'warning')
   const painted = Object.keys(doc.cells).length
 
   return [
@@ -204,15 +202,6 @@ export function getSubmissionChecklist(doc: ScheduleDoc): ChecklistItem[] {
         empty === 0 && named.length > 0
           ? 'Mes completo (sin celdas vacías)'
           : `${empty} celdas vacías (normal en turnos rotativos / 24 h)`,
-    },
-    {
-      id: 'avisos',
-      ok: warnings.length === 0,
-      level: 'recommended',
-      message:
-        warnings.length === 0
-          ? 'Sin avisos de cobertura/descansos'
-          : `${warnings.length} aviso(s) informativos (no bloquean el envío)`,
     },
   ]
 }
