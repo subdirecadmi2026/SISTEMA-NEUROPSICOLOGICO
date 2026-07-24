@@ -5,6 +5,7 @@ import {
   authorityCount,
   AUTHORITY_KIND_LABEL,
   addAuthority,
+  buildAdmisionesSignatureBox,
   buildPrintSignatureBoxes,
   createOrUpdateUserFromSigner,
   fullSignerName,
