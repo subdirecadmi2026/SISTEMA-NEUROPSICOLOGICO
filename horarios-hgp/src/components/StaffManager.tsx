@@ -64,7 +64,7 @@ export function StaffManager({
     upsertStaff(serviceType, unitName, toSave)
     setEditing(null)
     refresh()
-    onFlash('Personal guardado en biblioteca del servicio')
+    onFlash('Personal guardado en biblioteca del servicio (sync Supabase)')
   }
 
   async function handleImport(file: File) {

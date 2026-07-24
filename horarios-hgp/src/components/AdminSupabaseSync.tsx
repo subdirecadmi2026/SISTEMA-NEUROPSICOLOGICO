@@ -16,10 +16,10 @@ type Props = {
   onNotify?: () => void
 }
 
-const SQL_HINT = `supabase/migrations/20260723220000_leaves_notifications.sql`
+const SQL_HINT = `supabase/migrations/20260724193000_staff_library.sql`
 
 /**
- * Estado de sincronización Supabase para permisos y notificaciones.
+ * Estado de sincronización Supabase para personal, permisos y notificaciones.
  */
 export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
   const [status, setStatus] = useState<RemoteCatalogStatus | null>(null)
@@ -50,7 +50,7 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
       onNotify?.()
       onFlash(
         s.configured
-          ? `Sync OK · permisos ${s.leavesMode} (${s.leavesCount}) · avisos ${s.notificationsMode} (${s.notificationsCount})`
+          ? `Sync OK · personal ${s.staffLibraryMode} (${s.staffLibraryCount}) · permisos ${s.leavesMode} (${s.leavesCount}) · avisos ${s.notificationsMode} (${s.notificationsCount})`
           : 'Supabase no configurado · solo local',
       )
     } catch (e) {
@@ -74,11 +74,11 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
             Supabase
           </p>
           <h2 className="font-display text-lg text-navy">
-            Sync permisos y avisos
+            Sync personal, permisos y avisos
           </h2>
           <p className="mt-1 text-xs text-muted">
-            Los horarios ya van a Supabase. Permisos/vacaciones y notificaciones
-            se sincronizan aquí (tabla dedicada o bundle de respaldo).
+            Horarios y biblioteca de personal van a Supabase. Así el Validador
+            ve el personal que Admin carga (tabla dedicada o bundle de respaldo).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -101,11 +101,18 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
           <p className="text-[10px] font-bold uppercase text-muted">Estado</p>
           <p className="font-semibold text-navy">
             {remote ? 'Conectado' : 'Solo local'}
+          </p>
+        </div>
+        <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
+          <p className="text-[10px] font-bold uppercase text-muted">Personal</p>
+          <p className="font-semibold text-navy">
+            {status?.staffLibraryMode ?? '…'}
+            {status ? ` · ${status.staffLibraryCount}` : ''}
           </p>
         </div>
         <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
@@ -124,10 +131,12 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
         </div>
       </div>
 
-      {status?.leavesMode === 'bundle' || status?.notificationsMode === 'bundle' ? (
+      {status?.staffLibraryMode === 'bundle' ||
+      status?.leavesMode === 'bundle' ||
+      status?.notificationsMode === 'bundle' ? (
         <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Aún no hay tablas dedicadas. Se usa un <strong>bundle</strong> en
-          Supabase (funciona ya). Para el esquema óptimo ejecute en el SQL
+          Aún falta alguna tabla dedicada. Se usa un <strong>bundle</strong> de
+          respaldo (funciona ya). Para el esquema óptimo ejecute en el SQL
           Editor: <code className="font-mono">{SQL_HINT}</code>
         </p>
       ) : null}

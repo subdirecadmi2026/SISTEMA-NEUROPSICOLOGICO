@@ -130,8 +130,9 @@ export async function persistSchedule(
     if (error) throw new Error(error.message)
   }
 
-  // Staff snapshot en tabla staff (por id)
+  // Staff snapshot en tabla staff (por id) + refuerzo de biblioteca remota
   for (const s of local.staff) {
+    if (!s.name.trim()) continue
     await sb.from('staff').upsert(
       {
         id: s.id,
@@ -142,11 +143,43 @@ export async function persistSchedule(
         codigo_personal: s.codigoPersonal,
         section: s.section ?? null,
         service_unit: local.unitName,
+        service_type: local.serviceType,
         active: s.active !== false,
         sort_order: s.order,
       },
       { onConflict: 'id' },
     )
+    const libUpsert = await sb.from('staff_library').upsert(
+      {
+        id: s.id,
+        service_type: local.serviceType,
+        unit_name: local.unitName,
+        fun: s.fun,
+        name: s.name,
+        role: s.role,
+        relacion_laboral: s.relacionLaboral,
+        codigo_personal: s.codigoPersonal,
+        section: s.section ?? null,
+        active: s.active !== false,
+        sort_order: s.order,
+        horas_medicas: s.horasMedicas ?? 0,
+        horas_violencia_domestica: s.horasViolenciaDomestica ?? 0,
+        horas_lactancia: s.horasLactancia ?? 0,
+        horas_extras: s.horasExtras ?? 0,
+        observaciones: s.observaciones ?? '',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    )
+    // Si aún no existe la migración staff_library, no bloquea el horario
+    if (
+      libUpsert.error &&
+      !/could not find the table|does not exist|PGRST205|42P01/i.test(
+        libUpsert.error.message,
+      )
+    ) {
+      // ignore soft — el sync de catálogo lo reintentará
+    }
   }
 
   const last = local.audit.at(-1)

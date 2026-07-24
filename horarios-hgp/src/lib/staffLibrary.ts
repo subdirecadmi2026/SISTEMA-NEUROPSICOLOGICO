@@ -1,12 +1,31 @@
 import type { ServiceType, StaffMember } from '../types'
 import { uid } from '../types'
+import { listSavedSchedules, loadSchedule } from './storage'
 
 const STAFF_KEY = 'hgp-staff-library-v1'
 
 export type StaffLibrary = Record<string, StaffMember[]>
 
+/** Entrada plana para sync Supabase. */
+export type StaffLibraryEntry = StaffMember & {
+  serviceType: ServiceType
+  unitName: string
+  updatedAt: string
+}
+
 function libraryKey(serviceType: ServiceType, unitName: string): string {
   return `${serviceType}::${unitName}`
+}
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+function stampMember(s: StaffMember): StaffMember {
+  return {
+    ...s,
+    updatedAt: nowIso(),
+  }
 }
 
 function readAll(): StaffLibrary {
@@ -23,6 +42,15 @@ function writeAll(all: StaffLibrary) {
   localStorage.setItem(STAFF_KEY, JSON.stringify(all))
 }
 
+/** Dispara sync remoto sin bloquear la UI (evita ciclo de imports). */
+function queueRemotePush() {
+  void import('./remoteCatalog')
+    .then((m) => m.pushAllStaffLibraryRemote(flattenStaffLibrary()))
+    .catch(() => {
+      /* local sigue operativo */
+    })
+}
+
 export function listStaff(
   serviceType: ServiceType,
   unitName: string,
@@ -37,15 +65,19 @@ export function saveStaffList(
   serviceType: ServiceType,
   unitName: string,
   staff: StaffMember[],
+  opts?: { syncRemote?: boolean },
 ) {
   const all = readAll()
-  all[libraryKey(serviceType, unitName)] = staff.map((s, i) => ({
-    ...s,
-    serviceUnit: unitName,
-    order: i + 1,
-    active: s.active !== false,
-  }))
+  all[libraryKey(serviceType, unitName)] = staff.map((s, i) =>
+    stampMember({
+      ...s,
+      serviceUnit: unitName,
+      order: i + 1,
+      active: s.active !== false,
+    }),
+  )
   writeAll(all)
+  if (opts?.syncRemote !== false) queueRemotePush()
 }
 
 export function upsertStaff(
@@ -55,8 +87,15 @@ export function upsertStaff(
 ): StaffMember[] {
   const list = listStaff(serviceType, unitName)
   const idx = list.findIndex((s) => s.id === member.id)
-  if (idx >= 0) list[idx] = { ...member, serviceUnit: unitName }
-  else list.push({ ...member, serviceUnit: unitName, order: list.length + 1 })
+  if (idx >= 0) list[idx] = stampMember({ ...member, serviceUnit: unitName })
+  else
+    list.push(
+      stampMember({
+        ...member,
+        serviceUnit: unitName,
+        order: list.length + 1,
+      }),
+    )
   saveStaffList(serviceType, unitName, list)
   return listStaff(serviceType, unitName)
 }
@@ -94,6 +133,7 @@ export function createEmptyStaff(
     horasLactancia: 0,
     horasExtras: 0,
     observaciones: '',
+    updatedAt: nowIso(),
   }
 }
 
@@ -161,6 +201,7 @@ export function syncScheduleStaffToLibrary(
       serviceUnit: unitName,
       active: true,
       fun: serviceType === 'medico' ? 'MED' : s.fun,
+      updatedAt: nowIso(),
     })
     byName.delete(key)
   }
@@ -201,6 +242,7 @@ export function clearStaffLibraryBucket(
   const all = readAll()
   delete all[libraryKey(serviceType, unitName)]
   writeAll(all)
+  queueRemotePush()
 }
 
 /** Mueve el personal de biblioteca al renombrar una especialidad. */
@@ -221,7 +263,7 @@ export function renameStaffLibraryUnit(
     ...existing,
     ...fromList
       .filter((s) => !byName.has(s.name.trim().toLowerCase()))
-      .map((s) => ({ ...s, serviceUnit: to })),
+      .map((s) => ({ ...s, serviceUnit: to, updatedAt: nowIso() })),
   ]
   all[toKey] = merged.map((s, i) => ({
     ...s,
@@ -230,4 +272,93 @@ export function renameStaffLibraryUnit(
   }))
   delete all[fromKey]
   writeAll(all)
+  queueRemotePush()
+}
+
+export function flattenStaffLibrary(): StaffLibraryEntry[] {
+  const all = readAll()
+  const out: StaffLibraryEntry[] = []
+  for (const [key, staff] of Object.entries(all)) {
+    const [serviceType, ...rest] = key.split('::')
+    const unitName = rest.join('::')
+    if (!unitName) continue
+    for (const s of staff) {
+      if (!s.name?.trim()) continue
+      out.push({
+        ...s,
+        serviceType: serviceType as ServiceType,
+        unitName,
+        updatedAt: s.updatedAt || nowIso(),
+      })
+    }
+  }
+  return out
+}
+
+export function replaceAllStaffLibrary(
+  entries: StaffLibraryEntry[],
+  opts?: { syncRemote?: boolean },
+) {
+  const next: StaffLibrary = {}
+  for (const e of entries) {
+    if (!e.name?.trim() || !e.unitName?.trim()) continue
+    const key = libraryKey(e.serviceType, e.unitName)
+    const list = next[key] ?? []
+    const { serviceType: _st, unitName: _un, ...member } = e
+    list.push({
+      ...member,
+      serviceUnit: e.unitName,
+      updatedAt: e.updatedAt || nowIso(),
+    })
+    next[key] = list
+  }
+  for (const key of Object.keys(next)) {
+    next[key] = next[key]
+      .sort((a, b) => a.order - b.order)
+      .map((s, i) => ({ ...s, order: i + 1 }))
+  }
+  writeAll(next)
+  if (opts?.syncRemote) queueRemotePush()
+}
+
+export function mergeStaffLibraryEntries(
+  local: StaffLibraryEntry[],
+  remote: StaffLibraryEntry[],
+): StaffLibraryEntry[] {
+  const map = new Map<string, StaffLibraryEntry>()
+  for (const e of local) map.set(e.id, e)
+  for (const e of remote) {
+    const prev = map.get(e.id)
+    if (!prev) {
+      map.set(e.id, e)
+      continue
+    }
+    const prevAt = prev.updatedAt || ''
+    const nextAt = e.updatedAt || ''
+    map.set(e.id, nextAt >= prevAt ? e : prev)
+  }
+  return [...map.values()]
+}
+
+/** Personal con nombre tomado de horarios locales (fallback picker). */
+export function staffFromLocalSchedules(
+  serviceType: ServiceType,
+  unitName: string,
+): StaffMember[] {
+  try {
+    const map = new Map<string, StaffMember>()
+    for (const item of listSavedSchedules()) {
+      if (item.serviceType !== serviceType) continue
+      if (item.unitName !== unitName) continue
+      const doc = loadSchedule(item.id)
+      if (!doc) continue
+      for (const s of doc.staff) {
+        if (!s.name.trim()) continue
+        if (!map.has(s.id)) map.set(s.id, { ...s, serviceUnit: unitName })
+      }
+    }
+    return [...map.values()]
+  } catch {
+    return []
+  }
 }

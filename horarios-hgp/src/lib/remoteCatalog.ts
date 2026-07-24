@@ -1,22 +1,32 @@
-import type { ScheduleDoc } from '../types'
+import type { ScheduleDoc, ServiceType } from '../types'
 import { DEFAULT_COVERAGE } from '../types'
 import { getSupabase, isSupabaseConfigured } from './supabase'
 import { saveSchedule } from './storage'
 import type { StaffLeave } from './leavesStore'
 import type { HgpNotification } from './notifications'
+import {
+  flattenStaffLibrary,
+  mergeStaffLibraryEntries,
+  replaceAllStaffLibrary,
+  type StaffLibraryEntry,
+} from './staffLibrary'
 
 /** IDs de filas-sistema en `schedules` (fallback si aún no existen tablas dedicadas). */
 export const SYS_LEAVES_ID = 'sys-hgp-staff-leaves'
 export const SYS_NOTIF_ID = 'sys-hgp-notifications'
+export const SYS_STAFF_LIB_ID = 'sys-hgp-staff-library'
 export const SYS_LEAVES_UNIT = '__SYSTEM__/staff_leaves'
 export const SYS_NOTIF_UNIT = '__SYSTEM__/notifications'
+export const SYS_STAFF_LIB_UNIT = '__SYSTEM__/staff_library'
 
 export type RemoteCatalogStatus = {
   configured: boolean
   leavesMode: 'table' | 'bundle' | 'local' | 'unknown'
   notificationsMode: 'table' | 'bundle' | 'local' | 'unknown'
+  staffLibraryMode: 'table' | 'bundle' | 'local' | 'unknown'
   leavesCount: number
   notificationsCount: number
+  staffLibraryCount: number
   lastError?: string
 }
 
@@ -28,6 +38,11 @@ type LeavesBundlePayload = ScheduleDoc & {
 type NotifBundlePayload = ScheduleDoc & {
   systemKind?: 'notifications'
   systemItems?: HgpNotification[]
+}
+
+type StaffLibBundlePayload = ScheduleDoc & {
+  systemKind?: 'staff_library'
+  systemItems?: StaffLibraryEntry[]
 }
 
 function baseSystemDoc(
@@ -157,10 +172,55 @@ function rowToNotif(r: Record<string, unknown>): HgpNotification {
   }
 }
 
+function staffEntryToRow(e: StaffLibraryEntry) {
+  return {
+    id: e.id,
+    service_type: e.serviceType,
+    unit_name: e.unitName,
+    fun: e.fun,
+    name: e.name,
+    role: e.role ?? null,
+    relacion_laboral: e.relacionLaboral ?? null,
+    codigo_personal: e.codigoPersonal ?? null,
+    section: e.section ?? null,
+    active: e.active !== false,
+    sort_order: e.order ?? 1,
+    horas_medicas: e.horasMedicas ?? 0,
+    horas_violencia_domestica: e.horasViolenciaDomestica ?? 0,
+    horas_lactancia: e.horasLactancia ?? 0,
+    horas_extras: e.horasExtras ?? 0,
+    observaciones: e.observaciones ?? '',
+    updated_at: e.updatedAt || new Date().toISOString(),
+  }
+}
+
+function rowToStaffEntry(r: Record<string, unknown>): StaffLibraryEntry {
+  return {
+    id: String(r.id),
+    serviceType: r.service_type as ServiceType,
+    unitName: String(r.unit_name ?? r.service_unit ?? ''),
+    fun: String(r.fun ?? 'MED'),
+    name: String(r.name ?? ''),
+    role: String(r.role ?? ''),
+    relacionLaboral: String(r.relacion_laboral ?? 'LOSEP'),
+    codigoPersonal: String(r.codigo_personal ?? ''),
+    section: r.section ? String(r.section) : undefined,
+    serviceUnit: String(r.unit_name ?? r.service_unit ?? ''),
+    active: r.active !== false,
+    order: Number(r.sort_order) || 1,
+    horasMedicas: Number(r.horas_medicas) || 0,
+    horasViolenciaDomestica: Number(r.horas_violencia_domestica) || 0,
+    horasLactancia: Number(r.horas_lactancia) || 0,
+    horasExtras: Number(r.horas_extras) || 0,
+    observaciones: String(r.observaciones ?? ''),
+    updatedAt: String(r.updated_at ?? new Date().toISOString()),
+  }
+}
+
 async function upsertSystemBundle(
   id: string,
   unitName: string,
-  kind: 'staff_leaves' | 'notifications',
+  kind: 'staff_leaves' | 'notifications' | 'staff_library',
   items: unknown[],
 ): Promise<void> {
   const sb = getSupabase()
@@ -174,12 +234,19 @@ async function upsertSystemBundle(
           systemItems: items as StaffLeave[],
           updatedAt: new Date().toISOString(),
         } satisfies LeavesBundlePayload)
-      : ({
-          ...base,
-          systemKind: 'notifications',
-          systemItems: items as HgpNotification[],
-          updatedAt: new Date().toISOString(),
-        } satisfies NotifBundlePayload)
+      : kind === 'notifications'
+        ? ({
+            ...base,
+            systemKind: 'notifications',
+            systemItems: items as HgpNotification[],
+            updatedAt: new Date().toISOString(),
+          } satisfies NotifBundlePayload)
+        : ({
+            ...base,
+            systemKind: 'staff_library',
+            systemItems: items as StaffLibraryEntry[],
+            updatedAt: new Date().toISOString(),
+          } satisfies StaffLibBundlePayload)
 
   const row = {
     id,
@@ -213,7 +280,7 @@ async function upsertSystemBundle(
 
 async function fetchSystemBundleItems<T>(
   id: string,
-  kind: 'staff_leaves' | 'notifications',
+  kind: 'staff_leaves' | 'notifications' | 'staff_library',
 ): Promise<T[] | null> {
   const sb = getSupabase()
   if (!sb) return null
@@ -224,7 +291,10 @@ async function fetchSystemBundleItems<T>(
     .maybeSingle()
   if (error) throw new Error(error.message)
   if (!data?.payload) return []
-  const payload = data.payload as LeavesBundlePayload | NotifBundlePayload
+  const payload = data.payload as
+    | LeavesBundlePayload
+    | NotifBundlePayload
+    | StaffLibBundlePayload
   if (payload.systemKind !== kind) return []
   return (payload.systemItems as T[]) ?? []
 }
@@ -254,18 +324,22 @@ export async function probeRemoteCatalog(): Promise<RemoteCatalogStatus> {
     configured: isSupabaseConfigured(),
     leavesMode: 'unknown',
     notificationsMode: 'unknown',
+    staffLibraryMode: 'unknown',
     leavesCount: 0,
     notificationsCount: 0,
+    staffLibraryCount: 0,
   }
   if (!status.configured) {
     status.leavesMode = 'local'
     status.notificationsMode = 'local'
+    status.staffLibraryMode = 'local'
     return status
   }
   const sb = getSupabase()
   if (!sb) {
     status.leavesMode = 'local'
     status.notificationsMode = 'local'
+    status.staffLibraryMode = 'local'
     return status
   }
 
@@ -291,6 +365,19 @@ export async function probeRemoteCatalog(): Promise<RemoteCatalogStatus> {
   } else {
     status.lastError = notifProbe.error.message
     status.notificationsMode = 'bundle'
+  }
+
+  const staffProbe = await sb
+    .from('staff_library')
+    .select('id', { count: 'exact', head: true })
+  if (!staffProbe.error) {
+    status.staffLibraryMode = 'table'
+    status.staffLibraryCount = staffProbe.count ?? 0
+  } else if (isMissingTableError(staffProbe.error)) {
+    status.staffLibraryMode = 'bundle'
+  } else {
+    status.lastError = staffProbe.error.message
+    status.staffLibraryMode = 'bundle'
   }
 
   return status
@@ -457,7 +544,7 @@ export async function markNotificationReadRemote(id: string, read = true): Promi
 }
 
 /**
- * Arranque: trae permisos y notificaciones desde Supabase (tabla o bundle)
+ * Arranque: trae permisos, notificaciones y biblioteca de personal desde Supabase
  * y los fusiona con localStorage.
  */
 export async function syncCatalogsFromRemote(opts: {
@@ -490,5 +577,101 @@ export async function syncCatalogsFromRemote(opts: {
     status.lastError = e instanceof Error ? e.message : 'Error sync avisos'
   }
 
+  try {
+    const staff = await pullStaffLibraryRemote(flattenStaffLibrary())
+    replaceAllStaffLibrary(staff.items, { syncRemote: false })
+    status.staffLibraryMode = staff.mode
+    status.staffLibraryCount = staff.items.length
+    await pushAllStaffLibraryRemote(staff.items)
+  } catch (e) {
+    status.lastError = e instanceof Error ? e.message : 'Error sync personal'
+  }
+
   return status
+}
+
+export async function pullStaffLibraryRemote(
+  local: StaffLibraryEntry[],
+): Promise<{
+  items: StaffLibraryEntry[]
+  mode: 'table' | 'bundle' | 'local'
+}> {
+  if (!isSupabaseConfigured()) return { items: local, mode: 'local' }
+  const sb = getSupabase()
+  if (!sb) return { items: local, mode: 'local' }
+
+  const table = await sb.from('staff_library').select('*').limit(5000)
+  if (!table.error && table.data) {
+    const remote = table.data.map((r) =>
+      rowToStaffEntry(r as Record<string, unknown>),
+    )
+    // También incorpora personal de horarios ya guardados en public.staff
+    const legacy = await sb.from('staff').select('*').limit(5000)
+    const fromSchedules: StaffLibraryEntry[] = []
+    if (!legacy.error && legacy.data) {
+      for (const r of legacy.data) {
+        const row = r as Record<string, unknown>
+        const name = String(row.name ?? '').trim()
+        const unit = String(row.service_unit ?? '').trim()
+        if (!name || !unit) continue
+        const serviceType = (row.service_type as ServiceType | null) || null
+        if (!serviceType) continue
+        fromSchedules.push(
+          rowToStaffEntry({
+            ...row,
+            unit_name: unit,
+            service_type: serviceType,
+            updated_at: row.created_at ?? new Date().toISOString(),
+          }),
+        )
+      }
+    }
+    return {
+      items: mergeStaffLibraryEntries(
+        local,
+        mergeStaffLibraryEntries(remote, fromSchedules),
+      ),
+      mode: 'table',
+    }
+  }
+  if (table.error && !isMissingTableError(table.error)) {
+    throw new Error(table.error.message)
+  }
+
+  const remote =
+    (await fetchSystemBundleItems<StaffLibraryEntry>(
+      SYS_STAFF_LIB_ID,
+      'staff_library',
+    )) ?? []
+  return {
+    items: mergeStaffLibraryEntries(local, remote),
+    mode: 'bundle',
+  }
+}
+
+export async function pushAllStaffLibraryRemote(
+  entries: StaffLibraryEntry[],
+): Promise<'table' | 'bundle' | 'local'> {
+  if (!isSupabaseConfigured()) return 'local'
+  const sb = getSupabase()
+  if (!sb) return 'local'
+
+  const rows = entries
+    .filter((e) => e.name.trim() && e.unitName.trim())
+    .map(staffEntryToRow)
+  if (rows.length === 0) return 'table'
+
+  const { error } = await sb.from('staff_library').upsert(rows, {
+    onConflict: 'id',
+  })
+  if (!error) return 'table'
+  if (!isMissingTableError(error)) throw new Error(error.message)
+
+  await upsertSystemBundle(
+    SYS_STAFF_LIB_ID,
+    SYS_STAFF_LIB_UNIT,
+    'staff_library',
+    entries,
+  )
+  return 'bundle'
 }

@@ -48,6 +48,8 @@ export type StaffMember = {
   horasLactancia?: number
   horasExtras?: number
   observaciones?: string
+  /** Última edición en biblioteca (sync Supabase). */
+  updatedAt?: string
   /**
    * Estado del mes en el cuadro médico:
    * vacaciones → marca V; bajo_llamado → marca BL.

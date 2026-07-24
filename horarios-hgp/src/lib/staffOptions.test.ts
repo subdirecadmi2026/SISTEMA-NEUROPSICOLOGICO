@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { SHIFTS_MEDICO, UNITS_MEDICO } from '../data/templates'
 import {
   createEmptyStaff,
+  flattenStaffLibrary,
   listStaff,
+  mergeStaffLibraryEntries,
   renameStaffLibraryUnit,
+  replaceAllStaffLibrary,
   saveStaffList,
   syncScheduleStaffToLibrary,
 } from './staffLibrary'
@@ -86,6 +89,29 @@ describe('configuración médicos', () => {
     const lib = listStaff('medico', 'UCI')
     expect(lib).toHaveLength(2)
     expect(lib.find((s) => s.name === 'Dra. Vega')?.codigoPersonal).toBe('X')
+  })
+
+  it('aplana y fusiona biblioteca por updatedAt', () => {
+    const a = createEmptyStaff('medico', 'Nefrología')
+    a.name = 'Dr. Admin'
+    a.id = 'med-1'
+    saveStaffList('medico', 'Nefrología', [a], { syncRemote: false })
+    const flat = flattenStaffLibrary()
+    expect(flat).toHaveLength(1)
+    expect(flat[0].unitName).toBe('Nefrología')
+
+    const remote = [
+      {
+        ...flat[0],
+        name: 'Dr. Remoto',
+        updatedAt: '2099-01-01T00:00:00.000Z',
+      },
+    ]
+    const merged = mergeStaffLibraryEntries(flat, remote)
+    expect(merged).toHaveLength(1)
+    expect(merged[0].name).toBe('Dr. Remoto')
+    replaceAllStaffLibrary(merged, { syncRemote: false })
+    expect(listStaff('medico', 'Nefrología')[0].name).toBe('Dr. Remoto')
   })
 })
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AppUser, ServiceType, StaffMember } from '../types'
 import { SERVICE_LABEL } from '../data/templates'
 import { listUnits } from '../lib/unitsStore'
-import { listStaff } from '../lib/staffLibrary'
+import { listStaff, staffFromLocalSchedules } from '../lib/staffLibrary'
 import {
   LEAVE_HOUR_PRESETS,
   LEAVE_KINDS,
@@ -129,7 +129,20 @@ export function PermisosVacacionesPanel({
   const units = listUnits(form.serviceType)
   const libraryStaff = useMemo(() => {
     void tick
-    return form.unitName ? listStaff(form.serviceType, form.unitName) : []
+    if (!form.unitName) return []
+    const fromLib = listStaff(form.serviceType, form.unitName)
+    const fromSchedules = staffFromLocalSchedules(
+      form.serviceType,
+      form.unitName,
+    )
+    const map = new Map<string, (typeof fromLib)[number]>()
+    for (const s of fromLib) {
+      if (s.name.trim()) map.set(s.id, s)
+    }
+    for (const s of fromSchedules) {
+      if (s.name.trim() && !map.has(s.id)) map.set(s.id, s)
+    }
+    return [...map.values()]
   }, [form.serviceType, form.unitName, tick])
 
   const staffOptions = useMemo(() => {
@@ -511,8 +524,9 @@ export function PermisosVacacionesPanel({
             </select>
             {staffOptions.length === 0 ? (
               <span className="mt-1 block text-[11px] font-normal text-amber-800">
-                No hay personal en biblioteca ni en el horario. Cargue personal
-                primero o escriba el nombre abajo.
+                No hay personal en biblioteca ni en horarios de esta
+                especialidad. En Admin → Personal agréguelo y pulse
+                «Sincronizar ahora», o escriba el nombre abajo.
               </span>
             ) : null}
           </label>
