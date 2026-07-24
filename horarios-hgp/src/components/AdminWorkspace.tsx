@@ -38,11 +38,13 @@ import { AdminClavesPanel } from './AdminClavesPanel'
 import { AdminFeriadosPanel } from './AdminFeriadosPanel'
 import { PermisosVacacionesPanel } from './PermisosVacacionesPanel'
 import { AdminSupabaseSync } from './AdminSupabaseSync'
+import { AdminFirmasPanel } from './AdminFirmasPanel'
 import { shiftsFor } from '../lib/shiftsStore'
 
 type TabId =
   | 'resumen'
   | 'perfiles'
+  | 'firmas'
   | 'horarios'
   | 'especialidades'
   | 'claves'
@@ -67,6 +69,7 @@ type Props = {
 const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'perfiles', label: 'Perfiles' },
+  { id: 'firmas', label: 'Firmas' },
   { id: 'especialidades', label: 'Especialidades' },
   { id: 'claves', label: 'Claves' },
   { id: 'horarios', label: 'Horarios' },
@@ -529,6 +532,8 @@ export function AdminWorkspace({
           </div>
         </section>
       )}
+
+      {tab === 'firmas' && <AdminFirmasPanel onFlash={onFlash} />}
 
       {tab === 'horarios' && (
         <div className="space-y-3">

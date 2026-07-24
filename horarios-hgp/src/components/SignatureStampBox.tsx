@@ -6,7 +6,9 @@ type Props = {
   label: string
   /** Texto clásico (solo referencia; no genera sello electrónico). */
   value?: string
-  slot: ElectronicSignRecord['slot']
+  /** Nombre designado por el admin (responsables de firma). */
+  designatedName?: string
+  slot?: ElectronicSignRecord['slot']
   electronic?: ElectronicSignRecord
   scheduleId?: string
   unitName?: string
@@ -16,10 +18,12 @@ type Props = {
  * Casilla institucional.
  * El sello electrónico (QR + «Firmado electrónicamente») SOLO aparece
  * si existe un registro en electronicSigns del encargado.
+ * Si aún no firmó, muestra el responsable configurado por el admin.
  */
 export function SignatureStampBox({
   label,
   value,
+  designatedName,
   slot,
   electronic,
   scheduleId,
@@ -53,6 +57,9 @@ export function SignatureStampBox({
   const plainName = value
     ? value.split('\n')[0]?.split('—')[0]?.trim()
     : ''
+  const displayName = signedElectronic
+    ? electronic!.subjectCn
+    : plainName || designatedName || ''
 
   return (
     <div className="print-sign-box rounded border border-line bg-white px-2 py-1.5">
@@ -66,6 +73,7 @@ export function SignatureStampBox({
               src={qr}
               alt={`Código QR firma ${label}`}
               className="print-sign-qr h-[72px] w-[72px] shrink-0 object-contain"
+              crossOrigin="anonymous"
             />
           ) : (
             <div
@@ -81,6 +89,7 @@ export function SignatureStampBox({
                 src={electronic.imageDataUrl}
                 alt={`Sello ${label}`}
                 className="print-sign-img mb-0.5 max-h-8 max-w-full object-contain"
+                crossOrigin="anonymous"
               />
             ) : null}
             <p className="print-sign-firmado text-[8px] font-bold uppercase tracking-wide text-teal">
@@ -112,16 +121,20 @@ export function SignatureStampBox({
             </p>
           </div>
         </div>
-      ) : plainName ? (
-        <div className="mt-4">
-          <p className="text-[10px] font-semibold text-ink">{plainName}</p>
-          <p className="mt-0.5 text-[8px] text-muted">
-            Registro textual · sin sello electrónico
+      ) : displayName ? (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold leading-tight text-ink">
+            {displayName}
+          </p>
+          <p className="mt-3 border-t border-line pt-1 text-center text-[8px] text-muted">
+            {plainName && !signedElectronic
+              ? 'Registro textual · pendiente sello electrónico'
+              : 'Responsable designado · pendiente de firma'}
           </p>
         </div>
       ) : (
         <p className="print-sign-empty mt-6 text-[9px] text-muted">
-          Pendiente de firma electrónica
+          Pendiente de firma
         </p>
       )}
     </div>

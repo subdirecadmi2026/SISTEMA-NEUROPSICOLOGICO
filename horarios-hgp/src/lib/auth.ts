@@ -16,6 +16,7 @@ import {
   getManagedUser,
   listAppUsers,
 } from './usersStore'
+import { cargoForSigningUser } from './signersStore'
 
 const USER_KEY = 'hgp-auth-user-v1'
 
@@ -330,7 +331,9 @@ export function transitionStatus(
   const signature: ApprovalSignature = {
     role: sigRole,
     name: signedName,
-    cargo: opts?.cargo ?? roleLabel(user.role),
+    cargo:
+      opts?.cargo ??
+      cargoForSigningUser(user.id, roleLabel(user.role)),
     at: opts?.electronic?.signedAt ?? new Date().toISOString(),
     userId: user.id,
     electronic: !!opts?.electronic,
