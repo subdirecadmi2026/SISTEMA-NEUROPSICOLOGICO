@@ -21,19 +21,34 @@ function readBlob(): ShiftsBlob {
     const raw = localStorage.getItem(SHIFTS_KEY)
     if (!raw) return defaults()
     const parsed = JSON.parse(raw) as Partial<ShiftsBlob>
+    const base = defaults()
     return {
-      enfermeria:
+      enfermeria: mergeMissingDefaults(
         Array.isArray(parsed.enfermeria) && parsed.enfermeria.length
           ? parsed.enfermeria
-          : defaults().enfermeria,
-      medico:
+          : base.enfermeria,
+        base.enfermeria,
+      ),
+      medico: mergeMissingDefaults(
         Array.isArray(parsed.medico) && parsed.medico.length
           ? parsed.medico
-          : defaults().medico,
+          : base.medico,
+        base.medico,
+      ),
     }
   } catch {
     return defaults()
   }
+}
+
+/** Incorpora claves nuevas del catálogo oficial sin borrar las personalizadas. */
+function mergeMissingDefaults(
+  current: ShiftCode[],
+  catalog: ShiftCode[],
+): ShiftCode[] {
+  const have = new Set(current.map((s) => s.code.toUpperCase()))
+  const missing = catalog.filter((s) => !have.has(s.code.toUpperCase()))
+  return missing.length ? [...current, ...missing] : current
 }
 
 function writeBlob(blob: ShiftsBlob) {

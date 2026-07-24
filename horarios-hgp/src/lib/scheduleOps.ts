@@ -273,6 +273,101 @@ export function fillStaffEmptyDays(
   }
 }
 
+const MONTH_STATUS_CODES = {
+  vacaciones: 'V',
+  bajo_llamado: 'BL',
+} as const
+
+/** Quita de una fila las claves de vacaciones / bajo llamado. */
+export function clearStaffMonthStatusCodes(
+  doc: ScheduleDoc,
+  staffId: string,
+): ScheduleDoc {
+  const days = daysInMonth(doc.year, doc.month)
+  const cells = { ...doc.cells }
+  let cleared = 0
+  for (let d = 1; d <= days; d++) {
+    const key = `${staffId}:${d}`
+    const code = (cells[key] ?? '').toUpperCase()
+    if (code === 'V' || code === 'BL') {
+      delete cells[key]
+      cleared += 1
+    }
+  }
+  if (cleared === 0) return doc
+  return {
+    ...doc,
+    cells,
+    version: doc.version + 1,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/**
+ * Aplica el estado del mes de un médico al cuadro:
+ * vacaciones → V en días vacíos; bajo_llamado → BL; normal → limpia V/BL.
+ */
+export function applyStaffMonthStatus(
+  doc: ScheduleDoc,
+  staffId: string,
+  status: 'normal' | 'vacaciones' | 'bajo_llamado',
+): { doc: ScheduleDoc; painted: number } {
+  let next = clearStaffMonthStatusCodes(doc, staffId)
+  if (status === 'normal') return { doc: next, painted: 0 }
+  const code = MONTH_STATUS_CODES[status]
+  const beforeKeys = new Set(Object.keys(next.cells))
+  next = fillStaffEmptyDays(next, staffId, code)
+  let painted = 0
+  for (const k of Object.keys(next.cells)) {
+    if (!beforeKeys.has(k) && next.cells[k] === code) painted += 1
+  }
+  return { doc: next, painted }
+}
+
+/**
+ * Marca vacaciones o bajo llamado a nivel de cuadro sobre personal nombrado
+ * que no tenga ya un estado individual distinto.
+ */
+export function applyScheduleFlagsToGrid(
+  doc: ScheduleDoc,
+  opts: { vacacionesFlag: boolean; llamado: boolean },
+): { doc: ScheduleDoc; painted: number } {
+  let next: ScheduleDoc = {
+    ...doc,
+    vacacionesFlag: opts.vacacionesFlag,
+    llamado: opts.llamado,
+  }
+  let painted = 0
+
+  for (const s of next.staff) {
+    if (!s.name.trim()) continue
+    const individual = s.monthStatus ?? 'normal'
+    if (individual !== 'normal') continue
+
+    // Limpiar marcas previas de flags de cuadro
+    next = clearStaffMonthStatusCodes(next, s.id)
+
+    if (opts.vacacionesFlag) {
+      const r = applyStaffMonthStatus(next, s.id, 'vacaciones')
+      next = r.doc
+      painted += r.painted
+    } else if (opts.llamado) {
+      const r = applyStaffMonthStatus(next, s.id, 'bajo_llamado')
+      next = r.doc
+      painted += r.painted
+    }
+  }
+
+  return {
+    doc: {
+      ...next,
+      vacacionesFlag: opts.vacacionesFlag,
+      llamado: opts.llamado,
+    },
+    painted,
+  }
+}
+
 /** Pinta o borra toda una columna (día) para el personal con nombre. */
 export function paintDayColumn(
   doc: ScheduleDoc,

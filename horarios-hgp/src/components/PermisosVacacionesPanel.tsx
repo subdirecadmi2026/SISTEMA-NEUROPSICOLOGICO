@@ -37,6 +37,8 @@ type Props = {
    * talento_humano = validador TH visualiza todo el hospital y puede gestionar
    */
   variant?: 'servicio' | 'talento_humano'
+  /** Tras registrar un permiso, aplica las claves V/P/… al horario abierto. */
+  onApplyLeaveToSchedule?: () => void
 }
 
 type FormState = {
@@ -95,6 +97,7 @@ export function PermisosVacacionesPanel({
   scheduleStaff = [],
   compact = false,
   variant = 'servicio',
+  onApplyLeaveToSchedule,
 }: Props) {
   const isTH = variant === 'talento_humano'
   const [tick, setTick] = useState(0)
@@ -312,6 +315,7 @@ export function PermisosVacacionesPanel({
           ? 'Permiso actualizado'
           : `${LEAVE_KIND_LABEL[saved.kind]} registradas · aviso al jefe`,
       )
+      onApplyLeaveToSchedule?.()
       if (form.id) {
         notifyJefeLeaveChanged({
           unitName: saved.unitName,

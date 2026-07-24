@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import type { ScheduleDoc, ServiceType } from '../types'
 import { MONTHS_ES } from '../types'
 import { SERVICE_LABEL } from '../data/templates'
+import { applyScheduleFlagsToGrid } from '../lib/scheduleOps'
 
 type Props = {
   doc: ScheduleDoc
@@ -10,6 +11,7 @@ type Props = {
   onSwitchService: (t: ServiceType) => void
   onPatch: (next: ScheduleDoc) => void
   notesSlot?: ReactNode
+  onFlash?: (msg: string) => void
 }
 
 type Tab = 'tipo' | 'periodo' | 'notas'
@@ -29,11 +31,34 @@ export function ConfigModule({
   onSwitchService,
   onPatch,
   notesSlot,
+  onFlash,
 }: Props) {
   const [tab, setTab] = useState<Tab>('periodo')
   const [open, setOpen] = useState(false)
   const isMed = doc.serviceType === 'medico'
   const named = doc.staff.filter((s) => s.name.trim()).length
+
+  function setFlags(next: { vacacionesFlag: boolean; llamado: boolean }) {
+    const { doc: painted, painted: n } = applyScheduleFlagsToGrid(doc, next)
+    onPatch(painted)
+    if (next.vacacionesFlag && !doc.vacacionesFlag) {
+      onFlash?.(
+        n > 0
+          ? `Vacaciones del mes: marcadas ${n} celda(s) con V en el horario`
+          : 'Vacaciones del mes activadas (cabecera). Marque médicos en Personal si ya tenían turnos.',
+      )
+    } else if (next.llamado && !doc.llamado) {
+      onFlash?.(
+        n > 0
+          ? `Bajo llamado: marcadas ${n} celda(s) con BL en el horario`
+          : 'Bajo llamado activado (cabecera). Marque médicos en Personal si ya tenían turnos.',
+      )
+    } else if (!next.vacacionesFlag && doc.vacacionesFlag) {
+      onFlash?.('Vacaciones del mes desactivadas · se quitaron las V del cuadro')
+    } else if (!next.llamado && doc.llamado) {
+      onFlash?.('Bajo llamado desactivado · se quitaron las BL del cuadro')
+    }
+  }
 
   return (
     <section className="no-print mb-4 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
@@ -55,6 +80,8 @@ export function ConfigModule({
             {doc.unitName}
             {doc.jefeServicio ? ` · ${doc.jefeServicio}` : ''}
             {isMed ? ` · ${named}/${doc.staff.length} médicos` : ''}
+            {doc.vacacionesFlag ? ' · Vacaciones' : ''}
+            {doc.llamado ? ' · Bajo llamado' : ''}
           </p>
         </div>
         <span className="rounded-lg bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted ring-1 ring-line">
@@ -114,7 +141,7 @@ export function ConfigModule({
                       >
                         {t === 'enfermeria'
                           ? 'Plantilla Gestión de Enfermería'
-                          : 'Cuadro de trabajo médico · claves hasta 24 h'}
+                          : 'Cuadro de trabajo médico'}
                       </p>
                     </button>
                   )
@@ -189,28 +216,57 @@ export function ConfigModule({
                     }
                   />
                 </label>
-                <label className="flex items-center gap-2 text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    disabled={readOnly}
-                    checked={doc.llamado}
-                    onChange={(e) =>
-                      onPatch({ ...doc, llamado: e.target.checked })
-                    }
-                  />
-                  Llamado
-                </label>
-                <label className="flex items-center gap-2 text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    disabled={readOnly}
-                    checked={doc.vacacionesFlag}
-                    onChange={(e) =>
-                      onPatch({ ...doc, vacacionesFlag: e.target.checked })
-                    }
-                  />
-                  Vacaciones (mes)
-                </label>
+
+                <div className="col-span-2 rounded-xl border border-line bg-sand/30 p-3 sm:col-span-3">
+                  <p className="mb-2 text-xs font-semibold text-navy">
+                    Estado del mes (se refleja en el horario)
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        disabled={readOnly}
+                        checked={doc.vacacionesFlag}
+                        onChange={(e) =>
+                          setFlags({
+                            vacacionesFlag: e.target.checked,
+                            // Vacaciones y bajo llamado a nivel cuadro son excluyentes
+                            llamado: e.target.checked ? false : doc.llamado,
+                          })
+                        }
+                      />
+                      Vacaciones del mes
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-900">
+                        V
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        disabled={readOnly}
+                        checked={doc.llamado}
+                        onChange={(e) =>
+                          setFlags({
+                            llamado: e.target.checked,
+                            vacacionesFlag: e.target.checked
+                              ? false
+                              : doc.vacacionesFlag,
+                          })
+                        }
+                      />
+                      Bajo llamado
+                      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">
+                        BL
+                      </span>
+                    </label>
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted">
+                    Al activar, se marcan los días vacíos del personal en el
+                    cuadro. Para un solo médico, use la columna Estado en
+                    Personal.
+                  </p>
+                </div>
+
                 <label className="col-span-2 text-xs text-muted sm:col-span-3">
                   Cobertura mínima (personas / horas día)
                   <div className="mt-1 flex gap-2">
@@ -275,13 +331,6 @@ export function ConfigModule({
                     </div>
                   ) : null}
                 </label>
-                {isMed ? (
-                  <p className="col-span-2 rounded-xl border border-navy/15 bg-navy/5 px-3 py-2 text-xs text-ink sm:col-span-3">
-                    Los turnos médicos varían: CE 8 h, PT 12 h, HE 13 h, X 24 h.
-                    Configure la clave habitual de cada médico en la pestaña{' '}
-                    <strong>Personal</strong>.
-                  </p>
-                ) : null}
               </div>
             )}
 

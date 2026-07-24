@@ -4,6 +4,7 @@ import { createEmptyStaff, syncScheduleStaffToLibrary } from '../lib/staffLibrar
 import { uid } from '../types'
 import {
   addStaffFromNameList,
+  applyStaffMonthStatus,
   duplicateStaffRow,
   moveStaffOrder,
   sortStaffByName,
@@ -126,6 +127,38 @@ export function NamesEditor({
       ),
     })
     onFlash?.(`Clave ${code} aplicada a ${named} médico(s)`)
+  }
+
+  function setMonthStatus(
+    id: string,
+    monthStatus: 'normal' | 'vacaciones' | 'bajo_llamado',
+  ) {
+    const staff = doc.staff.map((s) =>
+      s.id === id ? { ...s, monthStatus } : s,
+    )
+    const withStaff = { ...doc, staff }
+    const { doc: painted, painted: n } = applyStaffMonthStatus(
+      withStaff,
+      id,
+      monthStatus,
+    )
+    onChange({ ...painted, staff })
+    const who = staff.find((s) => s.id === id)?.name || 'Médico'
+    if (monthStatus === 'vacaciones') {
+      onFlash?.(
+        n > 0
+          ? `${who}: vacaciones → ${n} día(s) marcados con V`
+          : `${who}: vacaciones (días ya ocupados; revise el horario)`,
+      )
+    } else if (monthStatus === 'bajo_llamado') {
+      onFlash?.(
+        n > 0
+          ? `${who}: bajo llamado → ${n} día(s) marcados con BL`
+          : `${who}: bajo llamado (días ya ocupados; revise el horario)`,
+      )
+    } else {
+      onFlash?.(`${who}: estado normal · se quitaron V/BL de la fila`)
+    }
   }
 
   function saveToLibrary() {
@@ -325,6 +358,7 @@ export function NamesEditor({
                 <th className="px-2 py-2 font-semibold">Relación</th>
                 <th className="px-2 py-2 font-semibold">Sección</th>
                 <th className="px-2 py-2 font-semibold">Clave habitual</th>
+                <th className="px-2 py-2 font-semibold">Estado mes</th>
                 {!readOnly && <th className="px-2 py-2">—</th>}
               </tr>
             </thead>
@@ -454,6 +488,33 @@ export function NamesEditor({
                         update(s.id, { codigoPersonal })
                       }
                     />
+                  </td>
+                  <td className="px-1 py-1 min-w-[8.5rem]">
+                    <select
+                      disabled={readOnly || !s.name.trim()}
+                      aria-label={`Estado mes fila ${idx + 1}`}
+                      className={`w-full rounded-lg border px-2 py-1.5 text-xs font-semibold disabled:opacity-60 ${
+                        (s.monthStatus ?? 'normal') === 'vacaciones'
+                          ? 'border-violet-300 bg-violet-50 text-violet-950'
+                          : (s.monthStatus ?? 'normal') === 'bajo_llamado'
+                            ? 'border-sky-300 bg-sky-50 text-sky-950'
+                            : 'border-line bg-white text-ink'
+                      }`}
+                      value={s.monthStatus ?? 'normal'}
+                      onChange={(e) =>
+                        setMonthStatus(
+                          s.id,
+                          e.target.value as
+                            | 'normal'
+                            | 'vacaciones'
+                            | 'bajo_llamado',
+                        )
+                      }
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="vacaciones">Vacaciones (V)</option>
+                      <option value="bajo_llamado">Bajo llamado (BL)</option>
+                    </select>
                   </td>
                   {!readOnly && (
                     <td className="px-2 py-1 text-center">

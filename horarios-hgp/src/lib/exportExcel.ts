@@ -93,7 +93,7 @@ export async function exportScheduleExcel(doc: ScheduleDoc) {
   ws.getCell(6, 6).value = `AÑO: ${doc.year}`
   ws.getCell(6, 8).value = `MES: ${MONTHS_ES[doc.month - 1].toUpperCase()}`
   ws.getCell(7, 1).value = `Tipo: ${service} · Período: ${period}`
-  ws.getCell(7, 3).value = doc.llamado ? 'LLAMADO: SÍ' : 'LLAMADO: NO'
+  ws.getCell(7, 3).value = doc.llamado ? 'BAJO LLAMADO: SÍ' : 'BAJO LLAMADO: NO'
   ws.getCell(7, 5).value = doc.vacacionesFlag ? 'VACACIONES: SÍ' : 'VACACIONES: NO'
   ws.getCell(7, 7).value = `Estado: ${doc.status}`
 

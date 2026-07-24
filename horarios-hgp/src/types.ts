@@ -47,6 +47,11 @@ export type StaffMember = {
   horasLactancia?: number
   horasExtras?: number
   observaciones?: string
+  /**
+   * Estado del mes en el cuadro médico:
+   * vacaciones → marca V; bajo_llamado → marca BL.
+   */
+  monthStatus?: 'normal' | 'vacaciones' | 'bajo_llamado'
 }
 
 export type ScheduleCell = Record<string, string> // `${staffId}:${day}` -> code

@@ -86,6 +86,7 @@ import { shiftMeta } from './data/templates'
 import { assignmentsOnDay, daysInMonth } from './lib/calendar'
 import { LeaveBalancePanel } from './components/LeaveBalancePanel'
 import { PermisosVacacionesPanel } from './components/PermisosVacacionesPanel'
+import { applyLeaveCodesToEmpty } from './lib/leaveValidation'
 
 const now = new Date()
 
@@ -717,6 +718,7 @@ export default function App() {
           units={units}
           onSwitchService={switchService}
           onPatch={patchDoc}
+          onFlash={flash}
           notesSlot={
             <textarea
               disabled={readOnly}
@@ -1104,6 +1106,23 @@ export default function App() {
               defaultUnitName={doc.unitName}
               scheduleStaff={doc.staff}
               variant="servicio"
+              onApplyLeaveToSchedule={() => {
+                if (readOnly) return
+                setDoc((current) => {
+                  const { doc: next, painted } = applyLeaveCodesToEmpty(current)
+                  if (painted > 0) {
+                    window.setTimeout(() => {
+                      flash(
+                        `${painted} día(s) del permiso marcados en el horario`,
+                      )
+                      setTab('horario')
+                    }, 0)
+                    setDirty(true)
+                    return next
+                  }
+                  return current
+                })
+              }}
             />
           </div>
         )}

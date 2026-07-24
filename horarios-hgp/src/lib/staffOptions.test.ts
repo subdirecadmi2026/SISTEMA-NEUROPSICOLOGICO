@@ -88,3 +88,40 @@ describe('configuración médicos', () => {
     expect(lib.find((s) => s.name === 'Dra. Vega')?.codigoPersonal).toBe('X')
   })
 })
+
+describe('vacaciones / bajo llamado en cuadro', () => {
+  it('marca V o BL en días vacíos según estado del médico', async () => {
+    const { createBlankSchedule } = await import('../data/demo')
+    const {
+      applyStaffMonthStatus,
+      applyScheduleFlagsToGrid,
+    } = await import('./scheduleOps')
+
+    let doc = createBlankSchedule('medico', 2026, 7, {
+      withDemo: false,
+      unitName: 'Medicina interna',
+      staff: [
+        {
+          ...createEmptyStaff('medico', 'Medicina interna'),
+          id: 'med-1',
+          name: 'Dr. Pérez',
+          codigoPersonal: 'CE',
+        },
+      ],
+    })
+
+    const vac = applyStaffMonthStatus(doc, 'med-1', 'vacaciones')
+    expect(vac.painted).toBeGreaterThan(20)
+    expect(vac.doc.cells['med-1:1']).toBe('V')
+
+    const bl = applyStaffMonthStatus(doc, 'med-1', 'bajo_llamado')
+    expect(bl.doc.cells['med-1:1']).toBe('BL')
+
+    const flags = applyScheduleFlagsToGrid(doc, {
+      vacacionesFlag: true,
+      llamado: false,
+    })
+    expect(flags.doc.vacacionesFlag).toBe(true)
+    expect(flags.doc.cells['med-1:2']).toBe('V')
+  })
+})

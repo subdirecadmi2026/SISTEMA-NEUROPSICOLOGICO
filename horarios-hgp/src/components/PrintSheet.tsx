@@ -85,7 +85,7 @@ export function InstitutionalPrintBody({ doc }: Props) {
               Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
               <strong>{doc.jefeServicio || '—'}</strong> ·{' '}
               {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
-              {doc.llamado ? ' · LLAMADO' : ''}
+              {doc.llamado ? ' · BAJO LLAMADO' : ''}
               {doc.vacacionesFlag ? ' · VACACIONES' : ''}
             </p>
           </div>

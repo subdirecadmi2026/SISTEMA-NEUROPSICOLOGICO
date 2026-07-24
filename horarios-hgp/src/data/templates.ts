@@ -394,6 +394,14 @@ export const SHIFTS_MEDICO: ShiftCode[] = [
     group: 'ausencia',
   },
   {
+    code: 'BL',
+    label: 'Bajo llamado',
+    hours: 0,
+    color: '#dce6f5',
+    text: '#1c3a5c',
+    group: 'ausencia',
+  },
+  {
     code: 'CD',
     label: 'Calamidad doméstica',
     hours: 0,
