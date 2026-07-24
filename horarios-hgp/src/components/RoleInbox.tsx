@@ -4,6 +4,7 @@ import {
   isJefeRole,
   isRevisorRole,
   isValidadorRole,
+  isAdmisionesRole,
 } from '../lib/auth'
 
 type Props = {
@@ -26,20 +27,24 @@ export function RoleInbox({ user, items, currentId, onOpen }: Props) {
   let pending: SavedIndexItem[] = []
   let accent = 'border-line bg-white/90'
 
-  if (isRevisorRole(user.role) && !isJefeRole(user.role)) {
-    pending = byStatus(items, 'EN_REVISION')
+  if (isAdmisionesRole(user.role) && !isJefeRole(user.role) && user.role === 'admisiones') {
+    pending = byStatus(items, 'EN_REVISION').filter((i) => !i.admisionesApproved)
+    title = 'Bandeja de Admisiones'
+    hint = 'Horarios enviados · dé el visto bueno (junto al revisor)'
+    accent = 'border-teal/30 bg-teal/5'
+  } else if (isRevisorRole(user.role) && !isJefeRole(user.role)) {
+    pending = byStatus(items, 'EN_REVISION').filter((i) => !i.revisorApproved)
     title = 'Bandeja del revisor'
-    hint = 'Horarios enviados a revisión · apruebe o devuelva con comentario'
+    hint = 'Horarios en revisión · apruebe (junto a Admisiones) o devuelva'
     accent = 'border-violet-200 bg-violet-50/70'
   } else if (isValidadorRole(user.role) && !isJefeRole(user.role)) {
     pending = byStatus(items, 'APROBADO')
     title = 'Bandeja del validador'
-    hint = 'Horarios aprobados pendientes de validación formal'
+    hint = 'Horarios aprobados por Admisiones y Revisor · validación formal'
     accent = 'border-emerald-200 bg-emerald-50/70'
   } else if (isJefeRole(user.role)) {
     const drafts = byStatus(items, 'BORRADOR')
-    const returned = drafts // en lista no vemos comentarios; mostramos borradores
-    pending = returned
+    pending = drafts
     title = 'Bandeja del jefe'
     hint = 'Borradores por completar o corregir y enviar a revisión'
     accent = 'border-teal/30 bg-teal/5'
@@ -115,8 +120,13 @@ export function countPendingForRole(
   items: SavedIndexItem[],
 ): number {
   if (!user || user.role === 'admin') return 0
+  if (user.role === 'admisiones') {
+    return byStatus(items, 'EN_REVISION').filter((i) => !i.admisionesApproved)
+      .length
+  }
   if (isRevisorRole(user.role) && !isJefeRole(user.role)) {
-    return byStatus(items, 'EN_REVISION').length
+    return byStatus(items, 'EN_REVISION').filter((i) => !i.revisorApproved)
+      .length
   }
   if (isValidadorRole(user.role) && !isJefeRole(user.role)) {
     return byStatus(items, 'APROBADO').length

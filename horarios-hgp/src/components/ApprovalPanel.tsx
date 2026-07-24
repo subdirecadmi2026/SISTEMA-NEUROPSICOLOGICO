@@ -7,12 +7,15 @@ import {
   isJefeRole,
   isRevisorRole,
   isValidadorRole,
+  isAdmisionesRole,
+  hasAdmisionesApproval,
+  hasRevisorApproval,
   resolveReviewComments,
 } from '../lib/auth'
 import { runAllValidations } from '../lib/validation'
 import { notifyJefeScheduleValidated, notifyJefeScheduleReturned, notifyJefeLeaveScheduleAlert } from '../lib/notifications'
 import { SignatureGate } from './SignatureGate'
-import { slotForStatus } from '../lib/firmaEc'
+import { slotForApprovalAs, slotForStatus } from '../lib/firmaEc'
 import {
   blobToPdfBase64,
   buildSchedulePdfBlob,
@@ -29,7 +32,7 @@ type Props = {
 
 const STEPS: Array<{ key: ScheduleDoc['status']; label: string }> = [
   { key: 'BORRADOR', label: '1. Elaborar (Jefe)' },
-  { key: 'EN_REVISION', label: '2. Revisar' },
+  { key: 'EN_REVISION', label: '2. Admisiones + Revisor' },
   { key: 'APROBADO', label: '3. Aprobado' },
   { key: 'ARCHIVADO', label: '4. Validar' },
 ]
@@ -60,8 +63,15 @@ export function ApprovalPanel({
   )
 
   const canSend = !!user && isJefeRole(user.role)
+  const canAdmisiones =
+    !!user && isAdmisionesRole(user.role) && user.role === 'admisiones'
   const canReview = !!user && isRevisorRole(user.role)
   const canValidate = !!user && isValidadorRole(user.role)
+  const approvalAs: 'admisiones' | 'revisor' | null = canAdmisiones
+    ? 'admisiones'
+    : canReview
+      ? 'revisor'
+      : null
 
   function requestSend() {
     if (!user) {
@@ -137,7 +147,10 @@ export function ApprovalPanel({
         return
       }
     }
-    const res = transitionStatus(doc, next, user, opts)
+    const res = transitionStatus(doc, next, user, {
+      ...opts,
+      approvalAs: next === 'APROBADO' ? approvalAs ?? undefined : undefined,
+    })
     if (!res.ok) {
       onFlash(res.error)
       return
@@ -157,14 +170,20 @@ export function ApprovalPanel({
       onNotify?.()
     }
     const elec = opts?.electronic ? ' (FirmaEC)' : ''
+    const stillPartial =
+      next === 'APROBADO' && res.doc.status === 'EN_REVISION'
     onFlash(
-      next === 'EN_REVISION'
-        ? `Firmado y enviado a revisión${elec} · ${opts?.signedName || user.name}`
-        : next === 'APROBADO'
-          ? `Firmado y aprobado${elec} · ${opts?.signedName || user.name}`
-          : next === 'ARCHIVADO'
-            ? `Firmado y validado${elec} · aviso enviado al jefe`
-            : `Estado: ${STATUS_LABEL[next]} · ${user.name}`,
+      stillPartial
+        ? approvalAs === 'admisiones'
+          ? `Visto bueno Admisiones${elec} · falta el revisor`
+          : `Aprobado por revisor${elec} · falta Admisiones`
+        : next === 'EN_REVISION'
+          ? `Firmado y enviado a revisión${elec} · ${opts?.signedName || user.name}`
+          : next === 'APROBADO'
+            ? `Firmado y aprobado${elec} · pasa a validador`
+            : next === 'ARCHIVADO'
+              ? `Firmado y validado${elec} · aviso enviado al jefe`
+              : `Estado: ${STATUS_LABEL[next]} · ${user.name}`,
     )
   }
 
@@ -172,7 +191,9 @@ export function ApprovalPanel({
     signIntent?.next === 'EN_REVISION'
       ? 'Firmar y enviar a revisión'
       : signIntent?.next === 'APROBADO'
-        ? 'Firmar y aprobar (Revisor)'
+        ? approvalAs === 'admisiones'
+          ? 'Firmar · validado por Admisiones'
+          : 'Firmar y aprobar (Revisor)'
         : signIntent?.next === 'ARCHIVADO'
           ? 'Firmar y validar'
           : ''
@@ -181,11 +202,15 @@ export function ApprovalPanel({
     signIntent?.next === 'EN_REVISION'
       ? 'Firmar y enviar'
       : signIntent?.next === 'APROBADO'
-        ? 'Firmar y aprobar'
+        ? approvalAs === 'admisiones'
+          ? 'Firmar visto bueno Admisiones'
+          : 'Firmar y aprobar'
         : 'Firmar y validar'
 
   const signSlot = signIntent
-    ? slotForStatus(signIntent.next)
+    ? signIntent.next === 'APROBADO' && approvalAs
+      ? slotForApprovalAs(approvalAs)
+      : slotForStatus(signIntent.next)
     : 'jefe'
 
   return (
@@ -240,6 +265,12 @@ export function ApprovalPanel({
               </span>
             )}
           </p>
+          {doc.status === 'EN_REVISION' && (
+            <p className="mt-1 text-xs text-muted">
+              Admisiones: {hasAdmisionesApproval(doc) ? '✓' : 'pendiente'} ·
+              Revisor: {hasRevisorApproval(doc) ? '✓' : 'pendiente'}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {doc.status === 'BORRADOR' && canSend && (
@@ -251,15 +282,28 @@ export function ApprovalPanel({
               Firmar y enviar a revisión
             </button>
           )}
-          {doc.status === 'EN_REVISION' && canReview && (
-            <button
-              type="button"
-              onClick={() => setSignIntent({ next: 'APROBADO' })}
-              className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white"
-            >
-              Firmar y aprobar
-            </button>
-          )}
+          {doc.status === 'EN_REVISION' &&
+            canAdmisiones &&
+            !hasAdmisionesApproval(doc) && (
+              <button
+                type="button"
+                onClick={() => setSignIntent({ next: 'APROBADO' })}
+                className="rounded-lg bg-teal px-3 py-2 text-sm font-semibold text-white"
+              >
+                Firmar · Admisiones
+              </button>
+            )}
+          {doc.status === 'EN_REVISION' &&
+            canReview &&
+            !hasRevisorApproval(doc) && (
+              <button
+                type="button"
+                onClick={() => setSignIntent({ next: 'APROBADO' })}
+                className="rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white"
+              >
+                Firmar y aprobar
+              </button>
+            )}
           {doc.status === 'APROBADO' && canValidate && (
             <button
               type="button"

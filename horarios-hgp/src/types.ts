@@ -2,6 +2,7 @@ export type ServiceType = 'enfermeria' | 'medico'
 
 export type UserRole =
   | 'lider_servicio' // Jefe de servicio: crea y edita horarios
+  | 'admisiones' // Visualiza y da visto bueno (junto al revisor)
   | 'revisor' // Visualiza: aprueba o pide corrección con comentario
   | 'validador' // Valida formalmente el horario aprobado
   | 'gestion_enfermeria' // legado → permisos de revisor
@@ -64,7 +65,14 @@ export type ContingencyRow = {
 }
 
 export type ApprovalSignature = {
-  role: UserRole | 'elaborado' | 'revisado' | 'aprobado' | 'talento_humano' | 'validado'
+  role:
+    | UserRole
+    | 'elaborado'
+    | 'revisado'
+    | 'aprobado'
+    | 'admisiones'
+    | 'talento_humano'
+    | 'validado'
   name: string
   cargo: string
   at: string
@@ -77,7 +85,7 @@ export type ApprovalSignature = {
 
 /** Registro de firma electrónica estampada en el horario. */
 export type ElectronicSignRecord = {
-  slot: 'jefe' | 'revisor' | 'validador'
+  slot: 'jefe' | 'revisor' | 'validador' | 'admisiones'
   subjectCn: string
   serialNumber?: string
   issuerCn?: string
@@ -146,6 +154,12 @@ export type ScheduleDoc = {
   revisadoPor: string
   aprobadoPor: string
   talentoHumano: string
+  /** Texto de sello cuando Admisiones da el visto bueno. */
+  admisionesPor?: string
+  /** ISO: Admisiones ya firmó (parcial en EN_REVISION). */
+  admisionesApprovedAt?: string
+  /** ISO: Revisor ya firmó (parcial en EN_REVISION). */
+  revisorApprovedAt?: string
   status: ScheduleStatus
   version: number
   signatures: ApprovalSignature[]
@@ -186,6 +200,7 @@ export const WEEKDAYS_ES = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 
 export const ROLE_LABEL: Record<UserRole, string> = {
   lider_servicio: 'Jefe de servicio',
+  admisiones: 'Admisiones',
   revisor: 'Revisor (visualización)',
   validador: 'Validador · Talento Humano',
   gestion_enfermeria: 'Gestión de Enfermería',
@@ -218,6 +233,10 @@ export type SavedIndexItem = {
   status?: ScheduleStatus
   /** Hay comentarios de corrección del revisor sin atender */
   hasOpenCorrections?: boolean
+  /** Visto bueno de Admisiones (parcial o completo). */
+  admisionesApproved?: boolean
+  /** Visto bueno del Revisor (parcial o completo). */
+  revisorApproved?: boolean
 }
 
 export function uid(prefix: string): string {

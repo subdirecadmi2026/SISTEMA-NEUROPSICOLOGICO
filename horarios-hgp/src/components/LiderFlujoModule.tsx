@@ -38,8 +38,12 @@ const FLOW_STEPS: Array<{
   hint: string
 }> = [
   { status: 'BORRADOR', label: 'Borrador', hint: 'En elaboración' },
-  { status: 'EN_REVISION', label: 'Enviado', hint: 'En revisión' },
-  { status: 'APROBADO', label: 'Revisado', hint: 'Aprobado por revisor' },
+  {
+    status: 'EN_REVISION',
+    label: 'Enviado',
+    hint: 'Admisiones + Revisor',
+  },
+  { status: 'APROBADO', label: 'Aprobado', hint: 'Listo para validador' },
   { status: 'ARCHIVADO', label: 'Validado', hint: 'Firmado y cerrado' },
 ]
 

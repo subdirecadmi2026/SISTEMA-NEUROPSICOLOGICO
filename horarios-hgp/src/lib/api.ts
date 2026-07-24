@@ -19,6 +19,19 @@ function toIndexItem(doc: ScheduleDoc): SavedIndexItem {
     updatedAt: doc.updatedAt,
     status: doc.status,
     hasOpenCorrections: (doc.reviewComments ?? []).some((c) => !c.resolved),
+    admisionesApproved: !!(
+      doc.admisionesApprovedAt ||
+      doc.admisionesPor?.trim() ||
+      (doc.electronicSigns ?? []).some((e) => e.slot === 'admisiones')
+    ),
+    revisorApproved: !!(
+      doc.revisorApprovedAt ||
+      (doc.status !== 'BORRADOR' &&
+        doc.status !== 'EN_REVISION' &&
+        (doc.revisadoPor?.trim() || doc.aprobadoPor?.trim())) ||
+      (doc.electronicSigns ?? []).some((e) => e.slot === 'revisor') ||
+      (!!doc.revisadoPor?.trim() && doc.status === 'EN_REVISION')
+    ),
   }
 }
 

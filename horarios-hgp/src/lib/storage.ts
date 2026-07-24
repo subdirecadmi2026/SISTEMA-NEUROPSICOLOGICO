@@ -4,6 +4,25 @@ export type { SavedIndexItem }
 
 const STORAGE_KEY = 'hgp-horarios-v1'
 
+function indexFlags(doc: ScheduleDoc) {
+  return {
+    hasOpenCorrections: (doc.reviewComments ?? []).some((c) => !c.resolved),
+    admisionesApproved: !!(
+      doc.admisionesApprovedAt ||
+      doc.admisionesPor?.trim() ||
+      (doc.electronicSigns ?? []).some((e) => e.slot === 'admisiones')
+    ),
+    revisorApproved: !!(
+      doc.revisorApprovedAt ||
+      (doc.status !== 'BORRADOR' &&
+        doc.status !== 'EN_REVISION' &&
+        (doc.revisadoPor?.trim() || doc.aprobadoPor?.trim())) ||
+      (doc.electronicSigns ?? []).some((e) => e.slot === 'revisor') ||
+      (!!doc.revisadoPor?.trim() && doc.status === 'EN_REVISION')
+    ),
+  }
+}
+
 function migrate(doc: ScheduleDoc): ScheduleDoc {
   return {
     ...doc,
@@ -55,7 +74,7 @@ export function listSavedSchedules(): SavedIndexItem[] {
       year: d.year,
       updatedAt: d.updatedAt,
       status: d.status,
-      hasOpenCorrections: (d.reviewComments ?? []).some((c) => !c.resolved),
+      ...indexFlags(d),
     }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }

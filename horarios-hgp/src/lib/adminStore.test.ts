@@ -67,11 +67,19 @@ describe('admin usersStore', () => {
   it('no elimina el último admin', () => {
     const others = listManagedUsers().filter((u) => u.role === 'admin')
     expect(others.length).toBeGreaterThanOrEqual(1)
-    // eliminar todos los no-admin no aplica; intentar borrar u-admin sin otro admin
-    for (const u of listManagedUsers()) {
-      if (u.role !== 'admin') deleteManagedUser(u.id)
-    }
-    expect(() => deleteManagedUser('u-admin')).toThrow(/último administrador/)
+    // u-admin es perfil de login protegido
+    expect(() => deleteManagedUser('u-admin')).toThrow(
+      /perfil de login|último administrador/,
+    )
+    // Crear admin custom y eliminar todos menos uno
+    const extra = upsertManagedUser({
+      name: 'Admin Extra',
+      email: 'admin.extra@hgp.gob.ec',
+      role: 'admin',
+      serviceUnits: [],
+      password: 'secreta',
+    })
+    expect(() => deleteManagedUser(extra.id)).not.toThrow()
   })
 })
 

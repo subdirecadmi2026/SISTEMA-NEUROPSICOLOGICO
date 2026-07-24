@@ -488,12 +488,14 @@ export default function App() {
               <p className="text-xs text-white/70">
                 {workspaceBase === 'admin' && !adminEditorOpen
                   ? 'Consola administrador · perfiles, especialidades y claves'
-                  : workspace === 'revisor'
+                    : workspace === 'admisiones'
+                      ? 'Módulo Admisiones · vista y visto bueno'
+                      : workspace === 'revisor'
                     ? 'Módulo de revisión · solo visualización'
                     : workspace === 'validador'
                       ? 'Módulo de validación · solo visualización'
                       : workspace === 'login'
-                        ? 'Acceso por perfil · Jefe · Revisor · Validador'
+                        ? 'Acceso por perfil · Jefe · Admisiones · Revisor · Validador'
                         : workspaceBase === 'admin' && adminEditorOpen
                           ? 'Admin · editando horario'
                           : `Sistema de horarios · MSP Ecuador${isRemoteEnabled() ? ' · Supabase' : ' · Local'}`}
@@ -670,6 +672,26 @@ export default function App() {
             } catch (e) {
               flash(e instanceof Error ? e.message : 'No se pudo reabrir')
             }
+          }}
+        />
+      )}
+
+      {workspace === 'admisiones' && user && (
+        <ReviewCardsModule
+          mode="admisiones"
+          user={user}
+          items={saved}
+          loading={listLoading}
+          onRefresh={() => void refreshList()}
+          onFlash={flash}
+          onNotify={bumpNotifications}
+          onChanged={(d) => {
+            void persistSchedule(d, user)
+              .then(() => refreshList())
+              .catch(() => {
+                saveSchedule(d)
+                void refreshList()
+              })
           }}
         />
       )}

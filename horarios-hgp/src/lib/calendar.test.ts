@@ -615,11 +615,12 @@ describe('feriados Ecuador', () => {
   })
 })
 
-describe('flujo de roles Jefe → Revisor → Validador', () => {
-  it('jefe envía, revisor aprueba o devuelve con comentario, validador valida', async () => {
+describe('flujo de roles Jefe → Admisiones + Revisor → Validador', () => {
+  it('jefe envía, admisiones y revisor aprueban, validador valida', async () => {
     const { transitionStatus } = await import('./auth')
     const { DEMO_USERS } = await import('./auth')
     const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+    const admisiones = DEMO_USERS.find((u) => u.id === 'u-admisiones')!
     const revisor = DEMO_USERS.find((u) => u.id === 'u-revisor')!
     const validador = DEMO_USERS.find((u) => u.id === 'u-validador')!
 
@@ -667,10 +668,26 @@ describe('flujo de roles Jefe → Revisor → Validador', () => {
     doc = resent.doc
     expect(doc.reviewComments.every((c) => c.resolved)).toBe(true)
 
-    const approved = transitionStatus(doc, 'APROBADO', revisor)
+    // Solo revisor → sigue en revisión
+    const onlyRev = transitionStatus(doc, 'APROBADO', revisor, {
+      approvalAs: 'revisor',
+    })
+    expect(onlyRev.ok).toBe(true)
+    if (!onlyRev.ok) return
+    doc = onlyRev.doc
+    expect(doc.status).toBe('EN_REVISION')
+    expect(doc.revisadoPor).toBeTruthy()
+
+    // Admisiones completa → APROBADO
+    const approved = transitionStatus(doc, 'APROBADO', admisiones, {
+      approvalAs: 'admisiones',
+      signedName: 'Lic. Carmen Ortiz',
+    })
     expect(approved.ok).toBe(true)
     if (!approved.ok) return
     doc = approved.doc
+    expect(doc.status).toBe('APROBADO')
+    expect(doc.admisionesPor).toContain('Carmen Ortiz')
 
     // Jefe no valida
     const badVal = transitionStatus(doc, 'ARCHIVADO', jefe)
@@ -688,6 +705,7 @@ describe('flujo de roles Jefe → Revisor → Validador', () => {
   it('guarda firmas con nombre firmado en cada etapa', async () => {
     const { transitionStatus, DEMO_USERS } = await import('./auth')
     const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
+    const admisiones = DEMO_USERS.find((u) => u.id === 'u-admisiones')!
     const revisor = DEMO_USERS.find((u) => u.id === 'u-revisor')!
     const validador = DEMO_USERS.find((u) => u.id === 'u-validador')!
 
@@ -700,12 +718,24 @@ describe('flujo de roles Jefe → Revisor → Validador', () => {
     doc = sent.doc
     expect(doc.elaboradoPor).toContain('Carlos Mendoza')
 
+    const adm = transitionStatus(doc, 'APROBADO', admisiones, {
+      approvalAs: 'admisiones',
+      signedName: 'Lic. Carmen Ortiz',
+    })
+    expect(adm.ok).toBe(true)
+    if (!adm.ok) return
+    doc = adm.doc
+    expect(doc.status).toBe('EN_REVISION')
+    expect(doc.admisionesPor).toContain('Carmen Ortiz')
+
     const approved = transitionStatus(doc, 'APROBADO', revisor, {
+      approvalAs: 'revisor',
       signedName: 'Dra. María Solís',
     })
     expect(approved.ok).toBe(true)
     if (!approved.ok) return
     doc = approved.doc
+    expect(doc.status).toBe('APROBADO')
     expect(doc.revisadoPor).toContain('María Solís')
 
     const validated = transitionStatus(doc, 'ARCHIVADO', validador, {
@@ -794,6 +824,7 @@ describe('FirmaEC PKCS#12 local', () => {
   it('transitionStatus estampa firma electrónica en casilla del validador', async () => {
     const { transitionStatus, DEMO_USERS } = await import('./auth')
     const validador = DEMO_USERS.find((u) => u.id === 'u-validador')!
+    const admisiones = DEMO_USERS.find((u) => u.id === 'u-admisiones')!
     const revisor = DEMO_USERS.find((u) => u.id === 'u-revisor')!
     const jefe = DEMO_USERS.find((u) => u.id === 'u-jefe')!
 
@@ -806,10 +837,20 @@ describe('FirmaEC PKCS#12 local', () => {
     if (!sent.ok) return
     let doc = sent.doc
 
-    const ap = transitionStatus(doc, 'APROBADO', revisor)
+    const adm = transitionStatus(doc, 'APROBADO', admisiones, {
+      approvalAs: 'admisiones',
+    })
+    expect(adm.ok).toBe(true)
+    if (!adm.ok) return
+    doc = adm.doc
+
+    const ap = transitionStatus(doc, 'APROBADO', revisor, {
+      approvalAs: 'revisor',
+    })
     expect(ap.ok).toBe(true)
     if (!ap.ok) return
     doc = ap.doc
+    expect(doc.status).toBe('APROBADO')
 
     const validated = transitionStatus(doc, 'ARCHIVADO', validador, {
       electronic: {

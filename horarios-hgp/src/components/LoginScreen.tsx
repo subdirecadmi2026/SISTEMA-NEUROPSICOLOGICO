@@ -3,6 +3,7 @@ import type { AppUser } from '../types'
 import {
   DEMO_PASSWORD,
   authenticateDemo,
+  isAdmisionesRole,
   isRevisorRole,
   isValidadorRole,
   primaryDemoUsers,
@@ -91,6 +92,26 @@ function IlluAdmin() {
   )
 }
 
+function IlluAdmisiones() {
+  return (
+    <svg viewBox="0 0 160 110" className="h-full w-full" aria-hidden>
+      <rect x="16" y="16" width="128" height="78" rx="10" fill="#fff" stroke="#1c3a5c" strokeWidth="3" />
+      <rect x="28" y="28" width="60" height="8" rx="2" fill="#2e7d84" />
+      <rect x="28" y="44" width="104" height="6" rx="2" fill="#d5dee6" />
+      <rect x="28" y="56" width="104" height="6" rx="2" fill="#d5dee6" />
+      <rect x="28" y="68" width="70" height="6" rx="2" fill="#d5dee6" />
+      <rect x="100" y="74" width="36" height="14" rx="4" fill="#1c3a5c" />
+      <path
+        d="M108 81l6 6 12-12"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 const ROLE_VISUALS: RoleVisual[] = [
   {
     id: 'u-jefe',
@@ -99,6 +120,14 @@ const ROLE_VISUALS: RoleVisual[] = [
     accent: 'border-teal/30 bg-teal/5',
     selected: 'border-teal ring-2 ring-teal/40 bg-teal/10',
     Illustration: IlluJefe,
+  },
+  {
+    id: 'u-admisiones',
+    title: 'Admisiones',
+    action: 'Ver y aprobar horarios',
+    accent: 'border-navy/15 bg-sand/60',
+    selected: 'border-navy ring-2 ring-navy/30 bg-sand',
+    Illustration: IlluAdmisiones,
   },
   {
     id: 'u-revisor',
@@ -162,10 +191,11 @@ export function LoginScreen({ onLogin }: Props) {
   function roleFitsCard(role: UserRole, cardId: string): boolean {
     if (cardId === 'u-admin') return role === 'admin'
     if (cardId === 'u-jefe') return role === 'lider_servicio'
+    if (cardId === 'u-admisiones')
+      return isAdmisionesRole(role) && role !== 'admin'
     if (cardId === 'u-revisor') return isRevisorRole(role) && role !== 'admin'
     if (cardId === 'u-validador')
       return isValidadorRole(role) && role !== 'admin'
-    // fallback: same id as demo seed
     return false
   }
 

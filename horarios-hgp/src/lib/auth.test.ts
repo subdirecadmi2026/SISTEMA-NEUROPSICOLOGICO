@@ -60,9 +60,15 @@ describe('login y perfiles demo', () => {
     expect(r.ok).toBe(false)
   })
 
-  it('primaryDemoUsers incluye jefe, revisor, validador y admin', () => {
+  it('primaryDemoUsers incluye jefe, admisiones, revisor, validador y admin', () => {
     const ids = primaryDemoUsers().map((u) => u.id)
-    expect(ids).toEqual(['u-jefe', 'u-revisor', 'u-validador', 'u-admin'])
+    expect(ids).toEqual([
+      'u-jefe',
+      'u-admisiones',
+      'u-revisor',
+      'u-validador',
+      'u-admin',
+    ])
   })
 
   it('restaurar perfiles revisor y validador si se borraron del login', () => {

@@ -8,7 +8,7 @@ const CFG_KEY = 'hgp-firmaec-config-v1'
 const IDB_NAME = 'hgp-firmaec-db-v1'
 const IDB_STORE = 'certs'
 
-export type FirmaEcSlot = 'jefe' | 'revisor' | 'validador'
+export type FirmaEcSlot = 'jefe' | 'revisor' | 'validador' | 'admisiones'
 
 export type FirmaEcCertMeta = {
   fileName: string
@@ -546,9 +546,16 @@ export function slotForStatus(
   return 'validador'
 }
 
+export function slotForApprovalAs(
+  as: 'admisiones' | 'revisor',
+): FirmaEcSlot {
+  return as === 'admisiones' ? 'admisiones' : 'revisor'
+}
+
 export function slotLabel(slot: FirmaEcSlot): string {
   if (slot === 'jefe') return 'Jefe de servicio'
   if (slot === 'revisor') return 'Revisor'
+  if (slot === 'admisiones') return 'Admisiones'
   return 'Validador'
 }
 
@@ -560,9 +567,11 @@ export function buildFirmaEcProtocolUrl(
   const pos =
     slot === 'jefe'
       ? { llx: 40, lly: 40 }
-      : slot === 'revisor'
-        ? { llx: 220, lly: 40 }
-        : { llx: 400, lly: 40 }
+      : slot === 'admisiones'
+        ? { llx: 160, lly: 40 }
+        : slot === 'revisor'
+          ? { llx: 280, lly: 40 }
+          : { llx: 400, lly: 40 }
   const pre = cfg.ambiente === 'pruebas' ? 'true' : 'false'
   const q = new URLSearchParams({
     token,

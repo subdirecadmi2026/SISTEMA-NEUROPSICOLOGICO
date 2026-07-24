@@ -72,7 +72,9 @@ describe('autoridades de firma', () => {
     expect(boxes[0].kind).toBe('elaborado')
     expect(boxes[0].label).toMatch(/Jefe de servicio/i)
     expect(boxes[0].designatedName).toBe('Dra. Ana López')
-    expect(boxes.length).toBe(1 + listActiveSigners().length)
+    expect(boxes[1].kind).toBe('admisiones')
+    expect(boxes[1].label).toMatch(/Validado por Admisiones/i)
+    expect(boxes.length).toBe(2 + listActiveSigners().length)
   })
 
   it('crea usuario de autoridad con nombres y responsabilidad', () => {
@@ -131,7 +133,7 @@ describe('autoridades de firma', () => {
         unitName: 'UCI',
         staff: [],
       }),
-    )).toHaveLength(1)
+    )).toHaveLength(2)
   })
 
   it('permite espacios al escribir nombres y apellidos', () => {

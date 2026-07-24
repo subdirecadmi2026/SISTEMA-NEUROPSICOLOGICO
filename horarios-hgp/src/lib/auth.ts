@@ -34,6 +34,11 @@ export function isJefeRole(role: UserRole): boolean {
   return role === 'lider_servicio' || role === 'admin'
 }
 
+/** Admisiones: visualiza y da visto bueno junto al revisor. */
+export function isAdmisionesRole(role: UserRole): boolean {
+  return role === 'admisiones' || role === 'admin'
+}
+
 /** Revisor: solo visualiza; puede aprobar o pedir corrección. */
 export function isRevisorRole(role: UserRole): boolean {
   return (
@@ -48,6 +53,23 @@ export function isRevisorRole(role: UserRole): boolean {
 /** Validador: valida formalmente un horario ya aprobado. */
 export function isValidadorRole(role: UserRole): boolean {
   return role === 'validador' || role === 'talento_humano' || role === 'admin'
+}
+
+export function hasAdmisionesApproval(doc: ScheduleDoc): boolean {
+  if (doc.admisionesApprovedAt) return true
+  if (doc.admisionesPor?.trim()) return true
+  return (doc.electronicSigns ?? []).some((e) => e.slot === 'admisiones')
+}
+
+export function hasRevisorApproval(doc: ScheduleDoc): boolean {
+  if (doc.revisorApprovedAt) return true
+  if (doc.status === 'APROBADO' || doc.status === 'ARCHIVADO') {
+    return !!doc.revisadoPor?.trim() || !!doc.aprobadoPor?.trim()
+  }
+  return (
+    !!doc.revisadoPor?.trim() ||
+    (doc.electronicSigns ?? []).some((e) => e.slot === 'revisor')
+  )
 }
 
 export function loadSession(): AppUser | null {
@@ -96,6 +118,7 @@ export const DEMO_PASSWORD = 'hgp2026'
 /** Perfiles principales del flujo (login destacado). */
 export const PRIMARY_DEMO_IDS = [
   'u-jefe',
+  'u-admisiones',
   'u-revisor',
   'u-validador',
   'u-admin',
@@ -169,15 +192,17 @@ export function roleLabel(role: UserRole): string {
 export function roleMission(role: UserRole): string {
   switch (role) {
     case 'lider_servicio':
-      return 'Elabora el horario, registra permisos/vacaciones del personal y lo envía a revisión.'
+      return 'Elabora el horario completo y lo envía a Admisiones y Revisor.'
+    case 'admisiones':
+      return 'Visualiza horarios en revisión y da el visto bueno de Admisiones (junto al revisor).'
     case 'revisor':
     case 'direccion_asistencial':
     case 'subdireccion':
     case 'gestion_enfermeria':
-      return 'Revisa en solo lectura: aprueba o devuelve con comentario.'
+      return 'Revisa en solo lectura: aprueba o devuelve con comentario (junto a Admisiones).'
     case 'validador':
     case 'talento_humano':
-      return 'Talento Humano: valida horarios, archiva PDF y visualiza/gestiona permisos y vacaciones.'
+      return 'Talento Humano: valida horarios ya aprobados por Admisiones y Revisor, archiva PDF.'
     case 'admin':
       return 'Administra usuarios, servicios, personal, permisos y horarios.'
     default:
@@ -265,6 +290,8 @@ export function transitionStatus(
     comment?: string
     signedName?: string
     electronic?: ElectronicSignRecord
+    /** Quién está dando el visto bueno en EN_REVISION → APROBADO. */
+    approvalAs?: 'admisiones' | 'revisor'
   },
 ): { ok: true; doc: ScheduleDoc } | { ok: false; error: string } {
   const allowed: Record<ScheduleStatus, ScheduleStatus[]> = {
@@ -288,13 +315,36 @@ export function transitionStatus(
     }
   }
 
-  // Revisor aprueba o devuelve con comentario
-  if (doc.status === 'EN_REVISION' && next === 'APROBADO' && !isRevisorRole(user.role)) {
-    return { ok: false, error: 'Solo el revisor puede aprobar' }
+  // Admisiones o Revisor dan visto bueno (ambos requeridos para APROBADO)
+  if (doc.status === 'EN_REVISION' && next === 'APROBADO') {
+    const as =
+      opts?.approvalAs ??
+      (user.role === 'admisiones'
+        ? 'admisiones'
+        : isRevisorRole(user.role)
+          ? 'revisor'
+          : isAdmisionesRole(user.role)
+            ? 'admisiones'
+            : null)
+    if (as === 'admisiones' && !isAdmisionesRole(user.role)) {
+      return { ok: false, error: 'Solo Admisiones puede dar este visto bueno' }
+    }
+    if (as === 'revisor' && !isRevisorRole(user.role)) {
+      return { ok: false, error: 'Solo el revisor puede aprobar' }
+    }
+    if (!as) {
+      return {
+        ok: false,
+        error: 'Solo Admisiones o el revisor pueden aprobar',
+      }
+    }
   }
   if (doc.status === 'EN_REVISION' && next === 'BORRADOR') {
-    if (!isRevisorRole(user.role)) {
-      return { ok: false, error: 'Solo el revisor puede devolver a borrador' }
+    if (!isRevisorRole(user.role) && !isAdmisionesRole(user.role)) {
+      return {
+        ok: false,
+        error: 'Solo Admisiones o el revisor pueden devolver a borrador',
+      }
     }
     if (!opts?.comment?.trim()) {
       return {
@@ -318,6 +368,116 @@ export function transitionStatus(
     return { ok: false, error: 'Solo admin puede reabrir un horario cerrado' }
   }
 
+  const approvalAs: 'admisiones' | 'revisor' | null =
+    doc.status === 'EN_REVISION' && next === 'APROBADO'
+      ? (opts?.approvalAs ??
+        (user.role === 'admisiones'
+          ? 'admisiones'
+          : isRevisorRole(user.role)
+            ? 'revisor'
+            : 'admisiones'))
+      : null
+
+  const signedName = (
+    opts?.electronic?.subjectCn ||
+    opts?.signedName?.trim() ||
+    user.name
+  ).trim()
+  const stampText = opts?.electronic?.stampText
+  const at = opts?.electronic?.signedAt ?? new Date().toISOString()
+  const cargo =
+    opts?.cargo ?? cargoForSigningUser(user.id, roleLabel(user.role))
+
+  // ——— Doble visto bueno: Admisiones + Revisor ———
+  if (doc.status === 'EN_REVISION' && next === 'APROBADO' && approvalAs) {
+    if (approvalAs === 'admisiones' && hasAdmisionesApproval(doc)) {
+      return { ok: false, error: 'Admisiones ya dio el visto bueno' }
+    }
+    if (approvalAs === 'revisor' && hasRevisorApproval(doc)) {
+      return { ok: false, error: 'El revisor ya aprobó este horario' }
+    }
+
+    const text = stampText ?? `${signedName} — ${cargo}`
+    const electronic = opts?.electronic
+      ? {
+          ...opts.electronic,
+          slot:
+            approvalAs === 'admisiones'
+              ? ('admisiones' as const)
+              : ('revisor' as const),
+        }
+      : undefined
+
+    let updated: ScheduleDoc = {
+      ...doc,
+      status: 'EN_REVISION',
+      signatures: [
+        ...doc.signatures,
+        {
+          role: approvalAs === 'admisiones' ? 'admisiones' : 'aprobado',
+          name: signedName,
+          cargo,
+          at,
+          userId: user.id,
+          electronic: !!electronic,
+          subjectCn: electronic?.subjectCn,
+          certSerial: electronic?.serialNumber,
+        },
+      ],
+      reviewComments: doc.reviewComments ?? [],
+      electronicSigns: [...(doc.electronicSigns ?? [])],
+    }
+
+    if (electronic) {
+      updated.electronicSigns = [
+        ...(updated.electronicSigns ?? []).filter(
+          (e) => e.slot !== electronic.slot,
+        ),
+        electronic,
+      ]
+    }
+
+    if (approvalAs === 'admisiones') {
+      updated = {
+        ...updated,
+        admisionesPor: text,
+        admisionesApprovedAt: at,
+      }
+    } else {
+      updated = {
+        ...updated,
+        revisadoPor: text,
+        revisorApprovedAt: at,
+      }
+    }
+
+    const both =
+      hasAdmisionesApproval(updated) && hasRevisorApproval(updated)
+    if (both) {
+      updated = {
+        ...updated,
+        status: 'APROBADO',
+        aprobadoPor:
+          updated.aprobadoPor ||
+          updated.revisadoPor ||
+          text,
+      }
+    }
+
+    const detail = both
+      ? `Firma ${approvalAs}: ${signedName} · pasa a Aprobado`
+      : `Firma parcial ${approvalAs}: ${signedName} · pendiente ${
+          approvalAs === 'admisiones' ? 'revisor' : 'admisiones'
+        }`
+    updated = appendAudit(
+      updated,
+      user,
+      both ? 'estado_APROBADO' : `visto_bueno_${approvalAs}`,
+      detail,
+    )
+    return { ok: true, doc: updated }
+  }
+
   const sigRole: ApprovalSignature['role'] =
     next === 'EN_REVISION'
       ? 'elaborado'
@@ -327,19 +487,11 @@ export function transitionStatus(
           ? 'validado'
           : 'revisado'
 
-  const signedName = (
-    opts?.electronic?.subjectCn ||
-    opts?.signedName?.trim() ||
-    user.name
-  ).trim()
-  const stampText = opts?.electronic?.stampText
   const signature: ApprovalSignature = {
     role: sigRole,
     name: signedName,
-    cargo:
-      opts?.cargo ??
-      cargoForSigningUser(user.id, roleLabel(user.role)),
-    at: opts?.electronic?.signedAt ?? new Date().toISOString(),
+    cargo,
+    at,
     userId: user.id,
     electronic: !!opts?.electronic,
     subjectCn: opts?.electronic?.subjectCn,
@@ -355,7 +507,6 @@ export function transitionStatus(
   }
 
   if (opts?.electronic) {
-    // Reemplaza firma electrónica previa del mismo slot
     updated.electronicSigns = [
       ...(updated.electronicSigns ?? []).filter(
         (e) => e.slot !== opts.electronic!.slot,
@@ -368,8 +519,16 @@ export function transitionStatus(
     updated = {
       ...updated,
       elaboradoPor: stampText ?? `${signedName} — ${signature.cargo}`,
+      // Al enviar de nuevo, limpia vistos buenos previos
+      admisionesPor: '',
+      admisionesApprovedAt: undefined,
+      revisorApprovedAt: undefined,
+      revisadoPor: '',
+      aprobadoPor: '',
+      electronicSigns: (updated.electronicSigns ?? []).filter(
+        (e) => e.slot === 'jefe',
+      ),
     }
-    // Al reenviar, marcar correcciones previas como atendidas
     if ((updated.reviewComments ?? []).some((c) => !c.resolved)) {
       updated = {
         ...updated,
@@ -378,15 +537,6 @@ export function transitionStatus(
           resolved: true,
         })),
       }
-    }
-  }
-
-  if (next === 'APROBADO') {
-    const text = stampText ?? `${signedName} — ${signature.cargo}`
-    updated = {
-      ...updated,
-      aprobadoPor: text,
-      revisadoPor: text,
     }
   }
 
@@ -411,9 +561,11 @@ export function transitionStatus(
     updated = {
       ...updated,
       reviewComments: [...(updated.reviewComments ?? []), comment],
-      // Quitar firma del revisor; se mantiene la del jefe
       revisadoPor: '',
       aprobadoPor: '',
+      admisionesPor: '',
+      admisionesApprovedAt: undefined,
+      revisorApprovedAt: undefined,
       electronicSigns: (updated.electronicSigns ?? []).filter(
         (e) => e.slot === 'jefe',
       ),
@@ -431,6 +583,9 @@ export function transitionStatus(
       revisadoPor: '',
       aprobadoPor: '',
       talentoHumano: '',
+      admisionesPor: '',
+      admisionesApprovedAt: undefined,
+      revisorApprovedAt: undefined,
       electronicSigns: [],
     }
   }

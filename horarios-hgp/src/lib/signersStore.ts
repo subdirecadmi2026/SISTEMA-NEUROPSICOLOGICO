@@ -344,7 +344,7 @@ export type PrintSignatureBox = {
   value: string
   designatedName?: string
   slot?: FirmaEcSlot
-  kind: SignerKind
+  kind: SignerKind | 'admisiones'
 }
 
 export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] {
@@ -362,7 +362,20 @@ export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] 
     kind: 'elaborado',
   }
 
-  const usedSlots = new Set<string>(['jefe'])
+  // Casilla Admisiones justo debajo del jefe (no al final)
+  const admisionesStamp = doc.admisionesPor?.trim() ?? ''
+  const admisionesName =
+    admisionesStamp.split('\n')[0]?.split('—')[0]?.trim() || ''
+  const admisiones: PrintSignatureBox = {
+    key: 'admisiones-auto',
+    label: 'Validado por Admisiones',
+    value: admisionesStamp,
+    designatedName: doc.jefeServicio.trim() || admisionesName || undefined,
+    slot: 'admisiones',
+    kind: 'admisiones',
+  }
+
+  const usedSlots = new Set<string>(['jefe', 'admisiones'])
   const authorities: PrintSignatureBox[] = listActiveSigners().map((s) => {
     const slotCandidate = electronicSlotForKind(s.kind)
     const slot =
@@ -390,7 +403,7 @@ export function buildPrintSignatureBoxes(doc: ScheduleDoc): PrintSignatureBox[] 
     }
   })
 
-  return [jefe, ...authorities]
+  return [jefe, admisiones, ...authorities]
 }
 
 export function createOrUpdateUserFromSigner(

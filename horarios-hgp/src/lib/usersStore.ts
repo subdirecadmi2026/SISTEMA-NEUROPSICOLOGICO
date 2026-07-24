@@ -36,6 +36,13 @@ export const SEED_USERS: AppUser[] = [
     serviceUnits: [],
   },
   {
+    id: 'u-admisiones',
+    email: 'admisiones@hgp.gob.ec',
+    name: 'Lic. Carmen Ortiz',
+    role: 'admisiones',
+    serviceUnits: [],
+  },
+  {
     id: 'u-validador',
     email: 'validador@hgp.gob.ec',
     name: 'Ing. Patricia Vega',
@@ -122,9 +129,10 @@ function writeDeletedDemo(ids: Set<string>) {
   localStorage.setItem(DELETED_DEMO_KEY, JSON.stringify([...ids]))
 }
 
-/** Perfiles del login (jefe, revisor, validador, admin) no deben desaparecer. */
+/** Perfiles del login (jefe, admisiones, revisor, validador, admin) no deben desaparecer. */
 export const PRIMARY_LOGIN_IDS = [
   'u-jefe',
+  'u-admisiones',
   'u-revisor',
   'u-validador',
   'u-admin',
@@ -284,7 +292,7 @@ export function deleteManagedUser(id: string): void {
 
   if ((PRIMARY_LOGIN_IDS as readonly string[]).includes(id)) {
     throw new Error(
-      'No se puede eliminar el perfil de login (Jefe, Revisor, Validador o Administrador). Desactívelo solo si es otro usuario.',
+      'No se puede eliminar el perfil de login (Jefe, Admisiones, Revisor, Validador o Administrador). Desactívelo solo si es otro usuario.',
     )
   }
 
@@ -328,6 +336,7 @@ export function checkUserPassword(
 
 export const ALL_ROLES: UserRole[] = [
   'lider_servicio',
+  'admisiones',
   'revisor',
   'validador',
   'admin',

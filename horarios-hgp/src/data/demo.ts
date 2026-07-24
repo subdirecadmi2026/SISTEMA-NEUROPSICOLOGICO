@@ -192,6 +192,9 @@ export function createBlankSchedule(
       talentoHumano: withDemo
         ? 'Ing. Elizabeth Yánez — Talento Humano'
         : '',
+      admisionesPor: '',
+      admisionesApprovedAt: undefined,
+      revisorApprovedAt: undefined,
       electronicSigns: [],
     }
   }
@@ -217,6 +220,9 @@ export function createBlankSchedule(
     talentoHumano: withDemo
       ? 'Ing. Lourdes Yánez — Talento Humano'
       : '',
+    admisionesPor: '',
+    admisionesApprovedAt: undefined,
+    revisorApprovedAt: undefined,
     electronicSigns: [],
   }
 }
