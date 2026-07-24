@@ -42,13 +42,15 @@ export function RoleModeBanner({ user, doc, canEdit }: Props) {
         <div className="no-print border-b border-teal/30 bg-teal/10 px-4 py-2 text-center text-sm text-navy">
           <strong>Jefe de servicio</strong> · puede elaborar y guardar · estado{' '}
           <strong>{status}</strong>
+          {' · '}
+          use <strong>Flujo / archivo</strong> para ver el estado de cada mes
         </div>
       )
     }
     return (
       <div className="no-print border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-950">
-        <strong>Jefe</strong> · edición bloqueada ({status}). Espere devolución
-        del revisor o cree un mes nuevo.
+        <strong>Jefe</strong> · edición bloqueada ({status}). Revise{' '}
+        <strong>Flujo / archivo</strong> o espere devolución del revisor.
       </div>
     )
   }

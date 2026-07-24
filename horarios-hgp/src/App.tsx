@@ -55,6 +55,7 @@ import { ScheduleTable } from './components/ScheduleTable'
 import { CreateScheduleWizard } from './components/CreateScheduleWizard'
 import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
 import { NamesEditor } from './components/NamesEditor'
+import { LiderFlujoModule } from './components/LiderFlujoModule'
 import { SchedulesHome } from './components/SchedulesHome'
 import { PrintSheet } from './components/PrintSheet'
 import {
@@ -130,6 +131,8 @@ export default function App() {
   const [focusDay, setFocusDay] = useState<number | null>(null)
   const [jumpDay, setJumpDay] = useState(1)
   const [notifyTick, setNotifyTick] = useState(0)
+  /** Módulo del líder: elaborar horario o ver flujo/archivo por mes. */
+  const [liderVista, setLiderVista] = useState<'elaborar' | 'flujo'>('flujo')
   const docRefApp = useRef(doc)
   docRefApp.current = doc
 
@@ -541,7 +544,33 @@ export default function App() {
                 + Crear horario
               </button>
             )}
-            {workspace === 'editor' && (
+            {workspace === 'editor' && user && isJefeRole(user.role) && (
+              <div className="flex overflow-hidden rounded-lg border border-white/25">
+                <button
+                  type="button"
+                  onClick={() => setLiderVista('flujo')}
+                  className={`px-3 py-2 text-sm font-semibold ${
+                    liderVista === 'flujo'
+                      ? 'bg-teal-soft text-navy-deep'
+                      : 'bg-white/5 hover:bg-white/10'
+                  }`}
+                >
+                  Flujo / archivo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLiderVista('elaborar')}
+                  className={`px-3 py-2 text-sm font-semibold ${
+                    liderVista === 'elaborar'
+                      ? 'bg-teal-soft text-navy-deep'
+                      : 'bg-white/5 hover:bg-white/10'
+                  }`}
+                >
+                  Elaborar
+                </button>
+              </div>
+            )}
+            {workspace === 'editor' && liderVista === 'elaborar' && (
               <button
                 type="button"
                 disabled={saving || readOnly}
@@ -551,7 +580,7 @@ export default function App() {
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
             )}
-            {workspace === 'editor' && (
+            {workspace === 'editor' && liderVista === 'elaborar' && (
               <>
                 <button
                   type="button"
@@ -616,10 +645,12 @@ export default function App() {
           onRefresh={() => void refreshList()}
           onCreateSchedule={() => {
             setAdminEditorOpen(true)
+            setLiderVista('elaborar')
             setShowCreate(true)
           }}
           onOpenSchedule={(id) => {
             setAdminEditorOpen(true)
+            setLiderVista('elaborar')
             void handleLoad(id)
           }}
           onDeleteSchedule={(id) => void handleDeleteSaved(id)}
@@ -684,7 +715,29 @@ export default function App() {
         />
       )}
 
-      {workspace === 'editor' && (
+      {workspace === 'editor' && user && isJefeRole(user.role) && liderVista === 'flujo' && (
+        <LiderFlujoModule
+          user={user}
+          items={visibleSaved}
+          loading={listLoading}
+          onRefresh={() => void refreshList()}
+          onFlash={flash}
+          onCreate={() => {
+            setShowCreate(true)
+            setLiderVista('elaborar')
+          }}
+          onOpenInEditor={(id) => {
+            setLiderVista('elaborar')
+            void handleLoad(id)
+          }}
+          onDelete={(id) => void handleDeleteSaved(id)}
+        />
+      )}
+
+      {workspace === 'editor' &&
+        (liderVista === 'elaborar' ||
+          !user ||
+          !isJefeRole(user.role)) && (
         <>
       <RoleModeBanner user={user} doc={doc} canEdit={!readOnly} />
       <ValidationNoticeBanner user={user} refreshKey={notifyTick} />
@@ -1442,6 +1495,7 @@ export default function App() {
         onClose={() => setShowCreate(false)}
         onCreate={(next) => {
           setDoc(next)
+          setLiderVista('elaborar')
           setActiveCode(
             shiftsFor(next.serviceType).find((s) => s.group === 'turno')
               ?.code ?? '',
