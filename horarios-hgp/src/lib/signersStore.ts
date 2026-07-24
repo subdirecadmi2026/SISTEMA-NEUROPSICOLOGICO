@@ -237,7 +237,29 @@ export function saveSignersConfig(cfg: SignersConfig): SignersConfig {
     signers,
   }
   localStorage.setItem(KEY, JSON.stringify(next))
+  queueSignersRemotePush(next)
   return next
+}
+
+function queueSignersRemotePush(cfg?: SignersConfig) {
+  if (typeof window === 'undefined') return
+  const payload = cfg ?? getSignersConfig()
+  void import('./remoteAppState')
+    .then(({ pushSignersRemote }) => pushSignersRemote(payload))
+    .catch(() => undefined)
+}
+
+export function replaceSignersConfig(
+  cfg: SignersConfig,
+  opts?: { syncRemote?: boolean },
+) {
+  const signers = normalizeList(cfg.signers)
+  const next: SignersConfig = {
+    count: totalCount(signers.length),
+    signers,
+  }
+  localStorage.setItem(KEY, JSON.stringify(next))
+  if (opts?.syncRemote !== false) queueSignersRemotePush(next)
 }
 
 /** Atajo: plantilla de 3 / 4 / 5 firmas totales (jefe + autoridades). */

@@ -4,6 +4,7 @@ import { getSupabase, isSupabaseConfigured } from './supabase'
 import { saveSchedule } from './storage'
 import type { StaffLeave } from './leavesStore'
 import type { HgpNotification } from './notifications'
+import type { AppConfigSyncStatus } from './remoteAppState'
 import {
   flattenStaffLibrary,
   mergeStaffLibraryEntries,
@@ -564,15 +565,16 @@ export async function markNotificationReadRemote(id: string, read = true): Promi
 }
 
 /**
- * Arranque: trae permisos, notificaciones y biblioteca de personal desde Supabase
- * y los fusiona con localStorage.
+ * Arranque: trae permisos, notificaciones, biblioteca de personal y
+ * configuración de app (usuarios, unidades, firmas, claves, feriados)
+ * desde Supabase y los fusiona con localStorage.
  */
 export async function syncCatalogsFromRemote(opts: {
   getLocalLeaves: () => StaffLeave[]
   setLocalLeaves: (items: StaffLeave[]) => void
   getLocalNotifications: () => HgpNotification[]
   setLocalNotifications: (items: HgpNotification[]) => void
-}): Promise<RemoteCatalogStatus> {
+}): Promise<RemoteCatalogStatus & { appConfig?: AppConfigSyncStatus }> {
   const status = await probeRemoteCatalog()
   if (!status.configured) return status
 
@@ -581,7 +583,6 @@ export async function syncCatalogsFromRemote(opts: {
     opts.setLocalLeaves(leaves.items)
     status.leavesMode = leaves.mode
     status.leavesCount = leaves.items.length
-    // Empuja merge al remoto para que otros clientes vean lo local previo
     await pushAllLeavesRemote(leaves.items)
   } catch (e) {
     status.lastError = e instanceof Error ? e.message : 'Error sync permisos'
@@ -605,6 +606,99 @@ export async function syncCatalogsFromRemote(opts: {
     await pushAllStaffLibraryRemote(staff.items)
   } catch (e) {
     status.lastError = e instanceof Error ? e.message : 'Error sync personal'
+  }
+
+  let appConfig: AppConfigSyncStatus | undefined
+  try {
+    appConfig = await syncAppConfigFromRemote()
+  } catch (e) {
+    status.lastError =
+      e instanceof Error ? e.message : 'Error sync configuración'
+  }
+
+  return { ...status, appConfig }
+}
+
+async function syncAppConfigFromRemote(): Promise<AppConfigSyncStatus> {
+  const {
+    pullUsersRemote,
+    pushUsersRemote,
+    pullUnitsRemote,
+    pushUnitsRemote,
+    pullSignersRemote,
+    pushSignersRemote,
+    pullShiftsRemote,
+    pushShiftsRemote,
+    pullHolidaysRemote,
+    pushHolidaysRemote,
+    probeAppConfigRemote,
+  } = await import('./remoteAppState')
+  const { readUsersRemoteBlob, replaceUsersRemoteBlob } = await import(
+    './usersStore'
+  )
+  const { readUnitsBlob, replaceUnitsBlob } = await import('./unitsStore')
+  const { getSignersConfig, replaceSignersConfig } = await import(
+    './signersStore'
+  )
+  const { readShiftsBlob, replaceShiftsBlob } = await import('./shiftsStore')
+  const { readHolidaysRemoteBlob, replaceHolidaysRemoteBlob } = await import(
+    './holidays'
+  )
+
+  const status = await probeAppConfigRemote()
+
+  try {
+    const users = await pullUsersRemote(readUsersRemoteBlob())
+    replaceUsersRemoteBlob(users.items, { syncRemote: false })
+    status.usersMode = users.mode
+    status.usersCount =
+      users.items.custom.length + Object.keys(users.items.overrides).length
+    await pushUsersRemote(users.items)
+  } catch (e) {
+    status.lastError = e instanceof Error ? e.message : 'Error sync usuarios'
+  }
+
+  try {
+    const units = await pullUnitsRemote(readUnitsBlob())
+    replaceUnitsBlob(units.items, { syncRemote: false })
+    status.unitsMode = units.mode
+    status.unitsCount =
+      units.items.enfermeria.length + units.items.medico.length
+    await pushUnitsRemote(units.items)
+  } catch (e) {
+    status.lastError = e instanceof Error ? e.message : 'Error sync unidades'
+  }
+
+  try {
+    const signers = await pullSignersRemote(getSignersConfig())
+    replaceSignersConfig(signers.items, { syncRemote: false })
+    status.signersMode = signers.mode
+    status.signersCount = signers.items.signers.length
+    await pushSignersRemote(signers.items)
+  } catch (e) {
+    status.lastError = e instanceof Error ? e.message : 'Error sync firmas'
+  }
+
+  try {
+    const shifts = await pullShiftsRemote(readShiftsBlob())
+    replaceShiftsBlob(shifts.items, { syncRemote: false })
+    status.shiftsMode = shifts.mode
+    status.shiftsCount =
+      shifts.items.enfermeria.length + shifts.items.medico.length
+    await pushShiftsRemote(shifts.items)
+  } catch (e) {
+    status.lastError = e instanceof Error ? e.message : 'Error sync claves'
+  }
+
+  try {
+    const holidays = await pullHolidaysRemote(readHolidaysRemoteBlob())
+    replaceHolidaysRemoteBlob(holidays.items, { syncRemote: false })
+    status.holidaysMode = holidays.mode
+    status.holidaysCount =
+      holidays.items.custom.length + holidays.items.suppressed.length
+    await pushHolidaysRemote(holidays.items)
+  } catch (e) {
+    status.lastError = e instanceof Error ? e.message : 'Error sync feriados'
   }
 
   return status

@@ -41,8 +41,12 @@ Para permisos/vacaciones y notificaciones multi-navegador, ejecute también:
 
 ```text
 supabase/migrations/20260723220000_leaves_notifications.sql
+supabase/migrations/20260724193000_staff_library.sql
+supabase/migrations/20260724194500_leave_pending_status.sql
+supabase/migrations/20260724210000_full_app_sync.sql
 ```
 
+La última migración conecta usuarios, firmas, claves, feriados y permisos pendientes.
 Sin esas tablas, la app igual sincroniza usando un **bundle** en `schedules` (`__SYSTEM__/…`). En Admin → Resumen puede ver el estado y forzar sync.
 
 ## Scripts

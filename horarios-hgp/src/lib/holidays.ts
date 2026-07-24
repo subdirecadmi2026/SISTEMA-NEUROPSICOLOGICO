@@ -55,6 +55,7 @@ function readAllCustom(): Holiday[] {
 
 function writeAllCustom(all: Holiday[]) {
   localStorage.setItem(CUSTOM_KEY, JSON.stringify(all))
+  queueHolidaysRemotePush()
 }
 
 function readSuppressed(): Set<string> {
@@ -69,6 +70,40 @@ function readSuppressed(): Set<string> {
 
 function writeSuppressed(ids: Set<string>) {
   localStorage.setItem(SUPPRESSED_KEY, JSON.stringify([...ids]))
+  queueHolidaysRemotePush()
+}
+
+function queueHolidaysRemotePush() {
+  if (typeof window === 'undefined') return
+  void import('./remoteAppState')
+    .then(({ pushHolidaysRemote }) =>
+      pushHolidaysRemote(readHolidaysRemoteBlob()),
+    )
+    .catch(() => undefined)
+}
+
+export function readHolidaysRemoteBlob(): {
+  custom: Holiday[]
+  suppressed: string[]
+  updatedAt: string
+} {
+  return {
+    custom: readAllCustom(),
+    suppressed: [...readSuppressed()],
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+export function replaceHolidaysRemoteBlob(
+  next: { custom: Holiday[]; suppressed: string[] },
+  opts?: { syncRemote?: boolean },
+) {
+  localStorage.setItem(CUSTOM_KEY, JSON.stringify(next.custom ?? []))
+  localStorage.setItem(
+    SUPPRESSED_KEY,
+    JSON.stringify(next.suppressed ?? []),
+  )
+  if (opts?.syncRemote !== false) queueHolidaysRemotePush()
 }
 
 /** Feriados fijos + móviles (Carnaval, Viernes Santo) para un año. */

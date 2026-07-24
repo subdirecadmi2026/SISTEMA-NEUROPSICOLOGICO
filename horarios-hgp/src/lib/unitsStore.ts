@@ -38,6 +38,26 @@ function readBlob(): UnitsBlob {
 
 function writeBlob(blob: UnitsBlob) {
   localStorage.setItem(UNITS_KEY, JSON.stringify(blob))
+  queueUnitsRemotePush()
+}
+
+function queueUnitsRemotePush() {
+  if (typeof window === 'undefined') return
+  void import('./remoteAppState')
+    .then(({ pushUnitsRemote }) => pushUnitsRemote(readBlob()))
+    .catch(() => undefined)
+}
+
+export function readUnitsBlob(): UnitsBlob {
+  return readBlob()
+}
+
+export function replaceUnitsBlob(
+  next: UnitsBlob,
+  opts?: { syncRemote?: boolean },
+) {
+  localStorage.setItem(UNITS_KEY, JSON.stringify(next))
+  if (opts?.syncRemote !== false) queueUnitsRemotePush()
 }
 
 export function listUnits(serviceType: ServiceType): string[] {

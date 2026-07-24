@@ -113,6 +113,7 @@ function readBlob(): UsersBlob {
 
 function writeBlob(blob: UsersBlob) {
   localStorage.setItem(USERS_KEY, JSON.stringify(blob))
+  queueUsersRemotePush()
 }
 
 function readDeletedDemo(): Set<string> {
@@ -127,6 +128,50 @@ function readDeletedDemo(): Set<string> {
 
 function writeDeletedDemo(ids: Set<string>) {
   localStorage.setItem(DELETED_DEMO_KEY, JSON.stringify([...ids]))
+  queueUsersRemotePush()
+}
+
+function queueUsersRemotePush() {
+  if (typeof window === 'undefined') return
+  void import('./remoteAppState')
+    .then(({ pushUsersRemote }) => pushUsersRemote(readUsersRemoteBlob()))
+    .catch(() => undefined)
+}
+
+/** Lectura para sync remoto. */
+export function readUsersRemoteBlob(): {
+  custom: ManagedUser[]
+  overrides: Record<string, Partial<ManagedUser>>
+  deletedDemo: string[]
+  updatedAt: string
+} {
+  const blob = readBlob()
+  return {
+    custom: blob.custom,
+    overrides: blob.overrides,
+    deletedDemo: [...readDeletedDemo()],
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+/** Reemplazo tras sync remoto (sin volver a empujar). */
+export function replaceUsersRemoteBlob(
+  next: {
+    custom: ManagedUser[]
+    overrides: Record<string, Partial<ManagedUser>>
+    deletedDemo: string[]
+  },
+  opts?: { syncRemote?: boolean },
+) {
+  localStorage.setItem(
+    USERS_KEY,
+    JSON.stringify({ custom: next.custom, overrides: next.overrides }),
+  )
+  localStorage.setItem(
+    DELETED_DEMO_KEY,
+    JSON.stringify(next.deletedDemo ?? []),
+  )
+  if (opts?.syncRemote !== false) queueUsersRemotePush()
 }
 
 /** Perfiles del login (jefe, admisiones, revisor, validador, admin) no deben desaparecer. */

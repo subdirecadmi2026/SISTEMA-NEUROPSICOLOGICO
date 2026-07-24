@@ -53,6 +53,26 @@ function mergeMissingDefaults(
 
 function writeBlob(blob: ShiftsBlob) {
   localStorage.setItem(SHIFTS_KEY, JSON.stringify(blob))
+  queueShiftsRemotePush()
+}
+
+function queueShiftsRemotePush() {
+  if (typeof window === 'undefined') return
+  void import('./remoteAppState')
+    .then(({ pushShiftsRemote }) => pushShiftsRemote(readBlob()))
+    .catch(() => undefined)
+}
+
+export function readShiftsBlob(): ShiftsBlob {
+  return readBlob()
+}
+
+export function replaceShiftsBlob(
+  next: ShiftsBlob,
+  opts?: { syncRemote?: boolean },
+) {
+  localStorage.setItem(SHIFTS_KEY, JSON.stringify(next))
+  if (opts?.syncRemote !== false) queueShiftsRemotePush()
 }
 
 function normalizeCode(code: string): string {

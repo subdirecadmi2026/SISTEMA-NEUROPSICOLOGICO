@@ -4,6 +4,10 @@ import {
   syncCatalogsFromRemote,
   type RemoteCatalogStatus,
 } from '../lib/remoteCatalog'
+import {
+  probeAppConfigRemote,
+  type AppConfigSyncStatus,
+} from '../lib/remoteAppState'
 import { readLeavesLocal, replaceLeavesLocal } from '../lib/leavesStore'
 import {
   readNotificationsLocal,
@@ -16,20 +20,25 @@ type Props = {
   onNotify?: () => void
 }
 
-const SQL_HINT = `supabase/migrations/20260724193000_staff_library.sql`
+const SQL_HINT = `supabase/migrations/20260724210000_full_app_sync.sql`
 
 /**
- * Estado de sincronización Supabase para personal, permisos y notificaciones.
+ * Estado de sincronización Supabase para todo el sistema HGP.
  */
 export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
   const [status, setStatus] = useState<RemoteCatalogStatus | null>(null)
+  const [appStatus, setAppStatus] = useState<AppConfigSyncStatus | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function refresh() {
     setBusy(true)
     try {
-      const s = await probeRemoteCatalog()
+      const [s, a] = await Promise.all([
+        probeRemoteCatalog(),
+        probeAppConfigRemote(),
+      ])
       setStatus(s)
+      setAppStatus(a)
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo consultar Supabase')
     } finally {
@@ -47,10 +56,11 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
         setLocalNotifications: replaceNotificationsLocal,
       })
       setStatus(s)
+      setAppStatus(s.appConfig ?? (await probeAppConfigRemote()))
       onNotify?.()
       onFlash(
         s.configured
-          ? `Sync OK · personal ${s.staffLibraryMode} (${s.staffLibraryCount}) · permisos ${s.leavesMode} (${s.leavesCount}) · avisos ${s.notificationsMode} (${s.notificationsCount})`
+          ? `Sync OK · horarios/personal/permisos/avisos + usuarios/unidades/firmas/claves/feriados`
           : 'Supabase no configurado · solo local',
       )
     } catch (e) {
@@ -65,6 +75,14 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
   }, [])
 
   const remote = isRemoteEnabled()
+  const usingBundle =
+    status?.staffLibraryMode === 'bundle' ||
+    status?.leavesMode === 'bundle' ||
+    status?.notificationsMode === 'bundle' ||
+    appStatus?.usersMode === 'bundle' ||
+    appStatus?.signersMode === 'bundle' ||
+    appStatus?.shiftsMode === 'bundle' ||
+    appStatus?.holidaysMode === 'bundle'
 
   return (
     <section className="rounded-2xl border border-line bg-white p-4 shadow-sm">
@@ -74,11 +92,12 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
             Supabase
           </p>
           <h2 className="font-display text-lg text-navy">
-            Sync personal, permisos y avisos
+            Conexión completa a la base de datos
           </h2>
           <p className="mt-1 text-xs text-muted">
-            Horarios y biblioteca de personal van a Supabase. Así el Validador
-            ve el personal que Admin carga (tabla dedicada o bundle de respaldo).
+            Horarios, personal, permisos, avisos, usuarios, unidades, firmas,
+            claves y feriados se sincronizan con Supabase (tabla dedicada o
+            bundle de respaldo).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -101,48 +120,70 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
-          <p className="text-[10px] font-bold uppercase text-muted">Estado</p>
-          <p className="font-semibold text-navy">
-            {remote ? 'Conectado' : 'Solo local'}
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
-          <p className="text-[10px] font-bold uppercase text-muted">Personal</p>
-          <p className="font-semibold text-navy">
-            {status?.staffLibraryMode ?? '…'}
-            {status ? ` · ${status.staffLibraryCount}` : ''}
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
-          <p className="text-[10px] font-bold uppercase text-muted">Permisos</p>
-          <p className="font-semibold text-navy">
-            {status?.leavesMode ?? '…'}
-            {status ? ` · ${status.leavesCount}` : ''}
-          </p>
-        </div>
-        <div className="rounded-xl border border-line bg-sand/30 px-3 py-2">
-          <p className="text-[10px] font-bold uppercase text-muted">Avisos</p>
-          <p className="font-semibold text-navy">
-            {status?.notificationsMode ?? '…'}
-            {status ? ` · ${status.notificationsCount}` : ''}
-          </p>
-        </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {[
+          {
+            label: 'Estado',
+            value: remote ? 'Conectado' : 'Solo local',
+          },
+          {
+            label: 'Personal',
+            value: `${status?.staffLibraryMode ?? '…'}${status ? ` · ${status.staffLibraryCount}` : ''}`,
+          },
+          {
+            label: 'Permisos',
+            value: `${status?.leavesMode ?? '…'}${status ? ` · ${status.leavesCount}` : ''}`,
+          },
+          {
+            label: 'Avisos',
+            value: `${status?.notificationsMode ?? '…'}${status ? ` · ${status.notificationsCount}` : ''}`,
+          },
+          {
+            label: 'Unidades',
+            value: `${appStatus?.unitsMode ?? '…'}${appStatus ? ` · ${appStatus.unitsCount}` : ''}`,
+          },
+          {
+            label: 'Usuarios',
+            value: `${appStatus?.usersMode ?? '…'}${appStatus ? ` · ${appStatus.usersCount}` : ''}`,
+          },
+          {
+            label: 'Firmas',
+            value: `${appStatus?.signersMode ?? '…'}${appStatus ? ` · ${appStatus.signersCount}` : ''}`,
+          },
+          {
+            label: 'Claves',
+            value: `${appStatus?.shiftsMode ?? '…'}${appStatus ? ` · ${appStatus.shiftsCount}` : ''}`,
+          },
+          {
+            label: 'Feriados',
+            value: `${appStatus?.holidaysMode ?? '…'}${appStatus ? ` · ${appStatus.holidaysCount}` : ''}`,
+          },
+        ].map((k) => (
+          <div
+            key={k.label}
+            className="rounded-xl border border-line bg-sand/30 px-3 py-2"
+          >
+            <p className="text-[10px] font-bold uppercase text-muted">
+              {k.label}
+            </p>
+            <p className="font-semibold text-navy">{k.value}</p>
+          </div>
+        ))}
       </div>
 
-      {status?.staffLibraryMode === 'bundle' ||
-      status?.leavesMode === 'bundle' ||
-      status?.notificationsMode === 'bundle' ? (
+      {usingBundle ? (
         <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Aún falta alguna tabla dedicada. Se usa un <strong>bundle</strong> de
-          respaldo (funciona ya). Para el esquema óptimo ejecute en el SQL
-          Editor: <code className="font-mono">{SQL_HINT}</code>
+          Algunas piezas usan <strong>bundle</strong> de respaldo en{' '}
+          <code className="font-mono">schedules</code> (ya sincroniza entre
+          navegadores). Para tablas dedicadas ejecute en el SQL Editor:{' '}
+          <code className="font-mono">{SQL_HINT}</code>
         </p>
       ) : null}
 
-      {status?.lastError ? (
-        <p className="mt-2 text-xs text-rose-800">{status.lastError}</p>
+      {status?.lastError || appStatus?.lastError ? (
+        <p className="mt-2 text-xs text-rose-800">
+          {status?.lastError || appStatus?.lastError}
+        </p>
       ) : null}
     </section>
   )
