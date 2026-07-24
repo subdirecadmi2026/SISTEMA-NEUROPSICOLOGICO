@@ -25,9 +25,9 @@ function mmToPx(mm: number) {
   return (mm * 96) / 25.4
 }
 
-/** Área útil A4 landscape (márgenes 5 mm). */
+/** Área útil A4 landscape (márgenes 6 mm, igual que @page). */
 function paperSize() {
-  const m = 5
+  const m = 6
   return { w: mmToPx(297 - m * 2), h: mmToPx(210 - m * 2) }
 }
 

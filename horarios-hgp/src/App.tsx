@@ -57,6 +57,11 @@ import { ScheduleStaffEditor } from './components/ScheduleStaffEditor'
 import { NamesEditor } from './components/NamesEditor'
 import { SchedulesHome } from './components/SchedulesHome'
 import { PrintSheet } from './components/PrintSheet'
+import {
+  buildSchedulePdfBlob,
+  downloadBlob,
+  pdfFileName,
+} from './lib/exportPdf'
 import { MonthSummary } from './components/MonthSummary'
 import { CodeUsageBar } from './components/CodeUsageBar'
 import { StaffHoursPanel } from './components/StaffHoursPanel'
@@ -1312,13 +1317,50 @@ export default function App() {
 
         <AuditTrail doc={doc} />
 
-        {/* Siempre montada: en pantalla solo en pestaña Imprimir; al imprimir siempre 1 hoja */}
+        {/* Siempre montada: en pantalla solo en pestaña Imprimir; al imprimir anclado arriba */}
         <div
-          className={
-            tab === 'imprimir' ? undefined : 'print-sheet-offscreen'
-          }
+          className={`print-root ${
+            tab === 'imprimir' ? '' : 'print-sheet-offscreen'
+          }`.trim()}
           aria-hidden={tab !== 'imprimir'}
         >
+          {doc.serviceType === 'medico' ? (
+            <div className="no-print mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-white px-4 py-3 shadow-sm">
+              <div>
+                <p className="font-display text-base text-navy">
+                  Horario completo
+                </p>
+                <p className="text-xs text-muted">
+                  PDF de 2 páginas: 1 = horario · 2 = distribución
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      const blob = await buildSchedulePdfBlob(doc, {
+                        grids: ['turno', 'area'],
+                      })
+                      downloadBlob(blob, pdfFileName(doc, 'ambos'))
+                      flash(
+                        'PDF completo descargado (pág. 1 horario, pág. 2 distribución)',
+                      )
+                    } catch (e) {
+                      flash(
+                        e instanceof Error
+                          ? e.message
+                          : 'No se pudo generar el PDF',
+                      )
+                    }
+                  })()
+                }}
+                className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white"
+              >
+                Descargar horario completo
+              </button>
+            </div>
+          ) : null}
           <div className="print-stack space-y-6">
             <PrintSheet doc={doc} gridMode="turno" />
             {doc.serviceType === 'medico' ? (

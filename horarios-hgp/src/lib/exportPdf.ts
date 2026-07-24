@@ -82,8 +82,9 @@ function addCanvasPage(
   const ratio = Math.min(pageW / canvas.width, pageH / canvas.height)
   const w = canvas.width * ratio
   const h = canvas.height * ratio
+  // Anclado arriba (no centrado) para coincidir con la impresión
   const x = (pageW - w) / 2
-  const y = (pageH - h) / 2
+  const y = 0
   pdf.addImage(imgData, 'JPEG', x, y, w, h)
 }
 

@@ -55,73 +55,57 @@ textarea {
   }
 }
 
-/* Impresión: formato institucional, 1 hoja. Sin forzar tipografía minúscula. */
+/* Impresión: anclado arriba, 1 hoja por planilla (o 2 si es completo). */
 @media print {
   @page {
     size: A4 landscape;
-    margin: 5mm;
-  }
-
-  .print-sheet-offscreen {
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
-    width: 100% !important;
-    height: auto !important;
-    opacity: 1 !important;
-    overflow: visible !important;
-    pointer-events: auto !important;
-    z-index: auto !important;
+    margin: 6mm;
   }
 
   html,
-  body,
-  #root {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 0 !important;
+  body {
     margin: 0 !important;
     padding: 0 !important;
-    overflow: hidden !important;
     background: white !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
+  /* Oculta la UI; el contenido imprimible se ancla arriba (absolute). */
   body * {
     visibility: hidden !important;
   }
 
-  .no-print {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  .print-stack,
-  .print-stack *,
-  .print-area,
-  .print-area * {
+  .print-root,
+  .print-root * {
     visibility: visible !important;
   }
 
-  /* Impresión selectiva: solo horario o solo distribución */
-  body[data-print-only='turno'] .print-area[data-print-grid='area'],
-  body[data-print-only='turno'] .print-area[data-print-grid='area'] * {
-    display: none !important;
-    visibility: hidden !important;
-  }
-
-  body[data-print-only='area'] .print-area[data-print-grid='turno'],
-  body[data-print-only='area'] .print-area[data-print-grid='turno'] * {
-    display: none !important;
-    visibility: hidden !important;
+  .print-root,
+  .print-root.print-sheet-offscreen {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    background: white !important;
+    z-index: 9999 !important;
   }
 
   .print-stack {
-    position: static !important;
     display: block !important;
     width: 100% !important;
-    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
   }
 
   .print-area {
@@ -130,6 +114,7 @@ textarea {
     top: auto !important;
     width: 100% !important;
     max-width: 100% !important;
+    height: auto !important;
     margin: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
@@ -145,8 +130,14 @@ textarea {
     print-color-adjust: exact !important;
   }
 
-  body[data-print-only='turno'] .print-area,
-  body[data-print-only='area'] .print-area {
+  /* Solo horario o solo distribución → una página */
+  body[data-print-only='turno'] .print-area[data-print-grid='area'],
+  body[data-print-only='area'] .print-area[data-print-grid='turno'] {
+    display: none !important;
+  }
+
+  body[data-print-only='turno'] .print-area[data-print-grid='turno'],
+  body[data-print-only='area'] .print-area[data-print-grid='area'] {
     page-break-after: auto !important;
     break-after: auto !important;
   }
@@ -161,24 +152,25 @@ textarea {
     transform-origin: top left !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    min-width: 0 !important;
   }
 
   .print-header {
-    padding: 6px 10px !important;
+    padding: 4px 8px !important;
   }
 
   .print-header .print-title {
-    font-size: 16px !important;
-    line-height: 1.15 !important;
+    font-size: 14px !important;
+    line-height: 1.1 !important;
   }
 
   .print-header img {
-    height: 40px !important;
+    height: 34px !important;
     width: auto !important;
   }
 
   .print-table-wrap {
-    padding: 4px !important;
+    padding: 2px 4px !important;
   }
 
   .print-schedule-table {
@@ -186,78 +178,39 @@ textarea {
     min-width: 0 !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 9px !important;
+    font-size: 8px !important;
   }
 
   .print-schedule-table th,
   .print-schedule-table td {
-    padding: 2px 3px !important;
-    line-height: 1.15 !important;
+    padding: 1px 2px !important;
+    line-height: 1.1 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
 
   .print-footer {
-    padding: 6px 10px !important;
-    gap: 8px !important;
-    font-size: 9px !important;
+    padding: 4px 8px !important;
+    gap: 6px !important;
+    font-size: 8px !important;
   }
 
   .print-footer .print-sign {
-    padding: 4px 6px !important;
+    padding: 3px 5px !important;
   }
 
   .print-footer .print-sign .mt-6 {
-    margin-top: 12px !important;
+    margin-top: 8px !important;
   }
 
-  .print-sign-qr {
-    width: 36px !important;
-    height: 36px !important;
+  .print-qr {
+    width: 48px !important;
+    height: 48px !important;
   }
 
-  .print-sign-box {
-    padding: 2px 4px !important;
-    overflow: hidden !important;
-    min-height: 0 !important;
-  }
-
-  .print-sign-stamp {
-    gap: 3px !important;
-    overflow: hidden !important;
-  }
-
-  .print-sign-role,
-  .print-sign-name,
-  .print-sign-meta-line,
-  .print-sign-firmado,
-  .print-sign-verify {
-    overflow: hidden !important;
-  }
-
-  .print-sign-name {
-    font-size: 8px !important;
-    line-height: 1.15 !important;
-  }
-
-  .print-sign-firmado,
-  .print-sign-meta-line,
-  .print-sign-verify {
-    font-size: 7px !important;
-    line-height: 1.1 !important;
-  }
-
-  .print-sign-img {
-    max-height: 18px !important;
-  }
-
-  .print-notes-text {
-    max-height: 3.2em !important;
-    overflow: hidden !important;
-    display: -webkit-box !important;
-    -webkit-line-clamp: 3 !important;
-    -webkit-box-orient: vertical !important;
-    white-space: normal !important;
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
   }
 }

@@ -48,7 +48,8 @@ async function waitForQrImages(root: HTMLElement | null, ms = 800) {
 
 /**
  * Vista institucional + PDF + impresión (revisor / validador).
- * Médico: Horario y Distribución con impresión / PDF independientes.
+ * Médico: Horario y Distribución con impresión / PDF independientes
+ * y descarga completa (pág. 1 horario, pág. 2 distribución).
  */
 export function InstitutionalPreview({
   doc,
@@ -79,7 +80,7 @@ export function InstitutionalPreview({
         kind === 'area'
           ? 'PDF de distribución descargado'
           : kind === 'ambos'
-            ? 'PDF horario + distribución descargado'
+            ? 'PDF completo: pág. 1 horario, pág. 2 distribución'
             : 'PDF de horario descargado',
       )
     } catch (e) {
@@ -91,12 +92,16 @@ export function InstitutionalPreview({
     }
   }
 
-  async function printOnly(kind: PrintKind) {
+  async function printOnly(kind: PrintKind | 'ambos') {
     setOpen(true)
     await new Promise((r) => setTimeout(r, 80))
     await waitForQrImages(printWrapRef.current)
     document.body.dataset.printing = '1'
-    document.body.dataset.printOnly = kind
+    if (kind === 'ambos') {
+      delete document.body.dataset.printOnly
+    } else {
+      document.body.dataset.printOnly = kind
+    }
     window.print()
     window.setTimeout(() => {
       delete document.body.dataset.printing
@@ -113,11 +118,23 @@ export function InstitutionalPreview({
           </h2>
           <p className="text-xs text-muted">
             {isMedico
-              ? 'Imprima o descargue Horario y Distribución por separado'
+              ? 'Horario y distribución · cada uno en 1 hoja · PDF completo = 2 páginas'
               : 'Firmas con código QR · mismo formato que imprime el médico'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {showDistribution ? (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void downloadPdf('ambos')}
+              className="rounded-xl bg-navy px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {busy === 'ambos'
+                ? 'Generando…'
+                : 'Descargar horario completo'}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -130,7 +147,7 @@ export function InstitutionalPreview({
 
       <div
         ref={printWrapRef}
-        className={open ? undefined : 'print-sheet-offscreen'}
+        className={`print-root ${open ? '' : 'print-sheet-offscreen'}`.trim()}
         aria-hidden={!open}
       >
         <div className="print-stack space-y-6 bg-white p-2">
@@ -162,7 +179,7 @@ export function InstitutionalPreview({
             data-print-grid="turno"
             className="print-area print-sheet-page overflow-x-auto bg-white"
           >
-            <div className="print-fit-one-page min-w-[900px]">
+            <div className="print-fit-one-page">
               <InstitutionalPrintBody doc={doc} gridMode="turno" />
             </div>
           </div>
@@ -197,7 +214,7 @@ export function InstitutionalPreview({
                 data-print-grid="area"
                 className="print-area print-sheet-page overflow-x-auto bg-white"
               >
-                <div className="print-fit-one-page min-w-[900px]">
+                <div className="print-fit-one-page">
                   <InstitutionalPrintBody doc={doc} gridMode="area" />
                 </div>
               </div>
