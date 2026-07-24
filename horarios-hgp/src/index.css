@@ -196,6 +196,12 @@ textarea {
     font-size: 8px !important;
   }
 
+  .print-footer .print-sign-box {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: 5.25rem !important;
+  }
+
   .print-footer .print-sign {
     padding: 3px 5px !important;
   }

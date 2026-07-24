@@ -90,13 +90,13 @@ export function SignatureStampBox({
   const primaryName = responsibleName || certName
 
   return (
-    <div className="print-sign-box flex h-full min-h-[5.5rem] flex-col overflow-hidden rounded border border-line bg-white px-1.5 py-1">
+    <div className="print-sign-box flex min-h-[4.75rem] flex-col overflow-hidden rounded border border-line bg-white px-1.5 py-1">
       <p className="print-sign-role shrink-0 text-[8px] font-semibold uppercase leading-tight tracking-wide text-navy">
         <span className="line-clamp-2 break-words">{label}</span>
       </p>
 
       {signedElectronic && electronic ? (
-        <div className="print-sign-stamp mt-0.5 flex min-h-0 flex-1 items-start gap-1 overflow-hidden">
+        <div className="print-sign-stamp mt-0.5 flex items-start gap-1 overflow-hidden">
           {qr ? (
             <img
               src={qr}
@@ -154,21 +154,21 @@ export function SignatureStampBox({
           </div>
         </div>
       ) : primaryName ? (
-        <div className="mt-auto flex min-h-0 flex-1 flex-col justify-end overflow-hidden pt-1">
+        <div className="mt-2 flex flex-col overflow-hidden">
           <p
             className="text-[9px] font-semibold leading-tight text-ink"
             title={primaryName}
           >
             <span className="line-clamp-2 break-words">{primaryName}</span>
           </p>
-          <p className="mt-1 border-t border-line pt-0.5 text-center text-[7px] leading-tight text-muted">
+          <p className="mt-2 border-t border-line pt-0.5 text-center text-[7px] leading-tight text-muted">
             {plainName && !signedElectronic
               ? 'Pendiente sello electrónico'
               : 'Pendiente de firma'}
           </p>
         </div>
       ) : (
-        <p className="print-sign-empty mt-auto text-[8px] text-muted">
+        <p className="print-sign-empty mt-3 text-[8px] text-muted">
           Pendiente de firma
         </p>
       )}

@@ -347,7 +347,7 @@ export type PrintSignatureBox = {
   kind: SignerKind | 'admisiones'
 }
 
-/** Casilla «Validado por Admisiones» (va bajo feriados, no con autoridades). */
+/** Casilla «Validado por Admisiones» (va bajo plan de contingencia, no con autoridades). */
 export function buildAdmisionesSignatureBox(
   doc: ScheduleDoc,
 ): PrintSignatureBox {

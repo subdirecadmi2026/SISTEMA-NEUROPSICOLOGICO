@@ -334,7 +334,7 @@ export function ReviewCardsModule({
             </h2>
             <p className="mb-3 text-sm text-muted">
               {mode === 'admisiones'
-                ? 'Revise horario y distribución. Al firmar aparecerá el cuadro «Validado por Admisiones» debajo de feriados.'
+                ? 'Revise horario y distribución. Al firmar aparecerá el cuadro «Validado por Admisiones» debajo del plan de contingencia.'
                 : 'Revise la grilla. Debe aprobar también Admisiones para que pase al validador.'}
             </p>
             <textarea

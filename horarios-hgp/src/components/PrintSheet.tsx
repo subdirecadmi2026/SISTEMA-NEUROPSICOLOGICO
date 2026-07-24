@@ -213,18 +213,6 @@ export function InstitutionalPrintBody({
           <p className="mb-1 font-semibold text-navy">Feriados {doc.year}</p>
           <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
 
-          <div className="mt-3 max-w-xs">
-            <SignatureStampBox
-              label={admisionesBox.label}
-              value={admisionesBox.value}
-              designatedName={admisionesBox.designatedName}
-              slot={admisionesBox.slot}
-              electronic={admisionesElectronic}
-              scheduleId={doc.id}
-              unitName={doc.unitName}
-            />
-          </div>
-
           {doc.notes ? (
             <>
               <p className="mb-1 mt-3 font-semibold text-navy">Observaciones</p>
@@ -239,11 +227,24 @@ export function InstitutionalPrintBody({
               <p className="print-notes-text">{doc.contingencyPlan}</p>
             </>
           ) : null}
+
+          <div className="mt-3 max-w-xs">
+            <SignatureStampBox
+              label={admisionesBox.label}
+              value={admisionesBox.value}
+              designatedName={admisionesBox.designatedName}
+              slot={admisionesBox.slot}
+              electronic={admisionesElectronic}
+              scheduleId={doc.id}
+              unitName={doc.unitName}
+            />
+          </div>
+
           <p className="mt-3 text-[10px] text-muted">
             Estado: {STATUS_LABEL[doc.status]} · v{doc.version}
           </p>
         </div>
-        <div className={`grid items-stretch gap-2 ${cols}`}>
+        <div className={`grid items-start gap-2 ${cols}`}>
           {signatures.map((s) => (
             <SignatureStampBox
               key={s.key}
