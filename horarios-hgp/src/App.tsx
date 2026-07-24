@@ -98,6 +98,7 @@ export default function App() {
     }),
   )
   const [activeCode, setActiveCode] = useState('CE')
+  const [areaActiveCode, setAreaActiveCode] = useState('CX')
   const [paintMode, setPaintMode] = useState(true)
   const [claveTab, setClaveTab] = useState<'turno' | 'area' | 'ausencia' | 'todas'>(
     'todas',
@@ -1084,18 +1085,99 @@ export default function App() {
 
         {tab === 'distribucion' && (
           <>
-            <DistributionPanel
-              doc={doc}
-              onPaintDay={(day) => {
-                setTab('horario')
-                setPaintMode(true)
-                flash(
-                  `Día ${day}: seleccione clave y clic en la cabecera del día para pintar la columna`,
-                )
-              }}
-            />
-            <StaffHoursPanel doc={doc} />
-            <MonthComparePanel doc={doc} />
+            {doc.serviceType === 'medico' ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-teal">
+                    Distribución médica
+                  </p>
+                  <h2 className="font-display text-xl text-navy">
+                    Áreas de servicio del mes
+                  </h2>
+                  <p className="mt-1 text-sm text-muted">
+                    El <strong>Horario</strong> es la consulta / jornada (CE, PT,
+                    X…). Aquí marca en qué área trabaja cada día:{' '}
+                    <strong>Consulta externa, Emergencia, Hospitalización,
+                    Interconsultas, Quirófano, UCI</strong>, etc. Mismo personal
+                    y diseño; grilla independiente.
+                  </p>
+                </div>
+                <ShiftPalette
+                  serviceType="medico"
+                  activeCode={areaActiveCode}
+                  claveTab="area"
+                  lockGroup="area"
+                  paintMode={paintMode}
+                  showTable={false}
+                  titleOverride="Áreas — Distribución médica"
+                  hintOverride="Elija área y pinte · CX E H IN QX UC GD"
+                  recentCodes={recentCodes.filter((c) => {
+                    const m = shiftMeta(doc.serviceType, c)
+                    return m?.group === 'area'
+                  })}
+                  onActiveCode={(code) => {
+                    setAreaActiveCode(code)
+                    setRecentCodes((prev) =>
+                      [code, ...prev.filter((x) => x !== code)].slice(0, 8),
+                    )
+                  }}
+                  onClaveTab={() => undefined}
+                  onPaintMode={setPaintMode}
+                />
+                <ScheduleTable
+                  doc={doc}
+                  gridMode="area"
+                  readOnly={readOnly}
+                  paintMode={paintMode}
+                  activeCode={areaActiveCode}
+                  highlightEmpty={highlightEmpty}
+                  compact={compactTable}
+                  focusDay={focusDay}
+                  onChange={patchDoc}
+                  onFlash={flash}
+                  onAddStaff={addStaff}
+                  onNewDemo={() =>
+                    setDoc(
+                      createBlankSchedule(doc.serviceType, doc.year, doc.month),
+                    )
+                  }
+                />
+                <details className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+                  <summary className="cursor-pointer font-display text-lg text-navy">
+                    Cobertura del horario de turnos (consulta)
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                    <DistributionPanel
+                      doc={doc}
+                      onPaintDay={(day) => {
+                        setTab('horario')
+                        setPaintMode(true)
+                        flash(
+                          `Día ${day}: seleccione clave y clic en la cabecera del día para pintar la columna`,
+                        )
+                      }}
+                    />
+                    <StaffHoursPanel doc={doc} />
+                    <MonthComparePanel doc={doc} />
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <>
+                <DistributionPanel
+                  doc={doc}
+                  onPaintDay={(day) => {
+                    setTab('horario')
+                    setPaintMode(true)
+                    flash(
+                      `Día ${day}: seleccione clave y clic en la cabecera del día para pintar la columna`,
+                    )
+                  }}
+                />
+                <StaffHoursPanel doc={doc} />
+                <MonthComparePanel doc={doc} />
+              </>
+            )}
           </>
         )}
 
@@ -1237,7 +1319,10 @@ export default function App() {
           }
           aria-hidden={tab !== 'imprimir'}
         >
-          <PrintSheet doc={doc} />
+          <PrintSheet doc={doc} gridMode="turno" />
+          {doc.serviceType === 'medico' ? (
+            <PrintSheet doc={doc} gridMode="area" />
+          ) : null}
         </div>
 
         {/* Vista móvil: resumen consultable */}

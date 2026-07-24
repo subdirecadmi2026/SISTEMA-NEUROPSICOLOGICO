@@ -17,6 +17,8 @@ import { buildPrintSignatureBoxes } from '../lib/signersStore'
 
 type Props = {
   doc: ScheduleDoc
+  /** turno = horario consulta; area = distribución por áreas */
+  gridMode?: 'turno' | 'area'
 }
 
 function mmToPx(mm: number) {
@@ -33,12 +35,17 @@ function paperSize() {
  * Cuerpo institucional del horario (encabezado MSP + grilla + firmas).
  * Usado por impresión del médico y por el PDF del validador.
  */
-export function InstitutionalPrintBody({ doc }: Props) {
+export function InstitutionalPrintBody({
+  doc,
+  gridMode = 'turno',
+}: Props) {
+  const isAreaGrid = gridMode === 'area'
   const days = daysInMonth(doc.year, doc.month)
   const isEnf = doc.serviceType === 'enfermeria'
   const staff = [...doc.staff]
     .filter((s) => s.name.trim())
     .sort((a, b) => a.order - b.order)
+  const gridCells = isAreaGrid ? (doc.areaCells ?? {}) : doc.cells
 
   const boxes = buildPrintSignatureBoxes(doc)
   const signatures = boxes.map((s) => ({
@@ -78,7 +85,9 @@ export function InstitutionalPrintBody({ doc }: Props) {
             </p>
             <p>{doc.department}</p>
             <p className="mt-1 font-semibold">
-              CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO
+              {isAreaGrid
+                ? 'DISTRIBUCIÓN MÉDICA POR ÁREA DE SERVICIO'
+                : 'CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO'}
             </p>
             <p className="mt-1">
               Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
@@ -148,7 +157,7 @@ export function InstitutionalPrintBody({ doc }: Props) {
                 </td>
                 {Array.from({ length: days }, (_, i) => {
                   const d = i + 1
-                  const code = doc.cells[cellKey(s.id, d)] ?? ''
+                  const code = gridCells[cellKey(s.id, d)] ?? ''
                   const meta = code
                     ? shiftMeta(doc.serviceType, code)
                     : undefined
@@ -237,11 +246,12 @@ export function InstitutionalPrintBody({ doc }: Props) {
  * Formato institucional (encabezado navy, firmas, feriados),
  * con escala solo si hace falta para caber en 1 hoja A4 horizontal.
  */
-export function PrintSheet({ doc }: Props) {
+export function PrintSheet({ doc, gridMode = 'turno' }: Props) {
   const days = daysInMonth(doc.year, doc.month)
   const staffCount = doc.staff.filter((s) => s.name.trim()).length
   const rootRef = useRef<HTMLElement>(null)
   const fitRef = useRef<HTMLDivElement>(null)
+  const isArea = gridMode === 'area'
 
   useEffect(() => {
     const root = rootRef.current
@@ -332,9 +342,13 @@ export function PrintSheet({ doc }: Props) {
     >
       <div className="no-print flex flex-wrap items-center justify-between gap-2 border-b border-line bg-sand/50 px-4 py-3">
         <div>
-          <h2 className="font-display text-xl text-navy">IMPRIMIR</h2>
+          <h2 className="font-display text-xl text-navy">
+            {isArea ? 'IMPRIMIR DISTRIBUCIÓN' : 'IMPRIMIR'}
+          </h2>
           <p className="text-sm text-muted">
-            Formato institucional · 1 hoja A4 horizontal ·{' '}
+            {isArea
+              ? 'Áreas de servicio · 1 hoja A4 horizontal · '
+              : 'Formato institucional · 1 hoja A4 horizontal · '}
             {STATUS_LABEL[doc.status]}
           </p>
         </div>
@@ -348,7 +362,7 @@ export function PrintSheet({ doc }: Props) {
       </div>
 
       <div ref={fitRef} className="print-fit-one-page">
-        <InstitutionalPrintBody doc={doc} />
+        <InstitutionalPrintBody doc={doc} gridMode={gridMode} />
       </div>
     </section>
   )

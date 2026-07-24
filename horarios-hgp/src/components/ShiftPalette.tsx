@@ -8,6 +8,10 @@ type Props = {
   paintMode: boolean
   showTable: boolean
   recentCodes?: string[]
+  /** Si se indica, fuerza filtro a ese grupo (p. ej. solo áreas). */
+  lockGroup?: 'turno' | 'area' | 'ausencia'
+  titleOverride?: string
+  hintOverride?: string
   onActiveCode: (code: string) => void
   onClaveTab: (t: 'turno' | 'area' | 'ausencia' | 'todas') => void
   onPaintMode: (v: boolean) => void
@@ -22,27 +26,36 @@ export function ShiftPalette({
   paintMode,
   showTable,
   recentCodes = [],
+  lockGroup,
+  titleOverride,
+  hintOverride,
   onActiveCode,
   onClaveTab,
   onPaintMode,
   onGoHorario,
 }: Props) {
   const shifts = shiftsFor(serviceType)
+  const effectiveTab = lockGroup ?? claveTab
   const visible: ShiftCode[] =
-    claveTab === 'todas' ? shifts : shifts.filter((s) => s.group === claveTab)
+    effectiveTab === 'todas'
+      ? shifts
+      : shifts.filter((s) => s.group === effectiveTab)
   const isEnf = serviceType === 'enfermeria'
   const recent = recentCodes
     .map((c) => shiftMeta(serviceType, c))
     .filter((s): s is ShiftCode => !!s)
+    .filter((s) => !lockGroup || s.group === lockGroup)
   const activeMeta = shiftMeta(serviceType, activeCode)
 
   const filters = (
-    [
-      ['todas', 'Todas'],
-      ['turno', 'Turnos'],
-      ...(isEnf ? [] : ([['area', 'Áreas']] as const)),
-      ['ausencia', 'Ausencias'],
-    ] as const
+    lockGroup
+      ? ([[lockGroup, lockGroup === 'area' ? 'Áreas' : lockGroup]] as const)
+      : ([
+          ['todas', 'Todas'],
+          ['turno', 'Turnos'],
+          ...(isEnf ? [] : ([['area', 'Áreas']] as const)),
+          ['ausencia', 'Ausencias'],
+        ] as const)
   )
 
   return (
@@ -53,12 +66,13 @@ export function ShiftPalette({
             Pintura
           </p>
           <h2 className="font-display text-lg text-navy">
-            Claves — {SERVICE_LABEL[serviceType]}
+            {titleOverride ?? `Claves — ${SERVICE_LABEL[serviceType]}`}
           </h2>
           <p className="text-xs text-muted">
-            {isEnf
-              ? 'Elija clave y pinte · Atajos L F V · D1 N1 · M T'
-              : 'Elija clave y pinte · Atajos L F V · CE X · PT1 PT2'}
+            {hintOverride ??
+              (isEnf
+                ? 'Elija clave y pinte · Atajos L F V · D1 N1 · M T'
+                : 'Elija clave y pinte · Atajos L F V · CE X · PT1 PT2')}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -95,10 +109,11 @@ export function ShiftPalette({
               type="button"
               onClick={() => onClaveTab(id)}
               className={`rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${
-                claveTab === id
+                claveTab === id || effectiveTab === id
                   ? 'bg-navy text-white shadow-sm'
                   : 'text-muted hover:bg-white hover:text-navy'
               }`}
+              disabled={!!lockGroup}
             >
               {label}
             </button>

@@ -17,6 +17,8 @@ function migrate(doc: ScheduleDoc): ScheduleDoc {
       minStaffPerDay: 2,
       minHoursPerDay: 16,
     },
+    cells: doc.cells ?? {},
+    areaCells: doc.areaCells ?? {},
   }
 }
 

@@ -47,6 +47,7 @@ function baseSystemDoc(
     year: 2099,
     staff: [],
     cells: {},
+    areaCells: {},
     notes: '',
     contingencyPlan: '',
     contingencyStaff: [],

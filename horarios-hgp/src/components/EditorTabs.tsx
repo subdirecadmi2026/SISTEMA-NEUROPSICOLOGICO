@@ -10,7 +10,7 @@ export type EditorTabId =
 const TABS: { id: EditorTabId; label: string; short: string }[] = [
   { id: 'horario', label: 'Horario', short: 'Horario' },
   { id: 'claves', label: 'Claves', short: 'Claves' },
-  { id: 'distribucion', label: 'Distribución', short: 'Dist.' },
+  { id: 'distribucion', label: 'Distribución', short: 'Áreas' },
   { id: 'contingencia', label: 'Contingencia', short: 'Cont.' },
   { id: 'personal', label: 'Personal', short: 'Pers.' },
   { id: 'permisos', label: 'Permisos', short: 'Perm.' },

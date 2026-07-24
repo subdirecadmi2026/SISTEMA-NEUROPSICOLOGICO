@@ -17,11 +17,18 @@ import { fillStaffEmptyDays, paintDayColumn, moveStaffOrder, duplicateStaffRow, 
 import { leaveConflictIfPaint, leaveDayMapForDoc, countLeaveConflictsForDay } from '../lib/leaveValidation'
 import { HabitualCodeSelect } from './HabitualCodeSelect'
 
+export type ScheduleGridMode = 'turno' | 'area'
+
 type Props = {
   doc: ScheduleDoc
   readOnly: boolean
   paintMode: boolean
   activeCode: string
+  /**
+   * turno = horario de consulta/jornada (`cells`)
+   * area = distribución por área de servicio (`areaCells`)
+   */
+  gridMode?: ScheduleGridMode
   highlightEmpty?: boolean
   compact?: boolean
   focusDay?: number | null
@@ -36,6 +43,7 @@ export function ScheduleTable({
   readOnly,
   paintMode,
   activeCode,
+  gridMode = 'turno',
   highlightEmpty = false,
   compact = false,
   focusDay = null,
@@ -44,12 +52,14 @@ export function ScheduleTable({
   onNewDemo,
   onFlash,
 }: Props) {
+  const isAreaGrid = gridMode === 'area'
   const days = daysInMonth(doc.year, doc.month)
   const isEnf = doc.serviceType === 'enfermeria'
   /** FUN (ENF/AUX…) solo aplica en enfermería; en médico siempre es MED y se omite en grilla. */
-  const showFun = isEnf
-  const staffCols = showFun ? 5 : 4
-  const summaryCols = isEnf ? 8 : 2
+  const showFun = isEnf && !isAreaGrid
+  const showHabitual = !isAreaGrid
+  const staffCols = 3 + (showFun ? 1 : 0) + (showHabitual ? 1 : 0)
+  const summaryCols = isAreaGrid ? 1 : isEnf ? 8 : 2
   const staffSorted = [...doc.staff].sort((a, b) => a.order - b.order)
   const holidays = holidayDatesInMonth(doc.year, doc.month)
   const leaveMap = leaveDayMapForDoc(doc)
@@ -68,6 +78,17 @@ export function ScheduleTable({
   const [staffFilter, setStaffFilter] = useState('')
   const dayRefs = useRef<Record<number, HTMLTableCellElement | null>>({})
 
+  function readCells(d: ScheduleDoc): Record<string, string> {
+    return isAreaGrid ? (d.areaCells ?? {}) : d.cells
+  }
+
+  function writeCells(
+    d: ScheduleDoc,
+    cells: Record<string, string>,
+  ): ScheduleDoc {
+    return isAreaGrid ? { ...d, areaCells: cells } : { ...d, cells }
+  }
+
   useEffect(() => {
     if (!focusDay) return
     const el = dayRefs.current[focusDay]
@@ -81,7 +102,7 @@ export function ScheduleTable({
       dragWarned.current = false
       if (paintBuffer.current) {
         const current = docRef.current
-        const next = { ...current, cells: paintBuffer.current }
+        const next = writeCells(current, paintBuffer.current)
         docRef.current = next
         onChangeRef.current(next)
         paintBuffer.current = null
@@ -94,9 +115,9 @@ export function ScheduleTable({
       window.removeEventListener('mouseup', stop)
       window.removeEventListener('touchend', stop)
     }
-  }, [])
+  }, [isAreaGrid])
 
-  const liveCells = previewCells ?? doc.cells
+  const liveCells = previewCells ?? readCells(doc)
   const filterNorm = staffFilter.trim().toLowerCase()
 
   const sections = (() => {
@@ -132,9 +153,9 @@ export function ScheduleTable({
 
   function clearCell(staffId: string, day: number) {
     const current = docRef.current
-    const cells = { ...current.cells }
+    const cells = { ...readCells(current) }
     delete cells[cellKey(staffId, day)]
-    commit({ ...current, cells })
+    commit(writeCells(current, cells))
   }
 
   function paintIntoBuffer(
@@ -143,7 +164,7 @@ export function ScheduleTable({
     mode: 'paint' | 'erase',
   ) {
     if (!paintBuffer.current) {
-      paintBuffer.current = { ...docRef.current.cells }
+      paintBuffer.current = { ...readCells(docRef.current) }
     }
     const key = cellKey(staffId, day)
     if (mode === 'erase') {
@@ -156,7 +177,7 @@ export function ScheduleTable({
 
   function applyPaint(staffId: string, day: number, mode: 'paint' | 'erase') {
     if (readOnly || !paintMode) return
-    if (mode === 'paint') {
+    if (mode === 'paint' && !isAreaGrid) {
       const warn = leaveConflictIfPaint(
         docRef.current,
         staffId,
@@ -178,18 +199,20 @@ export function ScheduleTable({
     }
     const current = docRef.current
     const key = cellKey(staffId, day)
-    if (current.cells[key] === activeCode) return
-    commit({
-      ...current,
-      cells: { ...current.cells, [key]: activeCode },
-    })
+    const cells = readCells(current)
+    if (cells[key] === activeCode) return
+    commit(writeCells(current, { ...cells, [key]: activeCode }))
   }
 
   function removeStaff(id: string) {
     const current = docRef.current
     const cells = { ...current.cells }
+    const areaCells = { ...(current.areaCells ?? {}) }
     Object.keys(cells).forEach((k) => {
       if (k.startsWith(`${id}:`)) delete cells[k]
+    })
+    Object.keys(areaCells).forEach((k) => {
+      if (k.startsWith(`${id}:`)) delete areaCells[k]
     })
     commit({
       ...current,
@@ -197,6 +220,7 @@ export function ScheduleTable({
         .filter((s) => s.id !== id)
         .map((s, i) => ({ ...s, order: i + 1 })),
       cells,
+      areaCells,
     })
   }
 
@@ -218,12 +242,15 @@ export function ScheduleTable({
             </h1>
             <p className="text-sm text-white/90">{doc.department}</p>
             <p className="mt-1 text-sm font-semibold">
-              CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO
+              {isAreaGrid
+                ? 'DISTRIBUCIÓN MÉDICA POR ÁREA DE SERVICIO'
+                : 'CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO'}
             </p>
             <p className="mt-2 text-sm text-white/90">
               Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
               <strong>{doc.jefeServicio || '—'}</strong> ·{' '}
               {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
+              {isAreaGrid ? ' · Áreas (Emergencia, Hospitalización…)' : ''}
             </p>
           </div>
         </div>
@@ -279,18 +306,20 @@ export function ScheduleTable({
               <th className="min-w-[100px] border border-line px-1 py-2 text-left">
                 Rel. laboral
               </th>
-              <th
-                className={`border border-line px-1 py-2 ${
-                  isEnf ? 'min-w-[50px]' : 'min-w-[78px]'
-                }`}
-                title={
-                  isEnf
-                    ? 'Código habitual'
-                    : 'Clave habitual del médico (CE 8h, PT 12h, HE 13h, X 24h)'
-                }
-              >
-                {isEnf ? 'Cód.' : 'Clave'}
-              </th>
+              {!isAreaGrid && (
+                <th
+                  className={`border border-line px-1 py-2 ${
+                    isEnf ? 'min-w-[50px]' : 'min-w-[78px]'
+                  }`}
+                  title={
+                    isEnf
+                      ? 'Código habitual'
+                      : 'Clave habitual del médico (CE 8h, PT 12h, HE 13h, X 24h)'
+                  }
+                >
+                  {isEnf ? 'Cód.' : 'Clave'}
+                </th>
+              )}
               {Array.from({ length: days }, (_, i) => {
                 const d = i + 1
                 const weekend = isWeekend(doc.year, doc.month, d)
@@ -312,22 +341,38 @@ export function ScheduleTable({
                     }
                     onClick={() => {
                       if (readOnly || !paintMode || !activeCode) return
-                      const conflicts = countLeaveConflictsForDay(
-                        docRef.current,
-                        d,
-                        activeCode,
-                      )
-                      if (conflicts > 0) {
-                        onFlash?.(
-                          `Día ${d}: ${conflicts} persona(s) con permiso/vacaciones — no use turno productivo`,
+                      if (!isAreaGrid) {
+                        const conflicts = countLeaveConflictsForDay(
+                          docRef.current,
+                          d,
+                          activeCode,
                         )
+                        if (conflicts > 0) {
+                          onFlash?.(
+                            `Día ${d}: ${conflicts} persona(s) con permiso/vacaciones — no use turno productivo`,
+                          )
+                        }
                       }
-                      onChange(paintDayColumn(docRef.current, d, activeCode))
+                      onChange(
+                        paintDayColumn(
+                          docRef.current,
+                          d,
+                          activeCode,
+                          isAreaGrid ? 'areaCells' : 'cells',
+                        ),
+                      )
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault()
                       if (readOnly) return
-                      onChange(paintDayColumn(docRef.current, d, null))
+                      onChange(
+                        paintDayColumn(
+                          docRef.current,
+                          d,
+                          null,
+                          isAreaGrid ? 'areaCells' : 'cells',
+                        ),
+                      )
                     }}
                     className={`min-w-[30px] border border-line px-0 py-1 text-center ${
                       readOnly ? '' : 'cursor-pointer hover:ring-2 hover:ring-navy/40'
@@ -350,7 +395,11 @@ export function ScheduleTable({
                   </th>
                 )
               })}
-              {isEnf ? (
+              {isAreaGrid ? (
+                <th className="min-w-[44px] border border-line px-0.5 py-1 text-[9px] leading-tight">
+                  Días área
+                </th>
+              ) : isEnf ? (
                 <>
                   <th className="min-w-[44px] border border-line px-0.5 py-1 text-[9px] leading-tight">
                     Turnos
@@ -461,30 +510,32 @@ export function ScheduleTable({
                         }
                       />
                     </td>
-                    <td className="border border-line px-0.5 py-0.5 text-center">
-                      {isEnf ? (
-                        <input
-                          disabled={readOnly}
-                          className="w-11 rounded border-0 bg-transparent px-0.5 py-1 text-center font-bold text-navy outline-none focus:bg-sand/60 disabled:opacity-70"
-                          value={s.codigoPersonal}
-                          onChange={(e) =>
-                            updateStaff(s.id, {
-                              codigoPersonal: e.target.value.toUpperCase(),
-                            })
-                          }
-                        />
-                      ) : (
-                        <HabitualCodeSelect
-                          compact
-                          serviceType="medico"
-                          value={s.codigoPersonal}
-                          disabled={readOnly}
-                          onChange={(codigoPersonal) =>
-                            updateStaff(s.id, { codigoPersonal })
-                          }
-                        />
-                      )}
-                    </td>
+                    {!isAreaGrid && (
+                      <td className="border border-line px-0.5 py-0.5 text-center">
+                        {isEnf ? (
+                          <input
+                            disabled={readOnly}
+                            className="w-11 rounded border-0 bg-transparent px-0.5 py-1 text-center font-bold text-navy outline-none focus:bg-sand/60 disabled:opacity-70"
+                            value={s.codigoPersonal}
+                            onChange={(e) =>
+                              updateStaff(s.id, {
+                                codigoPersonal: e.target.value.toUpperCase(),
+                              })
+                            }
+                          />
+                        ) : (
+                          <HabitualCodeSelect
+                            compact
+                            serviceType="medico"
+                            value={s.codigoPersonal}
+                            disabled={readOnly}
+                            onChange={(codigoPersonal) =>
+                              updateStaff(s.id, { codigoPersonal })
+                            }
+                          />
+                        )}
+                      </td>
+                    )}
                     {Array.from({ length: days }, (_, i) => {
                       const d = i + 1
                       const code = liveCells[cellKey(s.id, d)] ?? ''
@@ -559,7 +610,15 @@ export function ScheduleTable({
                         </td>
                       )
                     })}
-                    {isEnf ? (
+                    {isAreaGrid ? (
+                      <td className="border border-line px-0.5 text-center font-semibold text-navy">
+                        {
+                          Object.keys(liveCells).filter((k) =>
+                            k.startsWith(`${s.id}:`),
+                          ).length
+                        }
+                      </td>
+                    ) : isEnf ? (
                       <>
                         <td className="border border-line px-0.5 text-center font-semibold">
                           {plannedShifts(doc, s.id)}
@@ -650,6 +709,7 @@ export function ScheduleTable({
                                   docRef.current,
                                   s.id,
                                   activeCode,
+                                  isAreaGrid ? 'areaCells' : 'cells',
                                 ),
                               )
                             }}
@@ -670,7 +730,7 @@ export function ScheduleTable({
                           <button
                             type="button"
                             title="Copiar turnos de la fila anterior (solo vacíos)"
-                            disabled={globalIdx <= 0}
+                            disabled={globalIdx <= 0 || isAreaGrid}
                             onClick={() => {
                               const prev = staffSorted[globalIdx - 1]
                               if (!prev) return
@@ -690,7 +750,13 @@ export function ScheduleTable({
                             type="button"
                             title="Limpiar celdas de esta fila"
                             onClick={() =>
-                              onChange(clearStaffRowCells(docRef.current, s.id))
+                              onChange(
+                                clearStaffRowCells(
+                                  docRef.current,
+                                  s.id,
+                                  isAreaGrid ? 'areaCells' : 'cells',
+                                ),
+                              )
                             }
                             className="rounded px-1 py-0.5 text-[10px] text-amber-800 hover:bg-amber-50"
                           >

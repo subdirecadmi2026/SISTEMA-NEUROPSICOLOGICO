@@ -41,7 +41,7 @@ export function demoMedicalStaff(): StaffMember[] {
     ['Dr. Luis Paredes', 'MED', 'Médico residente', 'Código de Trabajo', 'PT2'],
     ['Dra. Sofía Mera', 'MED', 'Médica tratante', 'LOSEP', 'CE'],
     ['Dr. Andrés López', 'MED', 'Médico residente', 'Código de Trabajo', 'X'],
-    ['Dra. Gabriela Cerda', 'MED', 'Especialista', 'LOSEP', 'H'],
+    ['Dra. Gabriela Cerda', 'MED', 'Especialista', 'LOSEP', 'CE'],
   ]
   return rows.map(([name, fun, role, relacionLaboral, codigoPersonal], i) => ({
     id: uid('med'),
@@ -115,10 +115,24 @@ export function createBlankSchedule(
             year,
             month,
             {
-              MED: ['CE', 'CE', 'H', 'PT1', 'L', 'CE', 'PT2', 'L'],
+              // Horario de turnos / consulta (no áreas)
+              MED: ['CE', 'CE', 'CE', 'PT1', 'L', 'CE', 'PT2', 'L'],
             },
-            ['CE', 'H', 'L'],
+            ['CE', 'PT1', 'L'],
           )
+      : {}
+
+  const areaCells =
+    withDemo && staff.length > 0 && serviceType === 'medico'
+      ? seedDemoCells(
+          staff,
+          year,
+          month,
+          {
+            MED: ['CX', 'CX', 'H', 'E', '', 'IN', 'QX', ''],
+          },
+          ['CX', 'H', 'E'],
+        )
       : {}
 
   const base = {
@@ -130,6 +144,7 @@ export function createBlankSchedule(
     year,
     staff,
     cells,
+    areaCells,
     contingencyStaff: [
       {
         id: uid('cont'),

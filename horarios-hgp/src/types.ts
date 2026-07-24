@@ -129,7 +129,14 @@ export type ScheduleDoc = {
   month: number
   year: number
   staff: StaffMember[]
+  /** Horario de turnos (consulta / jornada): CE, PT, X, L… */
   cells: ScheduleCell
+  /**
+   * Distribución por área de servicio (médico):
+   * dónde trabaja cada día (Emergencia, Hospitalización, Quirófano…).
+   * Mismo personal y mes que `cells`, grilla independiente.
+   */
+  areaCells?: ScheduleCell
   notes: string
   contingencyPlan: string
   contingencyStaff: ContingencyRow[]

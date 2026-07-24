@@ -37,6 +37,7 @@ function migratePayload(raw: ScheduleDoc): ScheduleDoc {
     },
     staff: raw.staff ?? [],
     cells: raw.cells ?? {},
+    areaCells: raw.areaCells ?? {},
     contingencyStaff: raw.contingencyStaff ?? [],
   }
 }

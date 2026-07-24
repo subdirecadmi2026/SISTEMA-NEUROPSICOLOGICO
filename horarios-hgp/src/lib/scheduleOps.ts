@@ -29,6 +29,7 @@ export function clearMonthCells(doc: ScheduleDoc): ScheduleDoc {
 function mapCellsFromSource(
   doc: ScheduleDoc,
   source: ScheduleDoc,
+  field: 'cells' | 'areaCells' = 'cells',
 ): ScheduleCell {
   const destDays = daysInMonth(doc.year, doc.month)
   const srcDays = daysInMonth(source.year, source.month)
@@ -36,6 +37,8 @@ function mapCellsFromSource(
   const srcByKey = new Map(
     source.staff.map((s) => [`${s.fun}|${s.name}`.toLowerCase(), s]),
   )
+  const srcMap =
+    field === 'areaCells' ? (source.areaCells ?? {}) : source.cells
 
   for (const dest of doc.staff) {
     const src =
@@ -43,7 +46,7 @@ function mapCellsFromSource(
       srcByKey.get(`${dest.fun}|${dest.name}`.toLowerCase())
     if (!src) continue
     for (let d = 1; d <= Math.min(destDays, srcDays); d++) {
-      const code = source.cells[`${src.id}:${d}`]
+      const code = srcMap[`${src.id}:${d}`]
       if (code) cells[`${dest.id}:${d}`] = code
     }
   }
@@ -115,18 +118,22 @@ export async function duplicatePreviousMonth(
   // Si el destino no tiene personal nombrado, copiar también el staff
   let staff = doc.staff
   let cells: ScheduleCell
+  let areaCells: ScheduleCell
   if (doc.staff.filter((s) => s.name.trim()).length === 0 && source.staff.length > 0) {
     staff = cloneStaffRows(source.staff)
     const temp = { ...doc, staff }
-    cells = mapCellsFromSource(temp, source)
+    cells = mapCellsFromSource(temp, source, 'cells')
+    areaCells = mapCellsFromSource(temp, source, 'areaCells')
   } else {
-    cells = mapCellsFromSource(doc, source)
+    cells = mapCellsFromSource(doc, source, 'cells')
+    areaCells = mapCellsFromSource(doc, source, 'areaCells')
   }
 
   return {
     ...doc,
     staff,
     cells,
+    areaCells,
     version: doc.version + 1,
     updatedAt: new Date().toISOString(),
     audit: [
@@ -261,10 +268,13 @@ export function fillStaffEmptyDays(
   doc: ScheduleDoc,
   staffId: string,
   code: string,
+  target: 'cells' | 'areaCells' = 'cells',
 ): ScheduleDoc {
   if (!code.trim()) return doc
   const days = daysInMonth(doc.year, doc.month)
-  const cells = { ...doc.cells }
+  const cells = {
+    ...(target === 'areaCells' ? (doc.areaCells ?? {}) : doc.cells),
+  }
   let painted = 0
   for (let d = 1; d <= days; d++) {
     const key = `${staffId}:${d}`
@@ -275,7 +285,7 @@ export function fillStaffEmptyDays(
   if (painted === 0) return doc
   return {
     ...doc,
-    cells,
+    ...(target === 'areaCells' ? { areaCells: cells } : { cells }),
     version: doc.version + 1,
     updatedAt: new Date().toISOString(),
     audit: [
@@ -285,7 +295,7 @@ export function fillStaffEmptyDays(
         at: new Date().toISOString(),
         userName: 'Usuario',
         action: 'llenar_fila',
-        detail: `staff=${staffId} code=${code} celdas=${painted}`,
+        detail: `staff=${staffId} code=${code} celdas=${painted}${target === 'areaCells' ? ' (áreas)' : ''}`,
       },
     ],
   }
@@ -391,10 +401,13 @@ export function paintDayColumn(
   doc: ScheduleDoc,
   day: number,
   code: string | null,
+  target: 'cells' | 'areaCells' = 'cells',
 ): ScheduleDoc {
   const days = daysInMonth(doc.year, doc.month)
   if (day < 1 || day > days) return doc
-  const cells = { ...doc.cells }
+  const cells = {
+    ...(target === 'areaCells' ? (doc.areaCells ?? {}) : doc.cells),
+  }
   let changed = 0
   for (const s of doc.staff) {
     if (!s.name.trim()) continue
@@ -412,7 +425,7 @@ export function paintDayColumn(
   if (changed === 0) return doc
   return {
     ...doc,
-    cells,
+    ...(target === 'areaCells' ? { areaCells: cells } : { cells }),
     version: doc.version + 1,
     updatedAt: new Date().toISOString(),
     audit: [
@@ -422,7 +435,7 @@ export function paintDayColumn(
         at: new Date().toISOString(),
         userName: 'Usuario',
         action: code === null ? 'borrar_columna' : 'pintar_columna',
-        detail: `día=${day} code=${code ?? '—'} cambios=${changed}`,
+        detail: `día=${day} code=${code ?? '—'} cambios=${changed}${target === 'areaCells' ? ' (áreas)' : ''}`,
       },
     ],
   }
@@ -598,8 +611,11 @@ export function countCodesUsed(
 export function clearStaffRowCells(
   doc: ScheduleDoc,
   staffId: string,
+  target: 'cells' | 'areaCells' = 'cells',
 ): ScheduleDoc {
-  const cells = { ...doc.cells }
+  const cells = {
+    ...(target === 'areaCells' ? (doc.areaCells ?? {}) : doc.cells),
+  }
   let removed = 0
   for (const key of Object.keys(cells)) {
     if (key.startsWith(`${staffId}:`)) {
@@ -610,7 +626,7 @@ export function clearStaffRowCells(
   if (removed === 0) return doc
   return {
     ...doc,
-    cells,
+    ...(target === 'areaCells' ? { areaCells: cells } : { cells }),
     version: doc.version + 1,
     updatedAt: new Date().toISOString(),
     audit: [
@@ -620,7 +636,7 @@ export function clearStaffRowCells(
         at: new Date().toISOString(),
         userName: 'Usuario',
         action: 'limpiar_fila',
-        detail: `staff=${staffId} celdas=${removed}`,
+        detail: `staff=${staffId} celdas=${removed}${target === 'areaCells' ? ' (áreas)' : ''}`,
       },
     ],
   }
@@ -685,6 +701,7 @@ export function createNextMonthDraft(doc: ScheduleDoc): ScheduleDoc {
     year,
     staff,
     cells: {},
+    areaCells: {},
     status: 'BORRADOR',
     version: 1,
     signatures: [],
@@ -998,17 +1015,25 @@ export function duplicateScheduleAsNew(doc: ScheduleDoc): ScheduleDoc {
   }))
   const idMap = new Map(doc.staff.map((s, i) => [s.id, staff[i].id]))
   const cells: ScheduleCell = {}
+  const areaCells: ScheduleCell = {}
   for (const [k, v] of Object.entries(doc.cells)) {
     const [oldId, day] = k.split(':')
     const newId = idMap.get(oldId)
     if (!newId) continue
     cells[`${newId}:${day}`] = v
   }
+  for (const [k, v] of Object.entries(doc.areaCells ?? {})) {
+    const [oldId, day] = k.split(':')
+    const newId = idMap.get(oldId)
+    if (!newId) continue
+    areaCells[`${newId}:${day}`] = v
+  }
   return {
     ...doc,
     id: uid('sch'),
     staff,
     cells,
+    areaCells,
     status: 'BORRADOR',
     version: 1,
     signatures: [],
