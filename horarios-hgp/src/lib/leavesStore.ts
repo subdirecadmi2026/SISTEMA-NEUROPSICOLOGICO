@@ -1,5 +1,6 @@
 import type { AppUser, ServiceType } from '../types'
 import { uid } from '../types'
+import { hoursForCode } from '../data/templates'
 import { pushAllLeavesRemote, deleteLeaveRemote } from './remoteCatalog'
 
 const KEY = 'hgp-staff-leaves-v1'
@@ -57,7 +58,20 @@ export const LEAVE_KINDS: LeaveKind[] = [
   'otro',
 ]
 
-const DEFAULT_HOURS_PER_DAY = 8
+/** Fallback sin clave: CE médico 8 h / D1 enfermería 12 h (no fija turnos largos). */
+const DEFAULT_HOURS_ENF = 12
+const DEFAULT_HOURS_MED = 8
+
+/** Presets de jornada / turno usados en HGP (médico hasta 24 h). */
+export const LEAVE_HOUR_PRESETS: Array<{ hours: number; label: string }> = [
+  { hours: 4, label: '4 h' },
+  { hours: 6, label: '6 h' },
+  { hours: 8, label: '8 h' },
+  { hours: 10, label: '10 h' },
+  { hours: 12, label: '12 h' },
+  { hours: 13, label: '13 h' },
+  { hours: 24, label: '24 h' },
+]
 
 export function defaultAbsenceCode(
   kind: LeaveKind,
@@ -71,7 +85,7 @@ export function defaultAbsenceCode(
     case 'permiso_medico':
       return serviceType === 'medico' ? 'INC' : 'CM'
     case 'calamidad':
-      return serviceType === 'medico' ? 'CD' : 'CD'
+      return 'CD'
     case 'capacitacion':
       return serviceType === 'medico' ? 'CAP' : 'P'
     default:
@@ -79,14 +93,32 @@ export function defaultAbsenceCode(
   }
 }
 
-/** Estima horas autorizadas = días calendario inclusive × jornada. */
+/**
+ * Horas equivalentes por día de permiso:
+ * prioriza la clave habitual del personal (X=24, HE=13, PT=12, CE=8, D1=12…).
+ * Los médicos tienen turnos variables hasta 24 h — no asumir siempre 8 h.
+ */
+export function defaultHoursPerDay(
+  serviceType: ServiceType,
+  codigoPersonal?: string,
+): number {
+  const code = (codigoPersonal ?? '').trim()
+  if (code) {
+    const h = hoursForCode(serviceType, code)
+    if (Number.isFinite(h) && h > 0) return Math.min(24, h)
+  }
+  return serviceType === 'medico' ? DEFAULT_HOURS_MED : DEFAULT_HOURS_ENF
+}
+
+/** Estima horas autorizadas = días calendario inclusive × jornada/turno. */
 export function estimateAuthorizedHours(
   startDate: string,
   endDate: string,
-  hoursPerDay = DEFAULT_HOURS_PER_DAY,
+  hoursPerDay: number,
 ): number {
   const days = inclusiveDayCount(startDate, endDate)
-  return Math.max(0, days * hoursPerDay)
+  const h = Number.isFinite(hoursPerDay) && hoursPerDay > 0 ? hoursPerDay : 0
+  return Math.max(0, days * h)
 }
 
 export function inclusiveDayCount(startDate: string, endDate: string): number {
@@ -234,9 +266,16 @@ function validateInput(input: LeaveInput) {
   if (end.getTime() < start.getTime()) {
     throw new Error('La fecha fin no puede ser anterior al inicio')
   }
-  const hoursPerDay = input.hoursPerDay ?? DEFAULT_HOURS_PER_DAY
-  if (!Number.isFinite(hoursPerDay) || hoursPerDay <= 0) {
-    throw new Error('Horas por día deben ser mayores a 0')
+  const hoursPerDay =
+    input.hoursPerDay ?? defaultHoursPerDay(input.serviceType)
+  if (
+    !Number.isFinite(hoursPerDay) ||
+    hoursPerDay <= 0 ||
+    hoursPerDay > 24
+  ) {
+    throw new Error(
+      'Horas por día deben estar entre 1 y 24 (turnos: 8, 12, 13 o 24 h)',
+    )
   }
   const auth =
     input.authorizedHours ??

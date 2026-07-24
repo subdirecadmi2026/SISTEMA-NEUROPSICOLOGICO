@@ -3,6 +3,7 @@ import { createBlankSchedule } from '../data/demo'
 import { cellKey } from './calendar'
 import {
   cancelLeave,
+  defaultHoursPerDay,
   estimateAuthorizedHours,
   inclusiveDayCount,
   listLeaves,
@@ -47,6 +48,58 @@ describe('permisos / vacaciones', () => {
   it('estima horas autorizadas por días × jornada', () => {
     expect(inclusiveDayCount('2026-07-01', '2026-07-05')).toBe(5)
     expect(estimateAuthorizedHours('2026-07-01', '2026-07-05', 8)).toBe(40)
+    expect(estimateAuthorizedHours('2026-07-01', '2026-07-01', 13)).toBe(13)
+    expect(estimateAuthorizedHours('2026-07-01', '2026-07-02', 24)).toBe(48)
+  })
+
+  it('usa horas de clave habitual (X=24, HE=13) y no fija 8 h', () => {
+    expect(defaultHoursPerDay('medico', 'X')).toBe(24)
+    expect(defaultHoursPerDay('medico', 'HE')).toBe(13)
+    expect(defaultHoursPerDay('medico', 'PT1')).toBe(12)
+    expect(defaultHoursPerDay('medico', 'CE')).toBe(8)
+    expect(defaultHoursPerDay('enfermeria', 'D1')).toBe(12)
+
+    const guardia = upsertLeave({
+      staffId: 'med-x',
+      staffName: 'Dr. Guardia',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'permiso_temporal',
+      startDate: '2026-07-10',
+      endDate: '2026-07-10',
+      hoursPerDay: 24,
+      authorizedHours: 24,
+    })
+    expect(guardia.hoursPerDay).toBe(24)
+    expect(guardia.authorizedHours).toBe(24)
+
+    const he = upsertLeave({
+      staffId: 'med-he',
+      staffName: 'Dra. HE',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'permiso_temporal',
+      startDate: '2026-07-11',
+      endDate: '2026-07-12',
+      hoursPerDay: 13,
+    })
+    expect(he.hoursPerDay).toBe(13)
+    expect(he.authorizedHours).toBe(26)
+  })
+
+  it('rechaza jornada mayor a 24 h', () => {
+    expect(() =>
+      upsertLeave({
+        staffId: 'med-1',
+        staffName: 'Dr. Pérez',
+        serviceType: 'medico',
+        unitName: 'Medicina Interna',
+        kind: 'vacaciones',
+        startDate: '2026-07-01',
+        endDate: '2026-07-01',
+        hoursPerDay: 25,
+      }),
+    ).toThrow(/1 y 24/)
   })
 
   it('registra permiso y lo lista por unidad', () => {

@@ -113,7 +113,10 @@ function rowToLeave(r: Record<string, unknown>): StaffLeave {
     startDate: String(r.start_date).slice(0, 10),
     endDate: String(r.end_date).slice(0, 10),
     authorizedHours: Number(r.authorized_hours) || 0,
-    hoursPerDay: Number(r.hours_per_day) || 8,
+    hoursPerDay: (() => {
+      const n = Number(r.hours_per_day)
+      return Number.isFinite(n) && n > 0 && n <= 24 ? n : 8
+    })(),
     notes: String(r.notes ?? ''),
     status: (r.status as StaffLeave['status']) || 'activo',
     createdAt: String(r.created_at ?? new Date().toISOString()),

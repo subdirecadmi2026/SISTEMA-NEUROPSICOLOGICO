@@ -4,12 +4,14 @@ import { SERVICE_LABEL } from '../data/templates'
 import { listUnits } from '../lib/unitsStore'
 import { listStaff } from '../lib/staffLibrary'
 import {
+  LEAVE_HOUR_PRESETS,
   LEAVE_KINDS,
   LEAVE_KIND_LABEL,
   type LeaveKind,
   type StaffLeave,
   cancelLeave,
   defaultAbsenceCode,
+  defaultHoursPerDay,
   deleteLeave,
   estimateAuthorizedHours,
   findOverlappingLeaves,
@@ -62,6 +64,7 @@ function emptyForm(
   const m = String(start.getMonth() + 1).padStart(2, '0')
   const d = String(start.getDate()).padStart(2, '0')
   const ymd = `${y}-${m}-${d}`
+  const hoursPerDay = defaultHoursPerDay(serviceType)
   return {
     serviceType,
     unitName,
@@ -71,8 +74,8 @@ function emptyForm(
     absenceCode: defaultAbsenceCode('vacaciones', serviceType),
     startDate: ymd,
     endDate: ymd,
-    hoursPerDay: 8,
-    authorizedHours: 8,
+    hoursPerDay,
+    authorizedHours: estimateAuthorizedHours(ymd, ymd, hoursPerDay),
     autoHours: true,
     notes: '',
   }
@@ -213,11 +216,20 @@ export function PermisosVacacionesPanel({
 
   function pickStaff(id: string) {
     const s = staffOptions.find((x) => x.id === id)
-    setForm((f) => ({
-      ...f,
-      staffId: id,
-      staffName: s?.name ?? '',
-    }))
+    setForm((f) => {
+      const hoursPerDay = defaultHoursPerDay(
+        f.serviceType,
+        s?.codigoPersonal,
+      )
+      return syncAutoHours(
+        {
+          staffId: id,
+          staffName: s?.name ?? '',
+          hoursPerDay,
+        },
+        f,
+      )
+    })
   }
 
   function startCreate() {
@@ -433,15 +445,20 @@ export function PermisosVacacionesPanel({
               onChange={(e) => {
                 const serviceType = e.target.value as ServiceType
                 const unitName = listUnits(serviceType)[0] ?? ''
-                setForm((f) =>
-                  syncAutoHours({
-                    serviceType,
-                    unitName,
-                    staffId: '',
-                    staffName: '',
-                    absenceCode: defaultAbsenceCode(f.kind, serviceType),
-                  }),
-                )
+                setForm((f) => {
+                  const hoursPerDay = defaultHoursPerDay(serviceType)
+                  return syncAutoHours(
+                    {
+                      serviceType,
+                      unitName,
+                      staffId: '',
+                      staffName: '',
+                      absenceCode: defaultAbsenceCode(f.kind, serviceType),
+                      hoursPerDay,
+                    },
+                    f,
+                  )
+                })
               }}
             >
               <option value="medico">{SERVICE_LABEL.medico}</option>
@@ -479,7 +496,12 @@ export function PermisosVacacionesPanel({
               <option value="">Seleccione…</option>
               {staffOptions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} · {s.fun}
+                  {s.name}
+                  {s.codigoPersonal
+                    ? ` · ${s.codigoPersonal} (${defaultHoursPerDay(form.serviceType, s.codigoPersonal)} h)`
+                    : s.fun
+                      ? ` · ${s.fun}`
+                      : ''}
                 </option>
               ))}
             </select>
@@ -554,24 +576,52 @@ export function PermisosVacacionesPanel({
               }
             />
           </label>
-          <label className="block text-xs font-semibold text-muted">
-            Horas / día (jornada)
-            <input
-              type="number"
-              min={1}
-              max={24}
-              className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
-              value={form.hoursPerDay}
-              onChange={(e) =>
-                setForm((f) =>
-                  syncAutoHours(
-                    { hoursPerDay: Number(e.target.value) || 8 },
-                    f,
-                  ),
-                )
-              }
-            />
-          </label>
+          <div className="block text-xs font-semibold text-muted sm:col-span-2">
+            Horas / día (jornada o turno)
+            <p className="mt-1 text-[11px] font-normal text-muted">
+              Según la clave del personal (CE 8 h, PT 12 h, HE 13 h, X 24 h).
+              Los médicos pueden tener turnos de hasta 24 horas.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {LEAVE_HOUR_PRESETS.map((p) => (
+                <button
+                  key={p.hours}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) =>
+                      syncAutoHours({ hoursPerDay: p.hours }, f),
+                    )
+                  }
+                  className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
+                    form.hoursPerDay === p.hours
+                      ? 'border-teal bg-teal/10 text-teal'
+                      : 'border-line text-ink hover:border-teal/40'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <label className="mt-2 block text-[11px] font-semibold text-muted">
+              Otra cantidad (1–24)
+              <input
+                type="number"
+                min={1}
+                max={24}
+                step={1}
+                className="mt-1 w-full max-w-[8rem] rounded-xl border border-line px-3 py-2 text-sm"
+                value={form.hoursPerDay}
+                onChange={(e) => {
+                  const raw = Number(e.target.value)
+                  const hoursPerDay =
+                    Number.isFinite(raw) && raw > 0
+                      ? Math.min(24, raw)
+                      : defaultHoursPerDay(form.serviceType)
+                  setForm((f) => syncAutoHours({ hoursPerDay }, f))
+                }}
+              />
+            </label>
+          </div>
           <label className="block text-xs font-semibold text-muted">
             Horas autorizadas
             <input
