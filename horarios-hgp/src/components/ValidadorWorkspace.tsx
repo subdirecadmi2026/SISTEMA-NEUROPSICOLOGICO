@@ -53,7 +53,6 @@ export function ValidadorWorkspace({
 }: Props) {
   const [module, setModule] = useState<ModuleTab>('pendientes')
   const [filter, setFilter] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ScheduleDoc | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -105,19 +104,16 @@ export function ValidadorWorkspace({
 
   async function openCard(id: string) {
     setLoadingDetail(true)
-    setSelectedId(id)
     try {
       const doc = await loadAnySchedule(id)
       if (!doc) {
         onFlash('No se pudo abrir el horario')
-        setSelectedId(null)
         return
       }
       setDetail(doc)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'Error al abrir')
-      setSelectedId(null)
     } finally {
       setLoadingDetail(false)
     }
@@ -125,7 +121,6 @@ export function ValidadorWorkspace({
 
   function backToCards() {
     setDetail(null)
-    setSelectedId(null)
   }
 
   async function chooseRootFolder() {
@@ -373,13 +368,7 @@ export function ValidadorWorkspace({
 
   // ——— Tarjetas: módulos ———
   return (
-    <div
-      className={`mx-auto px-3 py-6 sm:px-6 ${
-        module === 'archivo' || module === 'permisos'
-          ? 'max-w-[1400px]'
-          : 'max-w-5xl'
-      }`}
-    >
+    <div className="mx-auto max-w-[1400px] px-3 py-6 sm:px-6">
       <header className="mb-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
           Talento Humano · Validador
@@ -497,7 +486,9 @@ export function ValidadorWorkspace({
       ) : module === 'archivo' ? (
         archived.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-12 text-center text-sm text-muted">
-            Aún no hay horarios validados. Valide desde Pendientes.
+            {filter.trim()
+              ? `Ningún resultado en archivo para «${filter.trim()}».`
+              : 'Aún no hay horarios validados. Valide desde Pendientes.'}
           </p>
         ) : (
           <div>
@@ -578,44 +569,51 @@ export function ValidadorWorkspace({
         )
       ) : cards.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-12 text-center text-sm text-muted">
-          No hay horarios pendientes de validación.
+          {filter.trim()
+            ? `Ningún resultado pendiente para «${filter.trim()}».`
+            : 'No hay horarios pendientes de validación.'}
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {cards.map((s, i) => (
             <button
               key={s.id}
               type="button"
               onClick={() => void openCard(s.id)}
-              className={`group relative overflow-hidden rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-teal/40 hover:shadow-lg ${
-                selectedId === s.id
-                  ? 'border-navy ring-2 ring-navy/15'
-                  : 'border-line'
-              }`}
+              className="group relative flex min-h-[11rem] flex-col overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-b from-white to-amber-50/40 p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-amber-300 hover:shadow-lg"
             >
               <div
-                className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-navy to-teal"
+                className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-400 to-amber-600"
                 aria-hidden
               />
-              <span className="absolute right-3 top-4 rounded-full bg-sand px-2 py-0.5 text-[10px] font-bold text-muted">
+              <span className="absolute right-3 top-4 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
                 #{i + 1}
               </span>
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
                 {s.serviceType === 'enfermeria' ? 'Enfermería' : 'Médico'}
               </p>
-              <h2 className="mt-2 pr-8 font-display text-xl leading-snug text-navy group-hover:text-teal">
+              <h2
+                className="mt-2 line-clamp-2 pr-8 font-display text-xl leading-snug text-navy group-hover:text-teal"
+                title={s.unitName}
+              >
                 {s.unitName}
               </h2>
-              <p className="mt-1 text-sm text-ink">
+              <p className="mt-1 text-sm font-semibold text-ink">
                 {MONTHS_ES[s.month - 1]} {s.year}
               </p>
-              <div className="mt-5 flex items-center justify-between">
+              <p className="mt-1 text-[11px] text-muted">
+                Actualizado{' '}
+                {new Date(s.updatedAt).toLocaleDateString('es-EC', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </p>
+              <div className="mt-auto flex items-center justify-between pt-4">
                 <span className="rounded-md bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-900 ring-1 ring-emerald-100">
                   {s.status ? STATUS_LABEL[s.status] : '—'}
                 </span>
-                <span className="text-sm font-semibold text-navy">
-                  Abrir →
-                </span>
+                <span className="text-sm font-semibold text-navy">Abrir →</span>
               </div>
             </button>
           ))}

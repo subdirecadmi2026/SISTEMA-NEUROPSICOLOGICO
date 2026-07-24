@@ -55,7 +55,6 @@ export function ReviewCardsModule({
   onFlash,
   onNotify,
 }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<ScheduleDoc | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [correction, setCorrection] = useState('')
@@ -120,12 +119,10 @@ export function ReviewCardsModule({
 
   async function openCard(id: string) {
     setLoadingDetail(true)
-    setSelectedId(id)
     try {
       const doc = await loadAnySchedule(id)
       if (!doc) {
         onFlash('No se pudo abrir el horario')
-        setSelectedId(null)
         return
       }
       setDetail(doc)
@@ -133,7 +130,6 @@ export function ReviewCardsModule({
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'Error al abrir')
-      setSelectedId(null)
     } finally {
       setLoadingDetail(false)
     }
@@ -141,7 +137,6 @@ export function ReviewCardsModule({
 
   function backToCards() {
     setDetail(null)
-    setSelectedId(null)
     setCorrection('')
   }
 
@@ -407,7 +402,7 @@ export function ReviewCardsModule({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-3 py-6 sm:px-6">
+    <div className="mx-auto max-w-[1400px] px-3 py-6 sm:px-6">
       <header className="mb-6">
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
           {mode === 'admisiones'
@@ -420,34 +415,39 @@ export function ReviewCardsModule({
         <p className="mt-1 max-w-xl text-sm text-muted">{subtitle}</p>
       </header>
 
-      {mode !== 'validador' && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setListTab('pendientes')}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-              listTab === 'pendientes'
-                ? 'bg-navy text-white'
-                : 'border border-line bg-white text-navy'
-            }`}
-          >
-            Pendientes ({pending.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setListTab('historial')}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-              listTab === 'historial'
-                ? 'bg-navy text-white'
-                : 'border border-line bg-white text-navy'
-            }`}
-          >
-            Historial ({historial.length})
-          </button>
-        </div>
-      )}
-
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        {mode !== 'validador' && (
+          <div className="inline-flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-line">
+            <button
+              type="button"
+              onClick={() => setListTab('pendientes')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                listTab === 'pendientes'
+                  ? 'bg-navy text-white'
+                  : 'text-muted hover:bg-sand'
+              }`}
+            >
+              Pendientes
+              <span className="ml-2 rounded-full bg-white/20 px-1.5 text-xs">
+                {pending.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setListTab('historial')}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                listTab === 'historial'
+                  ? 'bg-teal text-white'
+                  : 'text-muted hover:bg-sand'
+              }`}
+            >
+              Historial
+              <span className="ml-2 rounded-full bg-white/20 px-1.5 text-xs">
+                {historial.length}
+              </span>
+            </button>
+          </div>
+        )}
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -472,83 +472,105 @@ export function ReviewCardsModule({
         </p>
       ) : cards.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line bg-white/70 px-4 py-12 text-center text-sm text-muted">
-          {listTab === 'historial'
-            ? 'Aún no hay horarios en el historial.'
-            : mode === 'admisiones'
-              ? 'No hay horarios pendientes de visto bueno de Admisiones.'
-              : mode === 'revisor'
-                ? 'No hay horarios pendientes de revisión.'
-                : 'No hay horarios pendientes de validación.'}
+          {filter.trim()
+            ? `Ningún resultado para «${filter.trim()}».`
+            : listTab === 'historial'
+              ? 'Aún no hay horarios en el historial.'
+              : mode === 'admisiones'
+                ? 'No hay horarios pendientes de visto bueno de Admisiones.'
+                : mode === 'revisor'
+                  ? 'No hay horarios pendientes de revisión.'
+                  : 'No hay horarios pendientes de validación.'}
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {cards.map((s, i) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => void openCard(s.id)}
-              className={`group relative overflow-hidden rounded-2xl border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-md ${
-                selectedId === s.id
-                  ? 'border-navy ring-2 ring-navy/15'
-                  : 'border-line'
-              }`}
-            >
-              <span className="absolute right-3 top-3 rounded-full bg-sand px-2 py-0.5 text-[10px] font-bold text-muted">
-                #{i + 1}
-              </span>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted">
-                {s.serviceType === 'enfermeria' ? 'Enfermería' : 'Médico'}
-              </p>
-              <h2 className="mt-1 font-display text-xl text-navy group-hover:text-teal">
-                {s.unitName}
-              </h2>
-              <p className="mt-1 text-sm text-ink">
-                {MONTHS_ES[s.month - 1]} {s.year}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1 text-[10px] font-semibold">
-                <span
-                  className={`rounded-md px-1.5 py-0.5 ${
-                    s.admisionesApproved
-                      ? 'bg-teal/15 text-teal'
-                      : 'bg-sand text-muted'
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {cards.map((s, i) => {
+            const isHistorial = listTab === 'historial'
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => void openCard(s.id)}
+                className={`group relative flex min-h-[12rem] flex-col overflow-hidden rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                  isHistorial
+                    ? 'border-line/80 bg-gradient-to-b from-white to-sand/30 hover:border-teal/35'
+                    : 'border-amber-200/70 bg-gradient-to-b from-white to-amber-50/35 hover:border-amber-300'
+                }`}
+              >
+                <div
+                  className={`absolute inset-x-0 top-0 h-1.5 ${
+                    isHistorial
+                      ? 'bg-gradient-to-r from-navy via-teal to-teal-soft'
+                      : 'bg-gradient-to-r from-amber-400 to-amber-600'
                   }`}
+                  aria-hidden
+                />
+                <div className="mb-2 flex items-start justify-between gap-2 pt-1">
+                  <span className="rounded-md bg-sand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-navy">
+                    {s.serviceType === 'enfermeria' ? 'Enfermería' : 'Médico'}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      isHistorial
+                        ? 'bg-teal/15 text-teal'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}
+                  >
+                    {isHistorial ? 'Histórico' : `#${i + 1}`}
+                  </span>
+                </div>
+                <h2
+                  className="line-clamp-2 font-display text-xl leading-snug text-navy group-hover:text-teal"
+                  title={s.unitName}
                 >
-                  Admisiones {s.admisionesApproved ? '✓' : '·'}
-                </span>
-                <span
-                  className={`rounded-md px-1.5 py-0.5 ${
-                    s.revisorApproved
-                      ? 'bg-teal/15 text-teal'
-                      : 'bg-sand text-muted'
-                  }`}
-                >
-                  Revisor {s.revisorApproved ? '✓' : '·'}
-                </span>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-2">
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    mode === 'admisiones'
-                      ? 'bg-teal/15 text-navy'
-                      : mode === 'revisor'
-                        ? 'bg-violet-100 text-violet-950'
-                        : 'bg-emerald-100 text-emerald-950'
-                  }`}
-                >
-                  {s.status ? STATUS_LABEL[s.status] : '—'}
-                </span>
-                <span className="text-sm font-semibold text-navy">
-                  Abrir →
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] text-muted">
-                {new Date(s.updatedAt).toLocaleString('es-EC', {
-                  dateStyle: 'short',
-                  timeStyle: 'short',
-                })}
-              </p>
-            </button>
-          ))}
+                  {s.unitName}
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-ink">
+                  {MONTHS_ES[s.month - 1]} {s.year}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1 text-[10px] font-semibold">
+                  <span
+                    className={`rounded-md px-1.5 py-0.5 ${
+                      s.admisionesApproved
+                        ? 'bg-teal/15 text-teal'
+                        : 'bg-sand text-muted'
+                    }`}
+                  >
+                    Admisiones {s.admisionesApproved ? '✓' : '·'}
+                  </span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.5 ${
+                      s.revisorApproved
+                        ? 'bg-teal/15 text-teal'
+                        : 'bg-sand text-muted'
+                    }`}
+                  >
+                    Revisor {s.revisorApproved ? '✓' : '·'}
+                  </span>
+                </div>
+                <div className="mt-auto flex items-center justify-between gap-2 pt-4">
+                  <span
+                    className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                      mode === 'admisiones'
+                        ? 'bg-teal/10 text-navy ring-teal/20'
+                        : mode === 'revisor'
+                          ? 'bg-violet-50 text-violet-950 ring-violet-100'
+                          : 'bg-emerald-50 text-emerald-950 ring-emerald-100'
+                    }`}
+                  >
+                    {s.status ? STATUS_LABEL[s.status] : '—'}
+                  </span>
+                  <span className="text-sm font-semibold text-navy">Abrir →</span>
+                </div>
+                <p className="mt-2 text-[11px] text-muted">
+                  {new Date(s.updatedAt).toLocaleString('es-EC', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                </p>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
