@@ -1,6 +1,11 @@
-# Sistema Neuropsicológico Ñampi Wasi
+# Sistema Neuropsicológico Ñampi Wasi + Sacha Wasi
 
-El MVP de NeuroSys se encuentra en [`neurosys/`](./neurosys).
+Este repositorio contiene dos productos **independientes**:
 
-Consulta su [documentación de desarrollo](./neurosys/README.md) para ejecutar
-la aplicación localmente.
+| Carpeta | Producto |
+| --- | --- |
+| [`neurosys/`](./neurosys) | Sistema clínico NeuroSys (Ñampi Wasi) |
+| [`sacha-wasi/`](./sacha-wasi) | Gestión de comida rápida Sacha Wasi (POS, KDS, recetas, inventario) |
+
+No comparten módulos, horarios ni datos. Cada uno tiene su propio README,
+dependencias y despliegue (Vercel + Supabase).
