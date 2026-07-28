@@ -21,11 +21,16 @@ export function PosPage() {
     mesas,
     lastTicket,
     clearLastTicket,
+    customers,
+    coupons,
+    previewDiscount,
   } = useDemo();
   const [categoryId, setCategoryId] = useState<string>("all");
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
   const [channel, setChannel] = useState<OrderChannel>("mostrador");
   const [mesaId, setMesaId] = useState<string>("");
+  const [customerId, setCustomerId] = useState<string>("");
+  const [couponCode, setCouponCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   const filtered = useMemo(
@@ -40,6 +45,10 @@ export function PosPage() {
     const product = products.find((p) => p.id === line.productId);
     return sum + (product?.price ?? 0) * line.qty;
   }, 0);
+  const discountPreview = couponCode
+    ? previewDiscount(couponCode, total)
+    : { ok: false, message: "", discount: 0 };
+  const payable = Math.max(0, total - (discountPreview.ok ? discountPreview.discount : 0));
 
   return (
     <AppShell
@@ -218,6 +227,53 @@ export function PosPage() {
               </label>
             ) : null}
 
+            <label className="block text-xs text-[var(--sw-muted)]">
+              Cliente fidelización
+              <select
+                className="mt-1 w-full rounded-xl border border-[var(--sw-line)] bg-white px-3 py-2.5 text-sm"
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+              >
+                <option value="">Sin cliente</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.points} pts
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-xs text-[var(--sw-muted)]">
+              Cupón
+              <div className="mt-1 flex gap-2">
+                <input
+                  className="w-full rounded-xl border border-[var(--sw-line)] bg-white px-3 py-2.5 text-sm uppercase"
+                  placeholder="SELVA10"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  list="coupon-list"
+                />
+                <datalist id="coupon-list">
+                  {coupons
+                    .filter((c) => c.active)
+                    .map((c) => (
+                      <option key={c.id} value={c.code} />
+                    ))}
+                </datalist>
+              </div>
+              {couponCode && discountPreview.message ? (
+                <span
+                  className={`mt-1 block text-[11px] ${
+                    discountPreview.ok
+                      ? "text-[var(--sw-forest)]"
+                      : "text-[var(--sw-chili)]"
+                  }`}
+                >
+                  {discountPreview.message}
+                </span>
+              ) : null}
+            </label>
+
             <div className="grid grid-cols-3 gap-2">
               {(["efectivo", "tarjeta", "wallet"] as PaymentMethod[]).map((method) => (
                 <button
@@ -238,8 +294,13 @@ export function PosPage() {
               <div>
                 <p className="text-xs text-[var(--sw-muted)]">Total</p>
                 <p className="font-[family-name:var(--font-display)] text-3xl">
-                  {formatMoney(total)}
+                  {formatMoney(payable)}
                 </p>
+                {discountPreview.ok ? (
+                  <p className="text-xs text-[var(--sw-chili)]">
+                    Desc. {formatMoney(discountPreview.discount)}
+                  </p>
+                ) : null}
               </div>
               <p className="text-xs text-[var(--sw-muted)]">
                 Caja abierta {formatTime(cash.opened_at)}
@@ -253,12 +314,17 @@ export function PosPage() {
                 (channel === "mesa" && !mesaId)
               }
               onClick={() => {
-                const result = checkout(
-                  payment,
-                  channel,
-                  channel === "mesa" ? mesaId : null,
-                );
+                const result = checkout(payment, channel, {
+                  mesaId: channel === "mesa" ? mesaId : null,
+                  couponCode: couponCode || null,
+                  customerId: customerId || null,
+                });
                 setMessage(result.message);
+                if (result.ok) {
+                  setCouponCode("");
+                  setCustomerId("");
+                  setMesaId("");
+                }
               }}
               className="w-full rounded-2xl bg-[var(--sw-forest)] px-4 py-4 text-base font-semibold text-white disabled:opacity-40"
             >

@@ -11,12 +11,16 @@ import {
   type ReactNode,
 } from "react";
 import {
+  createInitialAttendance,
   createInitialAuditLogs,
   createInitialCashSession,
   createInitialMovements,
   createInitialOrders,
   createInitialPurchases,
+  createInitialShifts,
   DEMO_CATEGORIES,
+  DEMO_COUPONS,
+  DEMO_CUSTOMERS,
   DEMO_INSUMOS,
   DEMO_MESAS,
   DEMO_PRODUCTS,
@@ -31,8 +35,11 @@ import { buildAlerts, calcPurchaseTotal } from "@/lib/ops-helpers";
 import { homeForRole } from "@/lib/roles";
 import type {
   AppAlert,
+  AttendancePunch,
   AuditLog,
   CashSession,
+  Coupon,
+  Customer,
   Insumo,
   InventoryMovement,
   Mesa,
@@ -41,15 +48,18 @@ import type {
   OrderItem,
   OrderStatus,
   PaymentMethod,
+  Product,
   Profile,
   Proveedor,
   PurchaseOrder,
   PurchaseStatus,
   Role,
+  Shift,
+  ShiftType,
 } from "@/types";
 
 const SESSION_KEY = "sacha-wasi-session";
-const STORE_KEY = "sacha-wasi-store-v2";
+const STORE_KEY = "sacha-wasi-store-v3";
 
 type CartLine = {
   productId: string;
@@ -58,7 +68,14 @@ type CartLine = {
   modifiers: string[];
 };
 
+type CheckoutOptions = {
+  mesaId?: string | null;
+  couponCode?: string | null;
+  customerId?: string | null;
+};
+
 type DemoStoreState = {
+  products: Product[];
   insumos: Insumo[];
   orders: Order[];
   movements: InventoryMovement[];
@@ -66,6 +83,10 @@ type DemoStoreState = {
   audits: AuditLog[];
   purchases: PurchaseOrder[];
   mesas: Mesa[];
+  shifts: Shift[];
+  attendance: AttendancePunch[];
+  customers: Customer[];
+  coupons: Coupon[];
   orderSeq: number;
   purchaseSeq: number;
   lastTicket: Order | null;
@@ -76,6 +97,7 @@ type DemoContextValue = {
   user: Profile | null;
   sucursalId: string;
   cart: CartLine[];
+  products: Product[];
   insumos: Insumo[];
   orders: Order[];
   movements: InventoryMovement[];
@@ -83,10 +105,13 @@ type DemoContextValue = {
   audits: AuditLog[];
   purchases: PurchaseOrder[];
   mesas: Mesa[];
+  shifts: Shift[];
+  attendance: AttendancePunch[];
+  customers: Customer[];
+  coupons: Coupon[];
   proveedores: Proveedor[];
   alerts: AppAlert[];
   lastTicket: Order | null;
-  products: typeof DEMO_PRODUCTS;
   categories: typeof DEMO_CATEGORIES;
   recetas: typeof DEMO_RECETAS;
   recetaIngredientes: typeof DEMO_RECETA_INGREDIENTES;
@@ -103,7 +128,7 @@ type DemoContextValue = {
   checkout: (
     payment: PaymentMethod,
     channel: OrderChannel,
-    mesaId?: string | null,
+    options?: CheckoutOptions,
   ) => { ok: boolean; message: string; order?: Order };
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   adjustInventory: (
@@ -123,6 +148,33 @@ type DemoContextValue = {
     purchaseId: string,
     status: PurchaseStatus,
   ) => { ok: boolean; message: string };
+  upsertProduct: (product: Product) => { ok: boolean; message: string };
+  toggleProductActive: (productId: string) => void;
+  clockIn: (employeeId?: string) => { ok: boolean; message: string };
+  clockOut: (employeeId?: string) => { ok: boolean; message: string };
+  addShift: (input: {
+    employee_id: string;
+    date: string;
+    start: string;
+    end: string;
+    tipo: ShiftType;
+    role: Role;
+  }) => { ok: boolean; message: string };
+  upsertCustomer: (input: {
+    id?: string;
+    name: string;
+    phone: string;
+    email: string;
+  }) => { ok: boolean; message: string };
+  upsertCoupon: (coupon: Omit<Coupon, "id" | "uses"> & { id?: string }) => {
+    ok: boolean;
+    message: string;
+  };
+  previewDiscount: (code: string, subtotal: number) => {
+    ok: boolean;
+    message: string;
+    discount: number;
+  };
   recipeCost: (recetaId: string) => number;
 };
 
@@ -130,6 +182,7 @@ const DemoContext = createContext<DemoContextValue | null>(null);
 
 function initialStore(): DemoStoreState {
   return {
+    products: structuredClone(DEMO_PRODUCTS),
     insumos: structuredClone(DEMO_INSUMOS),
     orders: createInitialOrders(),
     movements: createInitialMovements(),
@@ -137,6 +190,10 @@ function initialStore(): DemoStoreState {
     audits: createInitialAuditLogs(),
     purchases: createInitialPurchases(),
     mesas: structuredClone(DEMO_MESAS),
+    shifts: createInitialShifts(),
+    attendance: createInitialAttendance(),
+    customers: structuredClone(DEMO_CUSTOMERS),
+    coupons: structuredClone(DEMO_COUPONS),
     orderSeq: 1004,
     purchaseSeq: 2403,
     lastTicket: null,
@@ -179,6 +236,16 @@ function pushAudit(
   ].slice(0, 200);
 }
 
+function calcDiscount(coupon: Coupon, subtotal: number) {
+  if (!coupon.active) return 0;
+  if (subtotal < coupon.min_ticket) return 0;
+  if (coupon.max_uses != null && coupon.uses >= coupon.max_uses) return 0;
+  if (coupon.type === "percent") {
+    return Number(((subtotal * coupon.value) / 100).toFixed(2));
+  }
+  return Math.min(coupon.value, subtotal);
+}
+
 export function DemoProvider({ children }: { children: ReactNode }) {
   const ready = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const [user, setUser] = useState<Profile | null>(() =>
@@ -193,19 +260,25 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     const saved = readJson<Partial<DemoStoreState> | null>(STORE_KEY, null);
     return { ...initialStore(), ...(saved ?? {}) };
   });
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!ready) return;
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
   }, [ready, store]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const login = useCallback((email: string, password: string) => {
     const found = DEMO_USERS.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
+      (u) =>
+        u.email.toLowerCase() === email.trim().toLowerCase() &&
+        u.password === password,
     );
-    if (!found) {
-      return { ok: false, message: "Credenciales inválidas" };
-    }
+    if (!found) return { ok: false, message: "Credenciales inválidas" };
     const profile: Profile = {
       id: found.id,
       email: found.email,
@@ -246,11 +319,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateCartLine = useCallback((productId: string, patch: Partial<CartLine>) => {
-    setCart((prev) =>
-      prev.map((l) => (l.productId === productId ? { ...l, ...patch } : l)),
-    );
-  }, []);
+  const updateCartLine = useCallback(
+    (productId: string, patch: Partial<CartLine>) => {
+      setCart((prev) =>
+        prev.map((l) => (l.productId === productId ? { ...l, ...patch } : l)),
+      );
+    },
+    [],
+  );
 
   const removeFromCart = useCallback((productId: string) => {
     setCart((prev) => prev.filter((l) => l.productId !== productId));
@@ -261,14 +337,45 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     setStore((prev) => ({ ...prev, lastTicket: null }));
   }, []);
 
+  const previewDiscount = useCallback(
+    (code: string, subtotal: number) => {
+      const coupon = store.coupons.find(
+        (c) => c.code.toUpperCase() === code.trim().toUpperCase(),
+      );
+      if (!coupon) return { ok: false, message: "Cupón no encontrado", discount: 0 };
+      const discount = calcDiscount(coupon, subtotal);
+      if (discount <= 0) {
+        return {
+          ok: false,
+          message: "Cupón no aplicable (mínimo, usos o inactivo)",
+          discount: 0,
+        };
+      }
+      return {
+        ok: true,
+        message: `Descuento ${coupon.code}: -${discount.toFixed(2)}`,
+        discount,
+      };
+    },
+    [store.coupons],
+  );
+
   const checkout = useCallback(
-    (payment: PaymentMethod, channel: OrderChannel, mesaId?: string | null) => {
+    (
+      payment: PaymentMethod,
+      channel: OrderChannel,
+      options: CheckoutOptions = {},
+    ) => {
       if (!user) return { ok: false, message: "Debes iniciar sesión" };
       if (cart.length === 0) return { ok: false, message: "Carrito vacío" };
       if (store.cash.closed_at) {
-        return { ok: false, message: "La caja está cerrada. Ábrela antes de vender." };
+        return {
+          ok: false,
+          message: "La caja está cerrada. Ábrela antes de vender.",
+        };
       }
 
+      const products = store.products;
       const requirements = new Map<string, number>();
       for (const line of cart) {
         const receta = DEMO_RECETAS.find(
@@ -297,7 +404,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       }
 
       const items: OrderItem[] = cart.map((line, idx) => {
-        const product = DEMO_PRODUCTS.find((p) => p.id === line.productId)!;
+        const product = products.find((p) => p.id === line.productId)!;
         return {
           id: `oi-${Date.now()}-${idx}`,
           producto_id: product.id,
@@ -309,10 +416,20 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         };
       });
 
-      const total = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
+      const subtotal = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
+      let discount = 0;
+      let couponCode: string | null = null;
+      if (options.couponCode) {
+        const preview = previewDiscount(options.couponCode, subtotal);
+        if (!preview.ok) return { ok: false, message: preview.message };
+        discount = preview.discount;
+        couponCode = options.couponCode.trim().toUpperCase();
+      }
+      const total = Number((subtotal - discount).toFixed(2));
+
       const maxPrep = Math.max(
         ...items.map((i) => {
-          const p = DEMO_PRODUCTS.find((x) => x.id === i.producto_id);
+          const p = products.find((x) => x.id === i.producto_id);
           return p?.prep_minutes ?? 8;
         }),
       );
@@ -325,60 +442,104 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         status: "recibido",
         payment_method: payment,
         total,
+        subtotal,
+        discount,
+        coupon_code: couponCode,
+        customer_id: options.customerId || null,
         items,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         created_by: user.id,
-        station_priority: store.orders.filter((o) =>
-          ["recibido", "en_preparacion"].includes(o.status),
-        ).length + 1,
-        estimated_ready_at: new Date(Date.now() + maxPrep * 60_000).toISOString(),
+        station_priority:
+          store.orders.filter((o) =>
+            ["recibido", "en_preparacion"].includes(o.status),
+          ).length + 1,
+        estimated_ready_at: new Date(
+          Date.now() + maxPrep * 60_000,
+        ).toISOString(),
       };
 
-      const nextInsumos = store.insumos.map((insumo) => {
-        const needed = requirements.get(insumo.id);
-        if (!needed) return insumo;
-        return { ...insumo, stock: Number((insumo.stock - needed).toFixed(3)) };
-      });
+      const pointsEarned = Math.floor(total);
 
-      const saleMovements: InventoryMovement[] = [...requirements.entries()].map(
-        ([insumoId, cantidad], idx) => ({
+      setStore((prev) => {
+        const nextInsumos = prev.insumos.map((insumo) => {
+          const needed = requirements.get(insumo.id);
+          if (!needed) return insumo;
+          return {
+            ...insumo,
+            stock: Number((insumo.stock - needed).toFixed(3)),
+          };
+        });
+        const saleMovements: InventoryMovement[] = [
+          ...requirements.entries(),
+        ].map(([insumoId, cantidad], idx) => ({
           id: `mov-${Date.now()}-${idx}`,
           insumo_id: insumoId,
-          tipo: "venta",
+          tipo: "venta" as const,
           cantidad,
           motivo: `Venta ${order.numero}`,
           referencia_id: order.id,
           created_by: user.id,
           created_at: new Date().toISOString(),
-        }),
-      );
+        }));
 
-      const cashIncrement = payment === "efectivo" ? total : 0;
-
-      setStore((prev) => ({
-        ...prev,
-        orderSeq: prev.orderSeq + 1,
-        orders: [order, ...prev.orders],
-        insumos: nextInsumos,
-        movements: [...saleMovements, ...prev.movements],
-        lastTicket: order,
-        mesas:
-          channel === "mesa" && mesaId
-            ? prev.mesas.map((m) =>
-                m.id === mesaId ? { ...m, status: "ocupada" } : m,
+        return {
+          ...prev,
+          orderSeq: prev.orderSeq + 1,
+          orders: [order, ...prev.orders],
+          insumos: nextInsumos,
+          movements: [...saleMovements, ...prev.movements],
+          lastTicket: order,
+          mesas:
+            channel === "mesa" && options.mesaId
+              ? prev.mesas.map((m) =>
+                  m.id === options.mesaId ? { ...m, status: "ocupada" } : m,
+                )
+              : prev.mesas,
+          coupons: couponCode
+            ? prev.coupons.map((c) =>
+                c.code === couponCode ? { ...c, uses: c.uses + 1 } : c,
               )
-            : prev.mesas,
-        cash: {
-          ...prev.cash,
-          expected_cash: prev.cash.expected_cash + cashIncrement,
-        },
-        audits: pushAudit(prev.audits, user, "create_order", "ordenes", order.id),
-      }));
+            : prev.coupons,
+          customers: options.customerId
+            ? prev.customers.map((c) =>
+                c.id === options.customerId
+                  ? {
+                      ...c,
+                      points: c.points + pointsEarned,
+                      visits: c.visits + 1,
+                    }
+                  : c,
+              )
+            : prev.customers,
+          cash: {
+            ...prev.cash,
+            expected_cash:
+              prev.cash.expected_cash + (payment === "efectivo" ? total : 0),
+          },
+          audits: pushAudit(
+            prev.audits,
+            user,
+            "create_order",
+            "ordenes",
+            order.id,
+          ),
+        };
+      });
       setCart([]);
       return { ok: true, message: `Orden ${order.numero} creada`, order };
     },
-    [cart, store.cash.closed_at, store.insumos, store.orderSeq, store.orders, sucursalId, user],
+    [
+      cart,
+      previewDiscount,
+      store.cash.closed_at,
+      store.insumos,
+      store.orderSeq,
+      store.orders,
+      store.products,
+      sucursalId,
+      user,
+    ],
   );
 
   const updateOrderStatus = useCallback(
@@ -391,7 +552,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             ? { ...o, status, updated_at: new Date().toISOString() }
             : o,
         ),
-        audits: pushAudit(prev.audits, user, `status_${status}`, "ordenes", orderId),
+        audits: pushAudit(
+          prev.audits,
+          user,
+          `status_${status}`,
+          "ordenes",
+          orderId,
+        ),
       }));
     },
     [user],
@@ -406,10 +573,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     ) => {
       if (!user) return { ok: false, message: "Sin sesión" };
       if (cantidad <= 0) return { ok: false, message: "Cantidad inválida" };
-
       const delta =
         tipo === "entrada" ? cantidad : tipo === "ajuste" ? cantidad : -cantidad;
-
       setStore((prev) => {
         const insumos = prev.insumos.map((i) => {
           if (i.id !== insumoId) return i;
@@ -432,7 +597,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ...prev,
           insumos,
           movements: [movement, ...prev.movements],
-          audits: pushAudit(prev.audits, user, `inventory_${tipo}`, "insumos", insumoId),
+          audits: pushAudit(
+            prev.audits,
+            user,
+            `inventory_${tipo}`,
+            "insumos",
+            insumoId,
+          ),
         };
       });
       return { ok: true, message: "Movimiento registrado" };
@@ -443,7 +614,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const closeCash = useCallback(
     (closingAmount: number, notes: string) => {
       if (!user) return { ok: false, message: "Sin sesión" };
-      if (store.cash.closed_at) return { ok: false, message: "La caja ya está cerrada" };
+      if (store.cash.closed_at) {
+        return { ok: false, message: "La caja ya está cerrada" };
+      }
       setStore((prev) => ({
         ...prev,
         cash: {
@@ -452,7 +625,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           closing_amount: closingAmount,
           notes: notes || null,
         },
-        audits: pushAudit(prev.audits, user, "close_cash", "cash_session", prev.cash.id),
+        audits: pushAudit(
+          prev.audits,
+          user,
+          "close_cash",
+          "cash_session",
+          prev.cash.id,
+        ),
       }));
       return { ok: true, message: "Caja cerrada" };
     },
@@ -508,7 +687,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         ...prev,
         purchaseSeq: prev.purchaseSeq + 1,
         purchases: [purchase, ...prev.purchases],
-        audits: pushAudit(prev.audits, user, "create_purchase", "compras", purchase.id),
+        audits: pushAudit(
+          prev.audits,
+          user,
+          "create_purchase",
+          "compras",
+          purchase.id,
+        ),
       }));
       return { ok: true, message: `Orden ${purchase.numero} creada` };
     },
@@ -521,10 +706,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       setStore((prev) => {
         const purchase = prev.purchases.find((p) => p.id === purchaseId);
         if (!purchase) return prev;
-
         let insumos = prev.insumos;
         let movements = prev.movements;
-
         if (status === "recibida" && purchase.status !== "recibida") {
           const now = new Date().toISOString();
           insumos = prev.insumos.map((insumo) => {
@@ -550,7 +733,6 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             ...prev.movements,
           ];
         }
-
         return {
           ...prev,
           insumos,
@@ -572,11 +754,202 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
+  const upsertProduct = useCallback(
+    (product: Product) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      setStore((prev) => {
+        const exists = prev.products.some((p) => p.id === product.id);
+        return {
+          ...prev,
+          products: exists
+            ? prev.products.map((p) => (p.id === product.id ? product : p))
+            : [product, ...prev.products],
+          audits: pushAudit(
+            prev.audits,
+            user,
+            exists ? "update_product" : "create_product",
+            "productos",
+            product.id,
+          ),
+        };
+      });
+      return { ok: true, message: "Producto guardado" };
+    },
+    [user],
+  );
+
+  const toggleProductActive = useCallback(
+    (productId: string) => {
+      if (!user) return;
+      setStore((prev) => ({
+        ...prev,
+        products: prev.products.map((p) =>
+          p.id === productId ? { ...p, active: !p.active } : p,
+        ),
+        audits: pushAudit(
+          prev.audits,
+          user,
+          "toggle_product",
+          "productos",
+          productId,
+        ),
+      }));
+    },
+    [user],
+  );
+
+  const clockIn = useCallback(
+    (employeeId?: string) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      const target = employeeId ?? user.id;
+      const open = store.attendance.find(
+        (a) => a.employee_id === target && !a.clock_out,
+      );
+      if (open) return { ok: false, message: "Ya tiene un fichaje abierto" };
+      const punch: AttendancePunch = {
+        id: `att-${Date.now()}`,
+        employee_id: target,
+        sucursal_id: sucursalId,
+        clock_in: new Date().toISOString(),
+        clock_out: null,
+      };
+      setStore((prev) => ({
+        ...prev,
+        attendance: [punch, ...prev.attendance],
+        audits: pushAudit(prev.audits, user, "clock_in", "asistencia", punch.id),
+      }));
+      return { ok: true, message: "Entrada registrada" };
+    },
+    [store.attendance, sucursalId, user],
+  );
+
+  const clockOut = useCallback(
+    (employeeId?: string) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      const target = employeeId ?? user.id;
+      const open = store.attendance.find(
+        (a) => a.employee_id === target && !a.clock_out,
+      );
+      if (!open) return { ok: false, message: "No hay fichaje abierto" };
+      setStore((prev) => ({
+        ...prev,
+        attendance: prev.attendance.map((a) =>
+          a.id === open.id
+            ? { ...a, clock_out: new Date().toISOString() }
+            : a,
+        ),
+        audits: pushAudit(prev.audits, user, "clock_out", "asistencia", open.id),
+      }));
+      return { ok: true, message: "Salida registrada" };
+    },
+    [store.attendance, user],
+  );
+
+  const addShift = useCallback(
+    (input: {
+      employee_id: string;
+      date: string;
+      start: string;
+      end: string;
+      tipo: ShiftType;
+      role: Role;
+    }) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      const shift: Shift = {
+        id: `sh-${Date.now()}`,
+        employee_id: input.employee_id,
+        sucursal_id: sucursalId,
+        date: input.date,
+        start: input.start,
+        end: input.end,
+        tipo: input.tipo,
+        role: input.role,
+      };
+      setStore((prev) => ({
+        ...prev,
+        shifts: [shift, ...prev.shifts],
+        audits: pushAudit(prev.audits, user, "add_shift", "turnos", shift.id),
+      }));
+      return { ok: true, message: "Turno programado" };
+    },
+    [sucursalId, user],
+  );
+
+  const upsertCustomer = useCallback(
+    (input: { id?: string; name: string; phone: string; email: string }) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      const id = input.id ?? `cus-${Date.now()}`;
+      setStore((prev) => {
+        const exists = prev.customers.some((c) => c.id === id);
+        const customer: Customer = exists
+          ? {
+              ...prev.customers.find((c) => c.id === id)!,
+              name: input.name,
+              phone: input.phone,
+              email: input.email,
+            }
+          : {
+              id,
+              name: input.name,
+              phone: input.phone,
+              email: input.email,
+              points: 0,
+              visits: 0,
+              created_at: new Date().toISOString(),
+            };
+        return {
+          ...prev,
+          customers: exists
+            ? prev.customers.map((c) => (c.id === id ? customer : c))
+            : [customer, ...prev.customers],
+          audits: pushAudit(
+            prev.audits,
+            user,
+            exists ? "update_customer" : "create_customer",
+            "clientes",
+            id,
+          ),
+        };
+      });
+      return { ok: true, message: "Cliente guardado" };
+    },
+    [user],
+  );
+
+  const upsertCoupon = useCallback(
+    (coupon: Omit<Coupon, "id" | "uses"> & { id?: string }) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      const id = coupon.id ?? `cp-${Date.now()}`;
+      setStore((prev) => {
+        const exists = prev.coupons.some((c) => c.id === id);
+        const next: Coupon = {
+          id,
+          code: coupon.code.toUpperCase(),
+          type: coupon.type,
+          value: coupon.value,
+          active: coupon.active,
+          min_ticket: coupon.min_ticket,
+          uses: exists ? prev.coupons.find((c) => c.id === id)!.uses : 0,
+          max_uses: coupon.max_uses,
+        };
+        return {
+          ...prev,
+          coupons: exists
+            ? prev.coupons.map((c) => (c.id === id ? next : c))
+            : [next, ...prev.coupons],
+          audits: pushAudit(
+            prev.audits,
+            user,
+            exists ? "update_coupon" : "create_coupon",
+            "cupones",
+            id,
+          ),
+        };
+      });
+      return { ok: true, message: "Cupón guardado" };
+    },
+    [user],
+  );
 
   const alerts = useMemo(() => {
     const critical = store.insumos
@@ -600,6 +973,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       user,
       sucursalId,
       cart,
+      products: store.products ?? DEMO_PRODUCTS,
       insumos: store.insumos,
       orders: store.orders,
       movements: store.movements,
@@ -607,10 +981,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       audits: store.audits,
       purchases: store.purchases ?? [],
       mesas: store.mesas ?? DEMO_MESAS,
+      shifts: store.shifts ?? [],
+      attendance: store.attendance ?? [],
+      customers: store.customers ?? DEMO_CUSTOMERS,
+      coupons: store.coupons ?? DEMO_COUPONS,
       proveedores: DEMO_PROVEEDORES,
       alerts,
       lastTicket: store.lastTicket ?? null,
-      products: DEMO_PRODUCTS,
       categories: DEMO_CATEGORIES,
       recetas: DEMO_RECETAS,
       recetaIngredientes: DEMO_RECETA_INGREDIENTES,
@@ -631,6 +1008,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       openCash,
       createPurchase,
       updatePurchaseStatus,
+      upsertProduct,
+      toggleProductActive,
+      clockIn,
+      clockOut,
+      addShift,
+      upsertCustomer,
+      upsertCoupon,
+      previewDiscount,
       recipeCost,
     }),
     [
@@ -654,6 +1039,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       openCash,
       createPurchase,
       updatePurchaseStatus,
+      upsertProduct,
+      toggleProductActive,
+      clockIn,
+      clockOut,
+      addShift,
+      upsertCustomer,
+      upsertCoupon,
+      previewDiscount,
     ],
   );
 

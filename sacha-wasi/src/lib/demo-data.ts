@@ -442,6 +442,10 @@ export function createInitialOrders(): Order[] {
       status: "en_preparacion",
       payment_method: "efectivo",
       total: 40.5,
+      subtotal: 40.5,
+      discount: 0,
+      coupon_code: null,
+      customer_id: "cus-1",
       items: [
         {
           id: "oi-1",
@@ -476,6 +480,10 @@ export function createInitialOrders(): Order[] {
       status: "recibido",
       payment_method: "tarjeta",
       total: 32,
+      subtotal: 32,
+      discount: 0,
+      coupon_code: null,
+      customer_id: null,
       items: [
         {
           id: "oi-3",
@@ -501,6 +509,10 @@ export function createInitialOrders(): Order[] {
       status: "listo",
       payment_method: "wallet",
       total: 36,
+      subtotal: 36,
+      discount: 0,
+      coupon_code: null,
+      customer_id: "cus-2",
       items: [
         {
           id: "oi-4",
@@ -665,3 +677,126 @@ export function createInitialPurchases() {
     },
   ];
 }
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function createInitialShifts() {
+  const day = todayISO();
+  return [
+    {
+      id: "sh-1",
+      employee_id: "usr-caja",
+      sucursal_id: "suc-centro",
+      date: day,
+      start: "08:00",
+      end: "16:00",
+      tipo: "apertura" as const,
+      role: "caja" as const,
+    },
+    {
+      id: "sh-2",
+      employee_id: "usr-cocina",
+      sucursal_id: "suc-centro",
+      date: day,
+      start: "09:00",
+      end: "17:00",
+      tipo: "intermedio" as const,
+      role: "cocina" as const,
+    },
+    {
+      id: "sh-3",
+      employee_id: "usr-inv",
+      sucursal_id: "suc-centro",
+      date: day,
+      start: "07:00",
+      end: "15:00",
+      tipo: "apertura" as const,
+      role: "inventario" as const,
+    },
+    {
+      id: "sh-4",
+      employee_id: "usr-super",
+      sucursal_id: "suc-norte",
+      date: day,
+      start: "10:00",
+      end: "18:00",
+      tipo: "intermedio" as const,
+      role: "supervisor" as const,
+    },
+  ];
+}
+
+export function createInitialAttendance() {
+  return [
+    {
+      id: "att-1",
+      employee_id: "usr-caja",
+      sucursal_id: "suc-centro",
+      clock_in: minutesAgo(240),
+      clock_out: null,
+    },
+    {
+      id: "att-2",
+      employee_id: "usr-cocina",
+      sucursal_id: "suc-centro",
+      clock_in: minutesAgo(200),
+      clock_out: null,
+    },
+  ];
+}
+
+export const DEMO_CUSTOMERS = [
+  {
+    id: "cus-1",
+    name: "Rosa Panduro",
+    phone: "965100200",
+    email: "rosa@correo.pe",
+    points: 120,
+    visits: 8,
+    created_at: minutesAgo(20000),
+  },
+  {
+    id: "cus-2",
+    name: "Diego Tapullima",
+    phone: "965300400",
+    email: "diego@correo.pe",
+    points: 45,
+    visits: 3,
+    created_at: minutesAgo(8000),
+  },
+];
+
+export const DEMO_COUPONS = [
+  {
+    id: "cp-1",
+    code: "SELVA10",
+    type: "percent" as const,
+    value: 10,
+    active: true,
+    min_ticket: 20,
+    uses: 4,
+    max_uses: 100,
+  },
+  {
+    id: "cp-2",
+    code: "JUANE5",
+    type: "fixed" as const,
+    value: 5,
+    active: true,
+    min_ticket: 15,
+    uses: 1,
+    max_uses: 50,
+  },
+  {
+    id: "cp-3",
+    code: "VIP20",
+    type: "percent" as const,
+    value: 20,
+    active: false,
+    min_ticket: 40,
+    uses: 0,
+    max_uses: 20,
+  },
+];

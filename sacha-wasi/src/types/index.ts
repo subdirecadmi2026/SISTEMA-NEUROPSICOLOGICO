@@ -101,6 +101,10 @@ export interface Order {
   status: OrderStatus;
   payment_method: PaymentMethod;
   total: number;
+  subtotal: number;
+  discount: number;
+  coupon_code: string | null;
+  customer_id: string | null;
   items: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -189,4 +193,48 @@ export interface Mesa {
   label: string;
   seats: number;
   status: "libre" | "ocupada";
+}
+
+export type ShiftType = "apertura" | "intermedio" | "cierre";
+
+export interface Shift {
+  id: string;
+  employee_id: string;
+  sucursal_id: string;
+  date: string;
+  start: string;
+  end: string;
+  tipo: ShiftType;
+  role: Role;
+}
+
+export interface AttendancePunch {
+  id: string;
+  employee_id: string;
+  sucursal_id: string;
+  clock_in: string;
+  clock_out: string | null;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  points: number;
+  visits: number;
+  created_at: string;
+}
+
+export type CouponType = "percent" | "fixed";
+
+export interface Coupon {
+  id: string;
+  code: string;
+  type: CouponType;
+  value: number;
+  active: boolean;
+  min_ticket: number;
+  uses: number;
+  max_uses: number | null;
 }

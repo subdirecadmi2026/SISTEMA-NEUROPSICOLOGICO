@@ -64,6 +64,16 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "supervisor", "caja"],
   },
   {
+    href: "/rrhh",
+    label: "RRHH",
+    roles: ["admin", "supervisor", "caja", "cocina", "inventario"],
+  },
+  {
+    href: "/fidelizacion",
+    label: "Fidelización",
+    roles: ["admin", "supervisor", "caja"],
+  },
+  {
     href: "/reportes",
     label: "Reportes",
     roles: ["admin", "supervisor"],

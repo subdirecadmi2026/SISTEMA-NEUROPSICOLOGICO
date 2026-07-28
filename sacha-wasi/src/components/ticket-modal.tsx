@@ -22,6 +22,7 @@ export function TicketModal({
           <p className="text-xs text-[var(--sw-muted)]">
             {formatDateTime(order.created_at)} · {order.channel} ·{" "}
             {order.payment_method}
+            {order.coupon_code ? ` · cupón ${order.coupon_code}` : ""}
           </p>
         </div>
 
@@ -35,6 +36,13 @@ export function TicketModal({
             </li>
           ))}
         </ul>
+
+        {(order.discount ?? 0) > 0 ? (
+          <div className="mt-3 flex justify-between text-sm text-[var(--sw-chili)]">
+            <span>Descuento</span>
+            <span>-{formatMoney(order.discount)}</span>
+          </div>
+        ) : null}
 
         <div className="mt-4 flex items-center justify-between">
           <span className="text-sm text-[var(--sw-muted)]">Total</span>

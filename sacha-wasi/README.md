@@ -37,12 +37,15 @@ Abre [http://localhost:3000](http://localhost:3000) e inicia sesión:
 
 ## MVP incluido
 
-- **POS**: pedidos, canales, pagos, notas; descuenta inventario por receta
+- **POS**: pedidos, canales, mesas, cupones, clientes, ticket imprimible
 - **KDS**: columnas recibido / preparación / listo con alertas de demora
 - **Recetas**: escandallo, costo y margen por plato
 - **Inventario**: stock, lotes, mermas, alertas de mínimo
+- **Compras**: proveedores, recepción e ingreso de stock
+- **RRHH**: turnos y fichaje entrada/salida
+- **Fidelización**: clientes, puntos y cupones
 - **Caja**: apertura, esperado, cierre y discrepancia
-- **Reportes**: KPIs + export CSV
+- **Reportes**: KPIs + export CSV + consolidado admin
 - **Usuarios / RBAC + auditoría** de acciones
 - Schema SQL con **RLS** y función atómica `create_order_with_inventory`
 

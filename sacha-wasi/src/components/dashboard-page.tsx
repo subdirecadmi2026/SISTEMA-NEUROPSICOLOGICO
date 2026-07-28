@@ -6,7 +6,17 @@ import { formatMoney } from "@/lib/currency";
 import { useDemo } from "@/lib/demo-store";
 
 export function DashboardPage() {
-  const { orders, insumos, cash, sucursalId, products, user } = useDemo();
+  const {
+    orders,
+    insumos,
+    cash,
+    sucursalId,
+    products,
+    user,
+    sucursales,
+    customers,
+    attendance,
+  } = useDemo();
 
   const scopedOrders = orders.filter((o) => o.sucursal_id === sucursalId);
   const sales = scopedOrders.reduce((s, o) => s + o.total, 0);
@@ -17,6 +27,9 @@ export function DashboardPage() {
   const critical = insumos.filter(
     (i) => i.sucursal_id === sucursalId && i.stock <= i.min_stock,
   );
+  const onShift = attendance.filter(
+    (a) => a.sucursal_id === sucursalId && !a.clock_out,
+  ).length;
 
   const kpis = [
     { label: "Ventas del día", value: formatMoney(sales) },
@@ -24,6 +37,20 @@ export function DashboardPage() {
     { label: "Órdenes en cocina", value: String(kitchenActive) },
     { label: "Stock crítico", value: String(critical.length) },
   ];
+
+  const consolidated =
+    user?.role === "admin"
+      ? sucursales.map((suc) => {
+          const list = orders.filter((o) => o.sucursal_id === suc.id);
+          const total = list.reduce((s, o) => s + o.total, 0);
+          return {
+            id: suc.id,
+            name: suc.name,
+            orders: list.length,
+            sales: total,
+          };
+        })
+      : [];
 
   const shortcuts =
     user?.role === "cocina"
@@ -36,14 +63,15 @@ export function DashboardPage() {
         : [
             { href: "/pos", label: "POS" },
             { href: "/kds", label: "KDS" },
-            { href: "/recetas", label: "Recetas" },
+            { href: "/rrhh", label: "RRHH" },
+            { href: "/fidelizacion", label: "Fidelización" },
             { href: "/reportes", label: "Reportes" },
           ];
 
   return (
     <AppShell
       title={`Hola, ${user?.full_name.split(" ")[0] ?? ""}`}
-      subtitle="Panel operativo de Sacha Wasi. KPIs de la sucursal activa y accesos rápidos."
+      subtitle="Panel operativo de Sacha Wasi. KPIs de la sucursal activa y vista consolidada."
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi, idx) => (
@@ -61,6 +89,31 @@ export function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {consolidated.length > 0 ? (
+        <section className="mt-5 rounded-3xl border border-[var(--sw-line)] bg-[var(--sw-panel)]/90 p-5">
+          <h2 className="font-[family-name:var(--font-display)] text-2xl">
+            Consolidado multi‑sucursal
+          </h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {consolidated.map((row) => (
+              <div
+                key={row.id}
+                className={`rounded-2xl border px-4 py-3 ${
+                  row.id === sucursalId
+                    ? "border-[var(--sw-forest)] bg-white"
+                    : "border-[var(--sw-line)] bg-white/70"
+                }`}
+              >
+                <p className="font-medium">{row.name}</p>
+                <p className="text-sm text-[var(--sw-muted)]">
+                  {row.orders} órdenes · {formatMoney(row.sales)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="rounded-3xl border border-[var(--sw-line)] bg-[var(--sw-panel)]/90 p-6">
@@ -91,6 +144,7 @@ export function DashboardPage() {
                 >
                   <span>
                     {order.numero} · {order.status.replaceAll("_", " ")}
+                    {order.discount > 0 ? " · c/desc" : ""}
                   </span>
                   <span className="font-medium">{formatMoney(order.total)}</span>
                 </li>
@@ -107,6 +161,10 @@ export function DashboardPage() {
             <li className="rounded-xl border border-[var(--sw-line)] px-3 py-3">
               Caja {cash.closed_at ? "cerrada" : "abierta"} · esperado{" "}
               {formatMoney(cash.expected_cash)}
+            </li>
+            <li className="rounded-xl border border-[var(--sw-line)] px-3 py-3">
+              Personal en turno: {onShift} · Clientes fidelizados:{" "}
+              {customers.length}
             </li>
             {critical.length === 0 ? (
               <li className="rounded-xl border border-[var(--sw-line)] px-3 py-3">

@@ -26,6 +26,14 @@ const MODULES = [
     body: "Órdenes a proveedores. Al recibir, el stock se actualiza solo.",
   },
   {
+    title: "RRHH",
+    body: "Turnos programados y fichaje de entrada/salida.",
+  },
+  {
+    title: "Fidelización",
+    body: "Clientes, puntos por compra y cupones aplicables en el POS.",
+  },
+  {
     title: "Caja",
     body: "Apertura, ventas en efectivo esperadas, cierre y discrepancia.",
   },
