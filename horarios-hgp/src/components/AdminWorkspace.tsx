@@ -302,7 +302,14 @@ export function AdminWorkspace({
 
       {tab === 'resumen' && (
         <section className="space-y-4">
-          <AdminSupabaseSync onFlash={onFlash} onNotify={onNotify} />
+          <AdminSupabaseSync
+            onFlash={onFlash}
+            onNotify={onNotify}
+            onSynced={() => {
+              refreshUsers()
+              onRefresh()
+            }}
+          />
           <div>
             <h2 className="font-display text-lg text-navy">Horarios</h2>
             <p className="text-xs text-muted">

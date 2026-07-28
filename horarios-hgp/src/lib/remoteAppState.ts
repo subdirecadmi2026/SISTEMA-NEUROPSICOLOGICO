@@ -306,26 +306,46 @@ export async function pullUsersRemote(local: UsersRemoteBlob): Promise<{
         continue
       }
       if (user.source === 'demo') {
+        const prev = overrides[user.id] ?? {}
         overrides[user.id] = {
-          ...overrides[user.id],
+          ...prev,
           email: user.email,
           name: user.name,
           role: user.role,
           serviceUnits: user.serviceUnits,
-          password: user.password,
+          // No borrar clave local si el remoto no trae password
+          password: user.password || prev.password,
           active: user.active,
           updatedAt: user.updatedAt,
-          createdAt: user.createdAt,
+          createdAt: user.createdAt ?? prev.createdAt,
           source: 'demo',
           id: user.id,
         }
       } else {
-        custom.push(user)
+        const prevLocal = local.custom.find((c) => c.id === user.id)
+        custom.push({
+          ...user,
+          password: user.password || prevLocal?.password,
+        })
       }
     }
-    const byId = new Map(custom.map((u) => [u.id, u]))
+    const byId = new Map<string, ManagedUser>()
+    for (const u of custom) byId.set(u.id, u)
     for (const u of local.custom) {
-      if (!byId.has(u.id)) byId.set(u.id, u)
+      const remoteU = byId.get(u.id)
+      if (!remoteU) {
+        byId.set(u.id, u)
+        continue
+      }
+      // Conservar password local si remoto no lo trae; ganar por updatedAt
+      const merged: ManagedUser = {
+        ...(remoteU.updatedAt >= u.updatedAt ? remoteU : u),
+        password:
+          (remoteU.updatedAt >= u.updatedAt
+            ? remoteU.password || u.password
+            : u.password || remoteU.password) || undefined,
+      }
+      byId.set(u.id, merged)
     }
     return {
       items: {
@@ -383,7 +403,7 @@ export async function pushUsersRemote(
       name: u.name,
       role: u.role,
       service_units: u.serviceUnits,
-      password: u.password ?? null,
+      ...(u.password ? { password: u.password } : {}),
       active: u.active !== false,
       source: 'custom',
       deleted_demo: false,
@@ -398,7 +418,7 @@ export async function pushUsersRemote(
       name: ov.name ?? id,
       role: ov.role ?? 'lider_servicio',
       service_units: ov.serviceUnits ?? [],
-      password: ov.password ?? null,
+      ...(ov.password ? { password: ov.password } : {}),
       active: ov.active !== false,
       source: 'demo',
       deleted_demo: blob.deletedDemo.includes(id),
@@ -724,14 +744,16 @@ export async function probeAppConfigRemote(): Promise<AppConfigSyncStatus> {
     table: string,
     bundleId: string,
   ): Promise<'table' | 'bundle' | 'local'> {
-    const t = await sb!.from(table).select('*', { count: 'exact', head: true })
+    const t = await sb!.from(table).select('id', { count: 'exact', head: true })
     if (!t.error) return 'table'
+    if (!isMissingTableError(t.error)) return 'local'
     const b = await sb!
       .from('schedules')
       .select('id')
       .eq('id', bundleId)
       .maybeSingle()
-    return b.data ? 'bundle' : 'bundle'
+    // Sin tabla dedicada siempre usamos bundle (se crea al primer push)
+    return b.error ? 'local' : 'bundle'
   }
 
   try {

@@ -73,6 +73,8 @@ export async function persistSchedule(
       .eq('unit_name', working.unitName)
       .eq('year', working.year)
       .eq('month', working.month)
+      .not('unit_name', 'like', '__SYSTEM__/%')
+      .not('id', 'like', 'sys-hgp-%')
       .maybeSingle()
 
     if (existing?.id && existing.id !== working.id) {
@@ -258,16 +260,12 @@ export async function listRemoteSchedules(): Promise<SavedIndexItem[]> {
     .select(
       'id, service_type, unit_name, month, year, status, updated_at, payload',
     )
+    .not('unit_name', 'like', '__SYSTEM__/%')
+    .not('id', 'like', 'sys-hgp-%')
     .order('updated_at', { ascending: false })
-    .limit(120)
+    .limit(300)
   if (error) throw new Error(error.message)
-  return (data ?? [])
-    .filter((r) => {
-      const unit = String(r.unit_name ?? '')
-      const id = String(r.id ?? '')
-      return !unit.startsWith('__SYSTEM__/') && !id.startsWith('sys-hgp-')
-    })
-    .map((r) => {
+  return (data ?? []).map((r) => {
       if (r.payload && typeof r.payload === 'object') {
         return toIndexItem(migratePayload(r.payload as ScheduleDoc))
       }

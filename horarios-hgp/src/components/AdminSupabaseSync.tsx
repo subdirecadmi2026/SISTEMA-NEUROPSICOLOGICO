@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
-  probeRemoteCatalog,
   syncCatalogsFromRemote,
   type RemoteCatalogStatus,
 } from '../lib/remoteCatalog'
 import {
-  probeAppConfigRemote,
-  type AppConfigSyncStatus,
-} from '../lib/remoteAppState'
+  checkDbHealth,
+  modeLabel,
+  type DbHealthReport,
+} from '../lib/dbHealth'
 import { readLeavesLocal, replaceLeavesLocal } from '../lib/leavesStore'
 import {
   readNotificationsLocal,
@@ -18,6 +18,7 @@ import { isRemoteEnabled } from '../lib/api'
 type Props = {
   onFlash: (msg: string) => void
   onNotify?: () => void
+  onSynced?: () => void
 }
 
 const SQL_HINT = `supabase/migrations/20260724210000_full_app_sync.sql`
@@ -25,20 +26,16 @@ const SQL_HINT = `supabase/migrations/20260724210000_full_app_sync.sql`
 /**
  * Estado de sincronización Supabase para todo el sistema HGP.
  */
-export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
-  const [status, setStatus] = useState<RemoteCatalogStatus | null>(null)
-  const [appStatus, setAppStatus] = useState<AppConfigSyncStatus | null>(null)
+export function AdminSupabaseSync({ onFlash, onNotify, onSynced }: Props) {
+  const [catalog, setCatalog] = useState<RemoteCatalogStatus | null>(null)
+  const [health, setHealth] = useState<DbHealthReport | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function refresh() {
     setBusy(true)
     try {
-      const [s, a] = await Promise.all([
-        probeRemoteCatalog(),
-        probeAppConfigRemote(),
-      ])
-      setStatus(s)
-      setAppStatus(a)
+      const h = await checkDbHealth()
+      setHealth(h)
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'No se pudo consultar Supabase')
     } finally {
@@ -55,13 +52,15 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
         getLocalNotifications: readNotificationsLocal,
         setLocalNotifications: replaceNotificationsLocal,
       })
-      setStatus(s)
-      setAppStatus(s.appConfig ?? (await probeAppConfigRemote()))
+      setCatalog(s)
+      const h = await checkDbHealth()
+      setHealth(h)
       onNotify?.()
+      onSynced?.()
       onFlash(
-        s.configured
-          ? `Sync OK · horarios/personal/permisos/avisos + usuarios/unidades/firmas/claves/feriados`
-          : 'Supabase no configurado · solo local',
+        h.reachable
+          ? `Sync OK · ${h.message}`
+          : 'Supabase no alcanzable · datos locales activos',
       )
     } catch (e) {
       onFlash(e instanceof Error ? e.message : 'Error al sincronizar')
@@ -76,13 +75,10 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
 
   const remote = isRemoteEnabled()
   const usingBundle =
-    status?.staffLibraryMode === 'bundle' ||
-    status?.leavesMode === 'bundle' ||
-    status?.notificationsMode === 'bundle' ||
-    appStatus?.usersMode === 'bundle' ||
-    appStatus?.signersMode === 'bundle' ||
-    appStatus?.shiftsMode === 'bundle' ||
-    appStatus?.holidaysMode === 'bundle'
+    health &&
+    [health.leaves, health.notifications, health.users, health.signers, health.shifts, health.holidays].some(
+      (m) => m === 'bundle',
+    )
 
   return (
     <section className="rounded-2xl border border-line bg-white p-4 shadow-sm">
@@ -92,12 +88,11 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
             Supabase
           </p>
           <h2 className="font-display text-lg text-navy">
-            Conexión completa a la base de datos
+            Conexión a la base de datos
           </h2>
           <p className="mt-1 text-xs text-muted">
             Horarios, personal, permisos, avisos, usuarios, unidades, firmas,
-            claves y feriados se sincronizan con Supabase (tabla dedicada o
-            bundle de respaldo).
+            claves y feriados. Si falta una tabla, se usa bundle de respaldo.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -107,7 +102,7 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
             onClick={() => void refresh()}
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
           >
-            Consultar
+            Diagnosticar
           </button>
           <button
             type="button"
@@ -120,43 +115,64 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div
+        className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
+          health?.reachable
+            ? 'border-teal/30 bg-teal/5 text-navy'
+            : remote
+              ? 'border-amber-200 bg-amber-50 text-amber-950'
+              : 'border-line bg-sand/30 text-muted'
+        }`}
+      >
+        <strong>
+          {health?.reachable
+            ? '● En línea'
+            : remote
+              ? '○ Configurado sin respuesta'
+              : '○ Solo local'}
+        </strong>
+        {health ? ` · ${health.message}` : ' · consultando…'}
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {[
           {
-            label: 'Estado',
-            value: remote ? 'Conectado' : 'Solo local',
-          },
-          {
-            label: 'Personal',
-            value: `${status?.staffLibraryMode ?? '…'}${status ? ` · ${status.staffLibraryCount}` : ''}`,
-          },
-          {
-            label: 'Permisos',
-            value: `${status?.leavesMode ?? '…'}${status ? ` · ${status.leavesCount}` : ''}`,
-          },
-          {
-            label: 'Avisos',
-            value: `${status?.notificationsMode ?? '…'}${status ? ` · ${status.notificationsCount}` : ''}`,
+            label: 'Horarios',
+            value: health?.schedulesOk ? 'tabla OK' : '—',
           },
           {
             label: 'Unidades',
-            value: `${appStatus?.unitsMode ?? '…'}${appStatus ? ` · ${appStatus.unitsCount}` : ''}`,
+            value: health?.servicesOk ? 'tabla OK' : '—',
+          },
+          {
+            label: 'Personal',
+            value: health?.staffLibraryOk
+              ? `tabla${catalog ? ` · ${catalog.staffLibraryCount}` : ''}`
+              : '—',
+          },
+          {
+            label: 'Permisos',
+            value: `${modeLabel(health?.leaves ?? 'local')}${catalog ? ` · ${catalog.leavesCount}` : ''}`,
+          },
+          {
+            label: 'Avisos',
+            value: `${modeLabel(health?.notifications ?? 'local')}${catalog ? ` · ${catalog.notificationsCount}` : ''}`,
           },
           {
             label: 'Usuarios',
-            value: `${appStatus?.usersMode ?? '…'}${appStatus ? ` · ${appStatus.usersCount}` : ''}`,
+            value: modeLabel(health?.users ?? 'local'),
           },
           {
             label: 'Firmas',
-            value: `${appStatus?.signersMode ?? '…'}${appStatus ? ` · ${appStatus.signersCount}` : ''}`,
+            value: modeLabel(health?.signers ?? 'local'),
           },
           {
             label: 'Claves',
-            value: `${appStatus?.shiftsMode ?? '…'}${appStatus ? ` · ${appStatus.shiftsCount}` : ''}`,
+            value: modeLabel(health?.shifts ?? 'local'),
           },
           {
             label: 'Feriados',
-            value: `${appStatus?.holidaysMode ?? '…'}${appStatus ? ` · ${appStatus.holidaysCount}` : ''}`,
+            value: modeLabel(health?.holidays ?? 'local'),
           },
         ].map((k) => (
           <div
@@ -172,18 +188,30 @@ export function AdminSupabaseSync({ onFlash, onNotify }: Props) {
       </div>
 
       {usingBundle ? (
-        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-          Algunas piezas usan <strong>bundle</strong> de respaldo en{' '}
-          <code className="font-mono">schedules</code> (ya sincroniza entre
-          navegadores). Para tablas dedicadas ejecute en el SQL Editor:{' '}
-          <code className="font-mono">{SQL_HINT}</code>
-        </p>
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <p>
+            Algunos catálogos usan <strong>bundle</strong> en{' '}
+            <code className="font-mono">schedules</code> (ya sincroniza entre
+            equipos). Para tablas dedicadas ejecute en SQL Editor de Supabase:
+          </p>
+          <code className="mt-1 block break-all font-mono text-[11px]">
+            {SQL_HINT}
+          </code>
+          <button
+            type="button"
+            className="mt-2 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold"
+            onClick={() => {
+              void navigator.clipboard?.writeText(SQL_HINT)
+              onFlash('Ruta de migración copiada')
+            }}
+          >
+            Copiar ruta SQL
+          </button>
+        </div>
       ) : null}
 
-      {status?.lastError || appStatus?.lastError ? (
-        <p className="mt-2 text-xs text-rose-800">
-          {status?.lastError || appStatus?.lastError}
-        </p>
+      {catalog?.lastError ? (
+        <p className="mt-2 text-xs text-rose-800">{catalog.lastError}</p>
       ) : null}
     </section>
   )

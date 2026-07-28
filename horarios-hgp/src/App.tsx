@@ -129,6 +129,10 @@ export default function App() {
   const [focusDay, setFocusDay] = useState<number | null>(null)
   const [jumpDay, setJumpDay] = useState(1)
   const [notifyTick, setNotifyTick] = useState(0)
+  const [dbLabel, setDbLabel] = useState(() =>
+    isRemoteEnabled() ? 'Supabase…' : 'Local',
+  )
+  const [catalogSyncing, setCatalogSyncing] = useState(false)
   /** Módulo del líder: elaborar horario o ver flujo/archivo por mes. */
   const [liderVista, setLiderVista] = useState<'elaborar' | 'flujo'>('flujo')
   const docRefApp = useRef(doc)
@@ -136,6 +140,42 @@ export default function App() {
 
   function bumpNotifications() {
     setNotifyTick((n) => n + 1)
+  }
+
+  async function runCatalogSync(opts?: { quiet?: boolean }) {
+    if (!isRemoteEnabled()) {
+      setDbLabel('Local')
+      return
+    }
+    setCatalogSyncing(true)
+    try {
+      const { checkDbHealth } = await import('./lib/dbHealth')
+      const health = await checkDbHealth()
+      setDbLabel(
+        health.reachable
+          ? health.message.includes('bundle')
+            ? 'Supabase · bundle'
+            : 'Supabase'
+          : 'Supabase · sin red',
+      )
+      await syncCatalogsFromRemote({
+        getLocalLeaves: readLeavesLocal,
+        setLocalLeaves: replaceLeavesLocal,
+        getLocalNotifications: readNotificationsLocal,
+        setLocalNotifications: (items) => {
+          replaceNotificationsLocal(items)
+          bumpNotifications()
+        },
+      })
+      bumpNotifications()
+      if (!opts?.quiet) {
+        /* flash solo si se pide explícito desde UI */
+      }
+    } catch {
+      setDbLabel('Supabase · error')
+    } finally {
+      setCatalogSyncing(false)
+    }
   }
 
   function pickCode(code: string) {
@@ -187,18 +227,21 @@ export default function App() {
       void seedServicesIfEmpty().catch(() => {
         /* silencioso: no bloquear UI */
       })
-      void syncCatalogsFromRemote({
-        getLocalLeaves: readLeavesLocal,
-        setLocalLeaves: replaceLeavesLocal,
-        getLocalNotifications: readNotificationsLocal,
-        setLocalNotifications: (items) => {
-          replaceNotificationsLocal(items)
-          bumpNotifications()
-        },
-      }).catch(() => {
-        /* silencioso: local sigue operativo */
-      })
+      void runCatalogSync({ quiet: true })
+    } else {
+      setDbLabel('Local')
     }
+  }, [])
+
+  // Re-sync al volver a la pestaña (otros equipos pueden haber cambiado datos)
+  useEffect(() => {
+    function onFocus() {
+      if (!isRemoteEnabled()) return
+      void runCatalogSync({ quiet: true })
+      void refreshList()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [])
 
   function flash(msg: string) {
@@ -498,7 +541,7 @@ export default function App() {
                         ? 'Acceso por perfil · Jefe · Admisiones · Revisor · Validador'
                         : workspaceBase === 'admin' && adminEditorOpen
                           ? 'Admin · editando horario'
-                          : `Sistema de horarios · MSP Ecuador${isRemoteEnabled() ? ' · Supabase' : ' · Local'}`}
+                          : `Sistema de horarios · MSP Ecuador · ${dbLabel}${catalogSyncing ? ' · sync…' : ''}`}
               </p>
             </div>
           </div>
@@ -512,6 +555,8 @@ export default function App() {
                 setUser(u)
                 setAdminEditorOpen(false)
                 setShowCreate(isJefeRole(u.role) && saved.length === 0)
+                void runCatalogSync({ quiet: true })
+                void refreshList()
                 const n = countPendingForRole(u, saved)
                 flash(
                   n > 0
