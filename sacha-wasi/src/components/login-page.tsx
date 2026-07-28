@@ -6,16 +6,42 @@ import { Leaf } from "lucide-react";
 import { DEMO_PASSWORD, DEMO_USERS } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
+type HealthPayload = {
+  mode: string;
+  supabase?: {
+    configured: boolean;
+    reachable: boolean;
+    schemaReady: boolean | null;
+    detail?: string;
+  };
+};
+
 export function LoginPage() {
   const { ready, user, login } = useDemo();
   const router = useRouter();
   const [email, setEmail] = useState("admin@sachawasi.pe");
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
+  const [health, setHealth] = useState<HealthPayload | null>(null);
 
   useEffect(() => {
     if (ready && user) router.replace("/");
   }, [ready, user, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((data: HealthPayload) => {
+        if (!cancelled) setHealth(data);
+      })
+      .catch(() => {
+        if (!cancelled) setHealth(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -26,6 +52,8 @@ export function LoginPage() {
     }
     router.push(result.redirect ?? "/");
   }
+
+  const sb = health?.supabase;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
@@ -66,6 +94,26 @@ export function LoginPage() {
           <p className="mt-2 text-sm text-[var(--sw-muted)]">
             Usa un usuario demo. Contraseña: <code>{DEMO_PASSWORD}</code>
           </p>
+
+          {sb ? (
+            <div
+              className={`mt-4 rounded-2xl border px-3 py-2 text-xs ${
+                sb.reachable
+                  ? "border-[var(--sw-forest)]/30 bg-[var(--sw-leaf)]/20"
+                  : "border-[var(--sw-chili)]/30 bg-[var(--sw-chili)]/10"
+              }`}
+            >
+              <p className="font-semibold">
+                Supabase: {sb.reachable ? "conectado" : "sin respuesta"}
+              </p>
+              <p className="mt-1 text-[var(--sw-muted)]">
+                {sb.schemaReady
+                  ? "Esquema listo."
+                  : (sb.detail ??
+                    "Auth OK. Ejecuta supabase/SETUP.sql en el SQL Editor.")}
+              </p>
+            </div>
+          ) : null}
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <label className="block text-xs text-[var(--sw-muted)]">

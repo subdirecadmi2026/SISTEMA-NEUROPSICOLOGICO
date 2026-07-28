@@ -7,7 +7,7 @@ Stack: **Next.js (TypeScript) + Vercel + Supabase**. Independiente de NeuroSys.
 
 ## Preview en vivo (desarrollo)
 
-**https://not-recorders-thereof-headline.trycloudflare.com/login**
+**https://checkout-deutsche-towers-plots.trycloudflare.com/login**
 
 Login demo: `admin@sachawasi.pe` / `sacha2026`
 
@@ -15,8 +15,8 @@ Login demo: `admin@sachawasi.pe` / `sacha2026`
 > Si el túnel se reinicia, el agente te pasará un link nuevo.
 
 Supabase destino: `https://jmpebicnieuvmjpfjyud.supabase.co`  
-Para conectar Auth/DB reales hace falta la clave **anon public** (JWT largo que empieza con `eyJ...`) desde:
-Supabase → Project Settings → API → `anon` `public`.
+Estado actual: **Auth conectado**. Falta ejecutar [`SETUP.sql`](./supabase/SETUP.sql) en el SQL Editor  
+(ver [`SETUP_SUPABASE.md`](./SETUP_SUPABASE.md)).
 
 ## Modo demo (sin Supabase)
 
