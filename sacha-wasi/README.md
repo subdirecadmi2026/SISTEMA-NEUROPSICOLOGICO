@@ -7,7 +7,7 @@ Stack: **Next.js (TypeScript) + Vercel + Supabase**. Independiente de NeuroSys.
 
 ## Preview en vivo (desarrollo)
 
-_(El agente actualiza el túnel Cloudflare al reiniciar el preview.)_
+**https://praise-already-accompanied-touch.trycloudflare.com/login**
 
 Login demo: `admin@sachawasi.pe` / `sacha2026`
 
