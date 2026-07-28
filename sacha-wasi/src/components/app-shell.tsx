@@ -18,7 +18,7 @@ export function AppShell({
   title: string;
   subtitle?: string;
 }) {
-  const { ready, user, logout, sucursalId, sucursales, setSucursalId, alerts } =
+  const { ready, user, logout, sucursalId, sucursales, setSucursalId, alerts, cloudMode, syncStatus, syncFromCloud } =
     useDemo();
   const pathname = usePathname();
   const router = useRouter();
@@ -99,7 +99,11 @@ export function AppShell({
                 <select
                   className="mt-1 w-full rounded-lg border border-[var(--sw-line)] bg-white px-2 py-2 text-sm text-[var(--sw-ink)]"
                   value={sucursalId}
-                  onChange={(e) => setSucursalId(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSucursalId(next);
+                    if (cloudMode) void syncFromCloud(next);
+                  }}
                 >
                   {sucursales.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -110,6 +114,22 @@ export function AppShell({
               </label>
             ) : (
               <p className="text-xs text-[var(--sw-muted)]">{sucursal?.name}</p>
+            )}
+            {cloudMode ? (
+              <div className="space-y-1">
+                <p className="text-[10px] leading-snug text-[var(--sw-muted)]">
+                  {syncStatus ?? "Cloud activo"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void syncFromCloud()}
+                  className="text-xs text-[var(--sw-forest)] hover:underline"
+                >
+                  Sincronizar ahora
+                </button>
+              </div>
+            ) : (
+              <p className="text-[10px] text-[var(--sw-muted)]">Modo demo local</p>
             )}
             <button
               type="button"

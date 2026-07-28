@@ -238,3 +238,24 @@ export interface Coupon {
   uses: number;
   max_uses: number | null;
 }
+
+export type IncidentSeverity = "baja" | "media" | "alta" | "critica";
+
+export type IncidentStatus =
+  | "abierta"
+  | "en_curso"
+  | "resuelta"
+  | "cerrada";
+
+export interface Incident {
+  id: string;
+  sucursal_id: string;
+  title: string;
+  description: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  reported_by: string;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+}

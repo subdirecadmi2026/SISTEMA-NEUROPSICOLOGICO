@@ -2,7 +2,7 @@
 
 Proyecto: `https://jmpebicnieuvmjpfjyud.supabase.co`
 
-## 1. Variables (ya configuradas en el entorno del agente)
+## 1. Variables
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://jmpebicnieuvmjpfjyud.supabase.co
@@ -13,11 +13,11 @@ En Vercel: Root Directory = `sacha-wasi` + las mismas variables.
 
 ## 2. Crear el esquema (obligatorio)
 
-1. Abre Supabase → **SQL Editor** → New query  
-2. Copia TODO el contenido de [`supabase/SETUP.sql`](./supabase/SETUP.sql)  
-3. Run / Ejecutar  
+En **SQL Editor**, ejecuta en orden:
 
-Eso crea tablas, RLS, función de venta atómica y datos demo de catálogo.
+1. [`supabase/SETUP.sql`](./supabase/SETUP.sql) — tablas, RLS, RPC `create_order_with_inventory`
+2. [`supabase/SETUP_PART2.sql`](./supabase/SETUP_PART2.sql) — políticas extra + seed visible (anon read)
+3. [`supabase/SETUP_PART3.sql`](./supabase/SETUP_PART3.sql) — incidencias + realtime KDS
 
 ## 3. Crear usuarios Auth
 
@@ -41,9 +41,23 @@ values (
 );
 ```
 
-> Tip: en Auth settings puedes activar **Confirm email = OFF** para pruebas.
+También puedes iniciar sesión cloud y usar el botón **Crear perfil admin** si Auth OK y falta `profiles`.
 
-## 4. Verificar
+> Tip: Auth settings → **Confirm email = OFF** para pruebas.
+
+## 4. Qué sincroniza el frontend (modo Cloud)
+
+Al login cloud:
+
+- Catálogo: sucursales, categorías, productos, insumos, recetas
+- Órdenes abiertas + items (KDS)
+- Caja abierta de la sucursal
+- Incidencias (si PART3 está aplicado)
+
+Al vender en POS cloud: RPC `create_order_with_inventory` (stock atómico).  
+KDS: suscripción realtime a `ordenes` + poll cada 20s.
+
+## 5. Verificar
 
 ```bash
 curl https://tu-preview/api/health
@@ -58,4 +72,4 @@ Esperado:
 }
 ```
 
-Hasta que `schemaReady` sea true, el frontend sigue operando en **modo demo** (localStorage) para que puedas usar el sistema sin bloquearte.
+Si el seed está vacío, PART2 debe devolver conteos > 0. El login **Demo local** sigue disponible sin cloud.

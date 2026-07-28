@@ -7,17 +7,17 @@ Stack: **Next.js (TypeScript) + Vercel + Supabase**. Independiente de NeuroSys.
 
 ## Preview en vivo (desarrollo)
 
-**https://checkout-deutsche-towers-plots.trycloudflare.com/login**
+_(El agente actualiza el túnel Cloudflare al reiniciar el preview.)_
 
 Login demo: `admin@sachawasi.pe` / `sacha2026`
 
-> Evita `loca.lt` (pide IP y suele bloquear). Usa el link de Cloudflare de arriba.
+> Evita `loca.lt` (pide IP y suele bloquear). Usa el link de Cloudflare.
 > Si el túnel se reinicia, el agente te pasará un link nuevo.
 
 Supabase destino: `https://jmpebicnieuvmjpfjyud.supabase.co`  
-Estado actual: **Auth + esquema listos**.  
-Siguiente: ejecuta [`SETUP_PART2.sql`](./supabase/SETUP_PART2.sql) (políticas + seed visible)  
-y crea un usuario en Authentication → Users.
+Estado: Auth + esquema + sync cloud (POS/KDS/caja/catálogo/incidencias).  
+Ejecuta en orden: [`SETUP.sql`](./supabase/SETUP.sql) → [`SETUP_PART2.sql`](./supabase/SETUP_PART2.sql) → [`SETUP_PART3.sql`](./supabase/SETUP_PART3.sql)  
+y crea un usuario Auth + fila en `profiles`. Guía: [SETUP_SUPABASE.md](./SETUP_SUPABASE.md).
 
 ## Modo demo (sin Supabase)
 
@@ -39,17 +39,18 @@ Abre [http://localhost:3000](http://localhost:3000) e inicia sesión:
 
 ## MVP incluido
 
-- **POS**: pedidos, canales, mesas, cupones, clientes, ticket imprimible
-- **KDS**: columnas recibido / preparación / listo con alertas de demora
+- **POS**: pedidos, canales, mesas, cupones, clientes, ticket; cloud vía RPC atómica
+- **KDS**: columnas + demora + beep + realtime Supabase
 - **Recetas**: escandallo, costo y margen por plato
 - **Inventario**: stock, lotes, mermas, alertas de mínimo
 - **Compras**: proveedores, recepción e ingreso de stock
 - **RRHH**: turnos y fichaje entrada/salida
 - **Fidelización**: clientes, puntos y cupones
-- **Caja**: apertura, esperado, cierre y discrepancia
+- **Caja**: apertura/cierre local y cloud
+- **Incidencias**: reportes operativos por sucursal
 - **Reportes**: KPIs + export CSV + consolidado admin
-- **Usuarios / RBAC + auditoría** de acciones
-- Schema SQL con **RLS** y función atómica `create_order_with_inventory`
+- **Usuarios / RBAC + auditoría**
+- Schema SQL con **RLS**, seed y `create_order_with_inventory`
 
 ## Scripts
 
@@ -76,13 +77,13 @@ Guía completa: [DEPLOY.md](./DEPLOY.md)
 
 ```
 sacha-wasi/
-  src/app/           # rutas (pos, kds, recetas, inventario, caja, reportes…)
+  src/app/           # rutas (pos, kds, recetas, inventario, caja, incidencias…)
   src/components/    # UI por módulo
   src/lib/           # demo store, roles, supabase clients
-  supabase/          # migraciones + seed
+  supabase/          # SETUP.sql + PART2 + PART3 + migraciones
 ```
 
 ## Roadmap post‑MVP
 
-RRHH/turnos, fidelización, forecasting, terminal fiscal, app riders,
+Forecasting, terminal fiscal, app riders,
 integraciones Rappi/Uber Eats y pasarelas (MercadoPago/Stripe).

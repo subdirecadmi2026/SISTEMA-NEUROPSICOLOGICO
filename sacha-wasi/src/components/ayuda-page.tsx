@@ -7,11 +7,11 @@ import { ROLE_LABELS } from "@/lib/roles";
 const MODULES = [
   {
     title: "POS",
-    body: "Toma pedidos, elige canal (mostrador/mesa/takeaway/delivery), cobra y envía a cocina. El stock baja según la receta.",
+    body: "Toma pedidos, elige canal (mostrador/mesa/takeaway/delivery), cobra y envía a cocina. El stock baja según la receta. En cloud usa create_order_with_inventory.",
   },
   {
     title: "KDS",
-    body: "Pantalla de cocina con estados y alerta si un pedido supera 12 minutos.",
+    body: "Pantalla de cocina con estados, alerta >12 min, beep en pedidos nuevos y realtime Supabase.",
   },
   {
     title: "Recetas",
@@ -35,7 +35,11 @@ const MODULES = [
   },
   {
     title: "Caja",
-    body: "Apertura, ventas en efectivo esperadas, cierre y discrepancia.",
+    body: "Apertura, ventas en efectivo esperadas, cierre y discrepancia (también en cloud).",
+  },
+  {
+    title: "Incidencias",
+    body: "Reportes operativos por sucursal (equipo, demoras, fallas). Requiere SETUP_PART3.sql en cloud.",
   },
   {
     title: "Reportes",

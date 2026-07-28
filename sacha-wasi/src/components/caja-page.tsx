@@ -84,9 +84,9 @@ export function CajaPage() {
         <section className="rounded-3xl border border-[var(--sw-line)] bg-[var(--sw-panel)]/95 p-6">
           {!cash.closed_at ? (
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                const result = closeCash(Number(closing), notes);
+                const result = await closeCash(Number(closing), notes);
                 setMessage(result.message);
               }}
               className="space-y-3"
@@ -123,10 +123,10 @@ export function CajaPage() {
             </form>
           ) : (
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                openCash(Number(opening));
-                setMessage("Nueva sesión de caja abierta");
+                const result = await openCash(Number(opening));
+                setMessage(result.message);
               }}
               className="space-y-3"
             >

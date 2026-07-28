@@ -114,22 +114,13 @@ export async function bootstrapProfile(input: {
 }
 
 export async function fetchRemoteCatalog() {
-  const supabase = createClient();
-  if (!supabase) return null;
-
-  const [sucursales, categories, productos] = await Promise.all([
-    supabase.from("sucursales").select("*").order("name"),
-    supabase.from("categories").select("*").order("sort_order"),
-    supabase.from("productos").select("*").eq("active", true).order("name"),
-  ]);
-
-  if (sucursales.error || categories.error || productos.error) {
-    return null;
-  }
-
+  const snapshot = await import("@/lib/supabase/cloud").then((m) =>
+    m.fetchCloudSnapshot(),
+  );
+  if (!snapshot) return null;
   return {
-    sucursales: sucursales.data ?? [],
-    categories: categories.data ?? [],
-    productos: productos.data ?? [],
+    sucursales: snapshot.sucursales,
+    categories: snapshot.categories,
+    productos: snapshot.products,
   };
 }

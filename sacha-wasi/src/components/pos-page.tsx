@@ -313,8 +313,9 @@ export function PosPage() {
                 Boolean(cash.closed_at) ||
                 (channel === "mesa" && !mesaId)
               }
-              onClick={() => {
-                const result = checkout(payment, channel, {
+              onClick={async () => {
+                setMessage("Procesando cobro…");
+                const result = await checkout(payment, channel, {
                   mesaId: channel === "mesa" ? mesaId : null,
                   couponCode: couponCode || null,
                   customerId: customerId || null,

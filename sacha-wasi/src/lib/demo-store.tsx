@@ -29,17 +29,32 @@ import {
   DEMO_RECETAS,
   DEMO_SUCURSALES,
   DEMO_USERS,
-  recipeCost,
 } from "@/lib/demo-data";
 import { buildAlerts, calcPurchaseTotal } from "@/lib/ops-helpers";
 import { homeForRole } from "@/lib/roles";
+import { createClient } from "@/lib/supabase/client";
+import {
+  bumpCloudCashExpected,
+  closeCloudCash,
+  createCloudIncident,
+  createCloudOrder,
+  fetchCloudSnapshot,
+  openCloudCash,
+  subscribeKitchenOrders,
+  updateCloudIncidentStatus,
+  updateCloudOrderStatus,
+} from "@/lib/supabase/cloud";
 import type {
   AppAlert,
   AttendancePunch,
   AuditLog,
   CashSession,
+  Category,
   Coupon,
   Customer,
+  Incident,
+  IncidentSeverity,
+  IncidentStatus,
   Insumo,
   InventoryMovement,
   Mesa,
@@ -53,13 +68,17 @@ import type {
   Proveedor,
   PurchaseOrder,
   PurchaseStatus,
+  Receta,
+  RecetaIngrediente,
   Role,
   Shift,
   ShiftType,
+  Sucursal,
 } from "@/types";
 
 const SESSION_KEY = "sacha-wasi-session";
-const STORE_KEY = "sacha-wasi-store-v3";
+const CLOUD_KEY = "sacha-wasi-cloud";
+const STORE_KEY = "sacha-wasi-store-v4";
 
 type CartLine = {
   productId: string;
@@ -95,6 +114,8 @@ type DemoStoreState = {
 type DemoContextValue = {
   ready: boolean;
   user: Profile | null;
+  cloudMode: boolean;
+  syncStatus: string | null;
   sucursalId: string;
   cart: CartLine[];
   products: Product[];
@@ -109,17 +130,19 @@ type DemoContextValue = {
   attendance: AttendancePunch[];
   customers: Customer[];
   coupons: Coupon[];
+  incidents: Incident[];
   proveedores: Proveedor[];
   alerts: AppAlert[];
   lastTicket: Order | null;
-  categories: typeof DEMO_CATEGORIES;
-  recetas: typeof DEMO_RECETAS;
-  recetaIngredientes: typeof DEMO_RECETA_INGREDIENTES;
-  sucursales: typeof DEMO_SUCURSALES;
+  categories: Category[];
+  recetas: Receta[];
+  recetaIngredientes: RecetaIngrediente[];
+  sucursales: Sucursal[];
   users: typeof DEMO_USERS;
   login: (email: string, password: string) => { ok: boolean; message: string; redirect?: string };
   loginAsProfile: (profile: Profile) => { ok: boolean; message: string; redirect?: string };
   logout: () => void;
+  syncFromCloud: (overrideSucursal?: string) => Promise<{ ok: boolean; message: string }>;
   setSucursalId: (id: string) => void;
   addToCart: (productId: string) => void;
   updateCartLine: (productId: string, patch: Partial<CartLine>) => void;
@@ -130,16 +153,19 @@ type DemoContextValue = {
     payment: PaymentMethod,
     channel: OrderChannel,
     options?: CheckoutOptions,
-  ) => { ok: boolean; message: string; order?: Order };
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  ) => Promise<{ ok: boolean; message: string; order?: Order }>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   adjustInventory: (
     insumoId: string,
     tipo: InventoryMovement["tipo"],
     cantidad: number,
     motivo: string,
   ) => { ok: boolean; message: string };
-  closeCash: (closingAmount: number, notes: string) => { ok: boolean; message: string };
-  openCash: (openingFloat: number) => void;
+  closeCash: (
+    closingAmount: number,
+    notes: string,
+  ) => Promise<{ ok: boolean; message: string }>;
+  openCash: (openingFloat: number) => Promise<{ ok: boolean; message: string }>;
   createPurchase: (input: {
     proveedor_id: string;
     lines: PurchaseOrder["lines"];
@@ -171,6 +197,15 @@ type DemoContextValue = {
     ok: boolean;
     message: string;
   };
+  createIncident: (input: {
+    title: string;
+    description: string;
+    severity: IncidentSeverity;
+  }) => Promise<{ ok: boolean; message: string }>;
+  updateIncidentStatus: (
+    incidentId: string,
+    status: IncidentStatus,
+  ) => Promise<{ ok: boolean; message: string }>;
   previewDiscount: (code: string, subtotal: number) => {
     ok: boolean;
     message: string;
@@ -252,6 +287,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(() =>
     readJson<Profile | null>(SESSION_KEY, null),
   );
+  const [cloudMode, setCloudMode] = useState(
+    () => readJson<boolean>(CLOUD_KEY, false),
+  );
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [sucursalId, setSucursalId] = useState(() => {
     const saved = readJson<Profile | null>(SESSION_KEY, null);
     return saved?.sucursal_id ?? "suc-centro";
@@ -261,6 +300,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     const saved = readJson<Partial<DemoStoreState> | null>(STORE_KEY, null);
     return { ...initialStore(), ...(saved ?? {}) };
   });
+  const [categories, setCategories] = useState<Category[]>(DEMO_CATEGORIES);
+  const [sucursales, setSucursales] = useState<Sucursal[]>(DEMO_SUCURSALES);
+  const [recetas, setRecetas] = useState<Receta[]>(DEMO_RECETAS);
+  const [recetaIngredientes, setRecetaIngredientes] = useState<
+    RecetaIngrediente[]
+  >(DEMO_RECETA_INGREDIENTES);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -269,9 +315,109 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, [ready, store]);
 
   useEffect(() => {
+    if (!ready) return;
+    localStorage.setItem(CLOUD_KEY, JSON.stringify(cloudMode));
+  }, [ready, cloudMode]);
+
+  useEffect(() => {
     const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
+
+  const applyCloudSnapshot = useCallback(
+    (
+      snapshot: NonNullable<Awaited<ReturnType<typeof fetchCloudSnapshot>>>,
+      preferredSucursal?: string | null,
+    ) => {
+      setCategories(
+        snapshot.categories.length ? snapshot.categories : DEMO_CATEGORIES,
+      );
+      setSucursales(
+        snapshot.sucursales.length ? snapshot.sucursales : DEMO_SUCURSALES,
+      );
+      setRecetas(snapshot.recetas.length ? snapshot.recetas : DEMO_RECETAS);
+      setRecetaIngredientes(
+        snapshot.recetaIngredientes.length
+          ? snapshot.recetaIngredientes
+          : DEMO_RECETA_INGREDIENTES,
+      );
+      setIncidents(snapshot.incidents);
+
+      const nextSucursal =
+        preferredSucursal &&
+        snapshot.sucursales.some((s) => s.id === preferredSucursal)
+          ? preferredSucursal
+          : snapshot.sucursales[0]?.id ?? preferredSucursal ?? sucursalId;
+
+      if (nextSucursal) setSucursalId(nextSucursal);
+
+      setStore((prev) => ({
+        ...prev,
+        products: snapshot.products.length ? snapshot.products : prev.products,
+        insumos: snapshot.insumos.length ? snapshot.insumos : prev.insumos,
+        orders: snapshot.orders.length ? snapshot.orders : prev.orders,
+        cash: snapshot.cash
+          ? snapshot.cash
+          : {
+              ...prev.cash,
+              sucursal_id: nextSucursal ?? prev.cash.sucursal_id,
+            },
+      }));
+    },
+    [sucursalId],
+  );
+
+  const syncFromCloud = useCallback(
+    async (overrideSucursal?: string) => {
+      const target = overrideSucursal ?? sucursalId;
+      setSyncStatus("Sincronizando…");
+      const snapshot = await fetchCloudSnapshot(target);
+      if (!snapshot) {
+        setSyncStatus("Sin datos cloud (¿SETUP_PART2.sql?)");
+        return {
+          ok: false,
+          message: "No se pudo leer catálogo. Revisa SETUP.sql / PART2.",
+        };
+      }
+      if (!snapshot.products.length && !snapshot.sucursales.length) {
+        setSyncStatus("Cloud vacío — ejecuta SETUP_PART2.sql");
+        return {
+          ok: false,
+          message: "Tablas vacías. Ejecuta SETUP_PART2.sql en Supabase.",
+        };
+      }
+      applyCloudSnapshot(snapshot, user?.sucursal_id ?? target);
+      setSyncStatus(
+        `Cloud OK · ${snapshot.products.length} productos · ${snapshot.insumos.length} insumos`,
+      );
+      return { ok: true, message: "Catálogo sincronizado" };
+    },
+    [applyCloudSnapshot, sucursalId, user?.sucursal_id],
+  );
+
+  useEffect(() => {
+    if (!ready || !cloudMode || !user) return;
+    const timer = window.setTimeout(() => {
+      void syncFromCloud();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [ready, cloudMode, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!cloudMode || !sucursalId) return;
+    const unsubscribe = subscribeKitchenOrders(sucursalId, () => {
+      window.setTimeout(() => {
+        void syncFromCloud();
+      }, 0);
+    });
+    const poll = window.setInterval(() => {
+      void syncFromCloud();
+    }, 20_000);
+    return () => {
+      unsubscribe();
+      window.clearInterval(poll);
+    };
+  }, [cloudMode, sucursalId, syncFromCloud]);
 
   const login = useCallback((email: string, password: string) => {
     const found = DEMO_USERS.find(
@@ -288,6 +434,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       sucursal_id: found.sucursal_id,
       active: found.active,
     };
+    setCloudMode(false);
+    setCategories(DEMO_CATEGORIES);
+    setSucursales(DEMO_SUCURSALES);
+    setRecetas(DEMO_RECETAS);
+    setRecetaIngredientes(DEMO_RECETA_INGREDIENTES);
+    setIncidents([]);
+    setSyncStatus("Modo demo local");
     setUser(profile);
     if (found.sucursal_id) setSucursalId(found.sucursal_id);
     localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
@@ -303,6 +456,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginAsProfile = useCallback((profile: Profile) => {
+    setCloudMode(true);
+    setSyncStatus("Sesión cloud — sincronizando…");
     setUser(profile);
     if (profile.sucursal_id) setSucursalId(profile.sucursal_id);
     localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
@@ -320,7 +475,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setUser(null);
     setCart([]);
+    setCloudMode(false);
+    setSyncStatus(null);
     localStorage.removeItem(SESSION_KEY);
+    localStorage.setItem(CLOUD_KEY, "false");
+    const supabase = createClient();
+    if (supabase) void supabase.auth.signOut();
   }, []);
 
   const addToCart = useCallback((productId: string) => {
@@ -377,7 +537,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   );
 
   const checkout = useCallback(
-    (
+    async (
       payment: PaymentMethod,
       channel: OrderChannel,
       options: CheckoutOptions = {},
@@ -392,13 +552,109 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       }
 
       const products = store.products;
+
+      if (cloudMode) {
+        const cloud = await createCloudOrder({
+          sucursalId,
+          channel,
+          payment,
+          items: cart.map((line) => ({
+            producto_id: line.productId,
+            qty: line.qty,
+            notes: line.notes || null,
+            modifiers: line.modifiers,
+          })),
+        });
+        if (!cloud.ok) return { ok: false, message: cloud.message };
+
+        let order = cloud.order;
+        if (options.couponCode || options.customerId) {
+          const subtotal = order.items.reduce(
+            (s, i) => s + i.qty * i.unit_price,
+            0,
+          );
+          let discount = 0;
+          let couponCode: string | null = null;
+          if (options.couponCode) {
+            const preview = previewDiscount(options.couponCode, subtotal);
+            if (preview.ok) {
+              discount = preview.discount;
+              couponCode = options.couponCode.trim().toUpperCase();
+            }
+          }
+          order = {
+            ...order,
+            subtotal,
+            discount,
+            coupon_code: couponCode,
+            customer_id: options.customerId || null,
+            total: Number((subtotal - discount).toFixed(2)),
+          };
+        }
+
+        const pointsEarned = Math.floor(order.total);
+        setStore((prev) => {
+          const nextExpected =
+            prev.cash.expected_cash +
+            (payment === "efectivo" ? order.total : 0);
+          if (cloudMode && prev.cash.id && !prev.cash.id.startsWith("cash-")) {
+            void bumpCloudCashExpected(prev.cash.id, nextExpected);
+          }
+          return {
+            ...prev,
+            orders: [order, ...prev.orders.filter((o) => o.id !== order.id)],
+            lastTicket: order,
+            mesas:
+              channel === "mesa" && options.mesaId
+                ? prev.mesas.map((m) =>
+                    m.id === options.mesaId ? { ...m, status: "ocupada" } : m,
+                  )
+                : prev.mesas,
+            coupons: order.coupon_code
+              ? prev.coupons.map((c) =>
+                  c.code === order.coupon_code ? { ...c, uses: c.uses + 1 } : c,
+                )
+              : prev.coupons,
+            customers: options.customerId
+              ? prev.customers.map((c) =>
+                  c.id === options.customerId
+                    ? {
+                        ...c,
+                        points: c.points + pointsEarned,
+                        visits: c.visits + 1,
+                      }
+                    : c,
+                )
+              : prev.customers,
+            cash: {
+              ...prev.cash,
+              expected_cash: nextExpected,
+            },
+            audits: pushAudit(
+              prev.audits,
+              user,
+              "create_order_cloud",
+              "ordenes",
+              order.id,
+            ),
+          };
+        });
+        setCart([]);
+        void syncFromCloud();
+        return {
+          ok: true,
+          message: `Orden cloud ${order.numero} creada`,
+          order,
+        };
+      }
+
       const requirements = new Map<string, number>();
       for (const line of cart) {
-        const receta = DEMO_RECETAS.find(
+        const receta = recetas.find(
           (r) => r.producto_id === line.productId && r.active,
         );
         if (!receta) continue;
-        const ingredients = DEMO_RECETA_INGREDIENTES.filter(
+        const ingredients = recetaIngredientes.filter(
           (i) => i.receta_id === receta.id,
         );
         for (const ing of ingredients) {
@@ -547,20 +803,31 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     },
     [
       cart,
+      cloudMode,
       previewDiscount,
+      recetaIngredientes,
+      recetas,
       store.cash.closed_at,
       store.insumos,
       store.orderSeq,
       store.orders,
       store.products,
       sucursalId,
+      syncFromCloud,
       user,
     ],
   );
 
   const updateOrderStatus = useCallback(
-    (orderId: string, status: OrderStatus) => {
+    async (orderId: string, status: OrderStatus) => {
       if (!user) return;
+      if (cloudMode) {
+        const remote = await updateCloudOrderStatus(orderId, status);
+        if (!remote.ok) {
+          setSyncStatus(remote.message);
+          return;
+        }
+      }
       setStore((prev) => ({
         ...prev,
         orders: prev.orders.map((o) =>
@@ -577,7 +844,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         ),
       }));
     },
-    [user],
+    [cloudMode, user],
   );
 
   const adjustInventory = useCallback(
@@ -628,10 +895,19 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   );
 
   const closeCash = useCallback(
-    (closingAmount: number, notes: string) => {
+    async (closingAmount: number, notes: string) => {
       if (!user) return { ok: false, message: "Sin sesión" };
       if (store.cash.closed_at) {
         return { ok: false, message: "La caja ya está cerrada" };
+      }
+      if (cloudMode && !store.cash.id.startsWith("cash-")) {
+        const remote = await closeCloudCash({
+          cashId: store.cash.id,
+          closingAmount,
+          notes,
+          expectedCash: store.cash.expected_cash,
+        });
+        if (!remote.ok) return remote;
       }
       setStore((prev) => ({
         ...prev,
@@ -651,12 +927,32 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       }));
       return { ok: true, message: "Caja cerrada" };
     },
-    [store.cash.closed_at, user],
+    [cloudMode, store.cash.closed_at, store.cash.expected_cash, store.cash.id, user],
   );
 
   const openCash = useCallback(
-    (openingFloat: number) => {
-      if (!user) return;
+    async (openingFloat: number) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      if (cloudMode) {
+        const remote = await openCloudCash({
+          sucursalId,
+          openingFloat,
+          openedBy: user.id,
+        });
+        if (!remote.ok) return remote;
+        setStore((prev) => ({
+          ...prev,
+          cash: remote.cash,
+          audits: pushAudit(
+            prev.audits,
+            user,
+            "open_cash_cloud",
+            "cash_session",
+            remote.cash.id,
+          ),
+        }));
+        return { ok: true, message: "Caja cloud abierta" };
+      }
       const cash: CashSession = {
         id: `cash-${Date.now()}`,
         sucursal_id: sucursalId,
@@ -673,8 +969,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         cash,
         audits: pushAudit(prev.audits, user, "open_cash", "cash_session", cash.id),
       }));
+      return { ok: true, message: "Caja abierta" };
     },
-    [sucursalId, user],
+    [cloudMode, sucursalId, user],
   );
 
   const createPurchase = useCallback(
@@ -967,6 +1264,116 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const createIncident = useCallback(
+    async (input: {
+      title: string;
+      description: string;
+      severity: IncidentSeverity;
+    }) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      if (!input.title.trim()) {
+        return { ok: false, message: "Título requerido" };
+      }
+
+      if (cloudMode) {
+        const remote = await createCloudIncident({
+          sucursalId,
+          title: input.title.trim(),
+          description: input.description.trim(),
+          severity: input.severity,
+          reportedBy: user.id,
+        });
+        if (!remote.ok) {
+          // fallback local if PART3 not applied yet
+          if (!remote.message.toLowerCase().includes("incidencias")) {
+            return remote;
+          }
+        } else {
+          setIncidents((prev) => [remote.incident, ...prev]);
+          setStore((prev) => ({
+            ...prev,
+            audits: pushAudit(
+              prev.audits,
+              user,
+              "create_incident",
+              "incidencias",
+              remote.incident.id,
+            ),
+          }));
+          return { ok: true, message: "Incidencia registrada en la nube" };
+        }
+      }
+
+      const incident: Incident = {
+        id: `inc-${Date.now()}`,
+        sucursal_id: sucursalId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        severity: input.severity,
+        status: "abierta",
+        reported_by: user.id,
+        assigned_to: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setIncidents((prev) => [incident, ...prev]);
+      setStore((prev) => ({
+        ...prev,
+        audits: pushAudit(
+          prev.audits,
+          user,
+          "create_incident",
+          "incidencias",
+          incident.id,
+        ),
+      }));
+      return { ok: true, message: "Incidencia registrada" };
+    },
+    [cloudMode, sucursalId, user],
+  );
+
+  const updateIncidentStatus = useCallback(
+    async (incidentId: string, status: IncidentStatus) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      if (cloudMode && !incidentId.startsWith("inc-")) {
+        const remote = await updateCloudIncidentStatus(incidentId, status);
+        if (!remote.ok && !remote.message.toLowerCase().includes("incidencias")) {
+          return remote;
+        }
+      }
+      setIncidents((prev) =>
+        prev.map((i) =>
+          i.id === incidentId
+            ? { ...i, status, updated_at: new Date().toISOString() }
+            : i,
+        ),
+      );
+      setStore((prev) => ({
+        ...prev,
+        audits: pushAudit(
+          prev.audits,
+          user,
+          `incident_${status}`,
+          "incidencias",
+          incidentId,
+        ),
+      }));
+      return { ok: true, message: "Incidencia actualizada" };
+    },
+    [cloudMode, user],
+  );
+
+  const computeRecipeCost = useCallback(
+    (recetaId: string) => {
+      const lines = recetaIngredientes.filter((r) => r.receta_id === recetaId);
+      return lines.reduce((sum, line) => {
+        const insumo = store.insumos.find((i) => i.id === line.insumo_id);
+        return sum + (insumo?.cost_unit ?? 0) * line.cantidad;
+      }, 0);
+    },
+    [recetaIngredientes, store.insumos],
+  );
+
   const alerts = useMemo(() => {
     const critical = store.insumos
       .filter((i) => i.sucursal_id === sucursalId && i.stock <= i.min_stock)
@@ -976,17 +1383,44 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       if (!["recibido", "en_preparacion"].includes(o.status)) return false;
       return nowMs - new Date(o.created_at).getTime() > 12 * 60_000;
     }).length;
-    return buildAlerts({
+    const openCriticalIncidents = incidents.filter(
+      (i) =>
+        i.sucursal_id === sucursalId &&
+        ["abierta", "en_curso"].includes(i.status) &&
+        ["alta", "critica"].includes(i.severity),
+    ).length;
+    const base = buildAlerts({
       cashClosed: Boolean(store.cash.closed_at),
       criticalStockNames: critical,
       lateKitchenCount,
     });
-  }, [nowMs, store.cash.closed_at, store.insumos, store.orders, sucursalId]);
+    if (openCriticalIncidents > 0) {
+      base.unshift({
+        id: "alert-incidents",
+        level: "warn",
+        title: "Incidencias abiertas",
+        body: `${openCriticalIncidents} incidencia(s) alta/crítica sin cerrar`,
+        href: "/incidencias",
+        created_at: new Date().toISOString(),
+        read: false,
+      });
+    }
+    return base;
+  }, [
+    incidents,
+    nowMs,
+    store.cash.closed_at,
+    store.insumos,
+    store.orders,
+    sucursalId,
+  ]);
 
   const value = useMemo<DemoContextValue>(
     () => ({
       ready,
       user,
+      cloudMode,
+      syncStatus,
       sucursalId,
       cart,
       products: store.products ?? DEMO_PRODUCTS,
@@ -1001,17 +1435,19 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       attendance: store.attendance ?? [],
       customers: store.customers ?? DEMO_CUSTOMERS,
       coupons: store.coupons ?? DEMO_COUPONS,
+      incidents,
       proveedores: DEMO_PROVEEDORES,
       alerts,
       lastTicket: store.lastTicket ?? null,
-      categories: DEMO_CATEGORIES,
-      recetas: DEMO_RECETAS,
-      recetaIngredientes: DEMO_RECETA_INGREDIENTES,
-      sucursales: DEMO_SUCURSALES,
+      categories,
+      recetas,
+      recetaIngredientes,
+      sucursales,
       users: DEMO_USERS,
       login,
       loginAsProfile,
       logout,
+      syncFromCloud,
       setSucursalId,
       addToCart,
       updateCartLine,
@@ -1032,19 +1468,29 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       addShift,
       upsertCustomer,
       upsertCoupon,
+      createIncident,
+      updateIncidentStatus,
       previewDiscount,
-      recipeCost,
+      recipeCost: computeRecipeCost,
     }),
     [
       ready,
       user,
+      cloudMode,
+      syncStatus,
       sucursalId,
       cart,
       store,
+      incidents,
       alerts,
+      categories,
+      recetas,
+      recetaIngredientes,
+      sucursales,
       login,
       loginAsProfile,
       logout,
+      syncFromCloud,
       addToCart,
       updateCartLine,
       removeFromCart,
@@ -1064,7 +1510,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       addShift,
       upsertCustomer,
       upsertCoupon,
+      createIncident,
+      updateIncidentStatus,
       previewDiscount,
+      computeRecipeCost,
     ],
   );
 
