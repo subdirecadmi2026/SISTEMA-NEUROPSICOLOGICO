@@ -6,6 +6,10 @@ import type { ScheduleDoc } from '../types'
 import { InstitutionalPrintBody } from '../components/PrintSheet'
 import { ensureElectronicQr } from './signatureQr'
 
+/** A4 landscape a 96 dpi (mismo criterio que la hoja de impresión). */
+const PAGE_W_PX = Math.round((297 * 96) / 25.4) // ≈1123
+const MARGIN_MM = 5
+
 function safeName(s: string): string {
   return s
     .normalize('NFD')
@@ -57,16 +61,50 @@ async function enrichSigns(doc: ScheduleDoc): Promise<ScheduleDoc> {
   return { ...doc, electronicSigns: withQr }
 }
 
+async function waitForImages(root: HTMLElement, timeoutMs = 2500) {
+  const imgs = [...root.querySelectorAll('img')]
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete && img.naturalWidth > 0) {
+            resolve()
+            return
+          }
+          const done = () => resolve()
+          img.addEventListener('load', done, { once: true })
+          img.addEventListener('error', done, { once: true })
+          window.setTimeout(done, timeoutMs)
+        }),
+    ),
+  )
+}
+
 async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
   const target =
     (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host
+  const w = PAGE_W_PX
+  const h = Math.ceil(
+    Math.max(target.scrollHeight, target.offsetHeight, host.offsetHeight, 1),
+  )
+  host.style.height = `${h}px`
+
   return html2canvas(target, {
-    scale: 2,
+    scale: 2.5,
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
     logging: false,
-    windowWidth: 1123,
+    width: w,
+    height: h,
+    windowWidth: w,
+    windowHeight: h,
+    onclone: (_doc, cloned) => {
+      cloned.querySelectorAll<HTMLElement>('.print-day-cell').forEach((td) => {
+        td.style.setProperty('-webkit-print-color-adjust', 'exact')
+        td.style.setProperty('print-color-adjust', 'exact')
+      })
+    },
   })
 }
 
@@ -78,14 +116,16 @@ function addCanvasPage(
   if (!isFirst) pdf.addPage()
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
-  const imgData = canvas.toDataURL('image/jpeg', 0.93)
-  const ratio = Math.min(pageW / canvas.width, pageH / canvas.height)
+  const imgData = canvas.toDataURL('image/jpeg', 0.95)
+  const usableW = pageW - MARGIN_MM * 2
+  const usableH = pageH - MARGIN_MM * 2
+  const ratio = Math.min(usableW / canvas.width, usableH / canvas.height)
   const w = canvas.width * ratio
   const h = canvas.height * ratio
-  // Anclado arriba (no centrado) para coincidir con la impresión
-  const x = (pageW - w) / 2
-  const y = 0
-  pdf.addImage(imgData, 'JPEG', x, y, w, h)
+  // Anclado arriba, centrado horizontalmente
+  const x = MARGIN_MM + (usableW - w) / 2
+  const y = MARGIN_MM
+  pdf.addImage(imgData, 'JPEG', x, y, w, h, undefined, 'FAST')
 }
 
 /**
@@ -107,10 +147,11 @@ export async function buildSchedulePdfBlob(
     'position:fixed',
     'left:-12000px',
     'top:0',
-    'width:1123px',
+    `width:${PAGE_W_PX}px`,
     'background:#ffffff',
     'z-index:-1',
     'pointer-events:none',
+    'overflow:hidden',
   ].join(';')
   document.body.appendChild(host)
 
@@ -130,7 +171,9 @@ export async function buildSchedulePdfBlob(
           gridMode: mode,
         }),
       )
-      await waitFrames(i === 0 ? 350 : 280)
+      await waitFrames(i === 0 ? 420 : 320)
+      await waitForImages(host)
+      await waitFrames(100)
       const canvas = await captureRoot(host)
       addCanvasPage(pdf, canvas, i === 0)
     }

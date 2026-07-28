@@ -169,6 +169,16 @@ textarea {
     width: auto !important;
   }
 
+  .print-schedule-icon {
+    height: 34px !important;
+    width: 34px !important;
+  }
+
+  .print-schedule-icon svg {
+    height: 18px !important;
+    width: 18px !important;
+  }
+
   .print-table-wrap {
     padding: 2px 4px !important;
   }
@@ -178,22 +188,38 @@ textarea {
     min-width: 0 !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 8px !important;
+    font-size: 8.5px !important;
   }
 
   .print-schedule-table th,
   .print-schedule-table td {
-    padding: 1px 2px !important;
-    line-height: 1.1 !important;
+    padding: 1px 1px !important;
+    line-height: 1.15 !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
 
+  .print-day-cell {
+    font-size: 8px !important;
+    font-weight: 700 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   .print-footer {
     padding: 4px 8px !important;
-    gap: 6px !important;
+    gap: 4px !important;
     font-size: 8px !important;
+    display: block !important;
+  }
+
+  .print-holidays {
+    margin-bottom: 4px !important;
+  }
+
+  .print-signs-row {
+    gap: 4px !important;
   }
 
   .print-footer .print-sign-box {
@@ -219,4 +245,51 @@ textarea {
     display: none !important;
     visibility: hidden !important;
   }
+}
+
+/* Captura PDF (html2canvas): mismos criterios de legibilidad que impresión */
+[data-pdf-capture] {
+  color: #1e2a36;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+[data-pdf-capture] .print-capture-root {
+  background: #fff;
+}
+
+[data-pdf-capture] .print-header {
+  padding: 6px 10px;
+}
+
+[data-pdf-capture] .print-schedule-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 9px;
+}
+
+[data-pdf-capture] .print-schedule-table th,
+[data-pdf-capture] .print-schedule-table td {
+  padding: 2px 1px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-pdf-capture] .print-day-cell {
+  font-size: 8.5px;
+  font-weight: 700;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+[data-pdf-capture] .print-footer {
+  display: block;
+  padding: 6px 10px;
+}
+
+[data-pdf-capture] .print-sign-box {
+  max-height: 5.5rem;
 }

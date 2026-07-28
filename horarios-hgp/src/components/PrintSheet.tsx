@@ -11,12 +11,38 @@ import {
   weekdayLetter,
 } from '../lib/calendar'
 import { shiftMeta } from '../data/templates'
-import { formatHolidaysLabel } from '../lib/holidays'
+import { holidaysForYear } from '../lib/holidays'
 import { SignatureStampBox } from './SignatureStampBox'
 import {
   buildAdmisionesSignatureBox,
   buildPrintSignatureBoxes,
 } from '../lib/signersStore'
+
+function PrintScheduleIcon() {
+  return (
+    <span
+      className="print-schedule-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-navy/8 text-navy ring-1 ring-navy/15"
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-5 w-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="4.5" width="18" height="16.5" rx="2.5" />
+        <path d="M3 9.5h18" />
+        <path d="M8 2.5v4" />
+        <path d="M16 2.5v4" />
+        <circle cx="15.25" cy="15.25" r="3.75" />
+        <path d="M15.25 13.6v1.75l1.15.7" />
+      </svg>
+    </span>
+  )
+}
 
 type Props = {
   doc: ScheduleDoc
@@ -62,44 +88,58 @@ export function InstitutionalPrintBody({
     (e) => e.slot === 'admisiones',
   )
 
-  const cols =
-    signatures.length >= 5
-      ? 'grid-cols-5'
-      : signatures.length === 4
-        ? 'grid-cols-4'
-        : signatures.length === 2
-          ? 'grid-cols-2'
-          : signatures.length === 1
-            ? 'grid-cols-1'
-            : 'grid-cols-3'
+  /** Todas las firmas en una sola fila (sin solapes con feriados). */
+  const allSigns = [
+    ...signatures,
+    {
+      key: 'admisiones-box',
+      label: admisionesBox.label,
+      value: admisionesBox.value,
+      designatedName: admisionesBox.designatedName,
+      slot: admisionesBox.slot,
+      electronic: admisionesElectronic,
+    },
+  ]
+  const signCols = Math.min(Math.max(allSigns.length, 1), 6)
+  const holidays = holidaysForYear(doc.year)
+  const nameColPct = isEnf ? 16 : 18
+  const metaCols = 5 + (isEnf ? 4 : 1)
+  const dayPct = Math.max(1.35, (100 - nameColPct - 14) / days)
 
   return (
     <div className="print-capture-root bg-white text-ink">
-      <div className="print-header border-b border-line px-4 py-3">
-        <div className="flex flex-wrap items-start gap-3">
+      <div className="print-header border-b-2 border-navy/20 px-3 py-2">
+        <div className="flex items-start gap-2.5">
           <img
             src="/logo_msp.png"
             alt="MSP"
-            className="h-12 w-auto rounded bg-white p-1"
+            className="h-11 w-auto shrink-0 rounded bg-white p-0.5"
             crossOrigin="anonymous"
           />
-          <div className="text-sm">
-            <p className="text-[11px] uppercase tracking-wider text-muted">
+          <PrintScheduleIcon />
+          <div className="min-w-0 flex-1 text-[11px] leading-snug">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted">
               {doc.provincial}
             </p>
-            <p className="print-title font-display text-xl text-navy">
+            <p className="print-title font-display text-lg leading-tight text-navy">
               {doc.hospital}
             </p>
-            <p>{doc.department}</p>
-            <p className="mt-1 font-semibold">
+            <p className="text-[10px] text-muted">{doc.department}</p>
+            <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-navy">
               {isAreaGrid
-                ? 'DISTRIBUCIÓN MÉDICA POR ÁREA DE SERVICIO'
-                : 'CUADRO DE TRABAJO DE PERSONAL DIRECTO O INDIRECTO'}
+                ? 'Distribución médica por área de servicio'
+                : 'Cuadro de trabajo de personal directo o indirecto'}
             </p>
-            <p className="mt-1">
-              Servicio: <strong>{doc.unitName}</strong> · Jefe:{' '}
-              <strong>{doc.jefeServicio || '—'}</strong> ·{' '}
-              {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
+            <p className="mt-0.5 text-[11px]">
+              <span className="text-muted">Servicio:</span>{' '}
+              <strong>{doc.unitName}</strong>
+              <span className="mx-1.5 text-line">|</span>
+              <span className="text-muted">Jefe:</span>{' '}
+              <strong>{doc.jefeServicio || '—'}</strong>
+              <span className="mx-1.5 text-line">|</span>
+              <strong>
+                {MONTHS_ES[doc.month - 1].toUpperCase()} {doc.year}
+              </strong>
               {doc.llamado ? ' · BAJO LLAMADO' : ''}
               {doc.vacacionesFlag ? ' · VACACIONES' : ''}
             </p>
@@ -107,34 +147,65 @@ export function InstitutionalPrintBody({
         </div>
       </div>
 
-      <div className="print-table-wrap p-2">
-        <table className="print-schedule-table w-full border-collapse text-[10px]">
+      <div className="print-table-wrap px-2 py-1.5">
+        <table className="print-schedule-table w-full border-collapse text-[9px]">
+          <colgroup>
+            <col style={{ width: '2.4%' }} />
+            <col style={{ width: '3.2%' }} />
+            <col style={{ width: `${nameColPct}%` }} />
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '3.4%' }} />
+            {Array.from({ length: days }, (_, i) => (
+              <col key={i} style={{ width: `${dayPct}%` }} />
+            ))}
+            {isEnf ? (
+              <>
+                <col style={{ width: '3.2%' }} />
+                <col style={{ width: '3.2%' }} />
+                <col style={{ width: '2.6%' }} />
+                <col style={{ width: '3.4%' }} />
+              </>
+            ) : (
+              <col style={{ width: '4%' }} />
+            )}
+          </colgroup>
           <thead>
             <tr className="bg-navy text-white">
-              <th className="border border-navy px-1 py-1">N°</th>
-              <th className="border border-navy px-1 py-1">FUN</th>
-              <th className="border border-navy px-1 py-1 text-left">
+              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+                N°
+              </th>
+              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+                FUN
+              </th>
+              <th className="border border-navy/80 px-1 py-1 text-left font-semibold">
                 Nombres y apellidos
               </th>
-              <th className="border border-navy px-1 py-1">Rel. lab.</th>
-              <th className="border border-navy px-1 py-1">Cód.</th>
+              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+                Rel. lab.
+              </th>
+              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+                Cód.
+              </th>
               {Array.from({ length: days }, (_, i) => (
-                <th key={i + 1} className="border border-navy px-0 py-1">
-                  <div className="text-[8px] font-normal opacity-80">
+                <th
+                  key={i + 1}
+                  className="border border-navy/80 px-0 py-0.5 font-semibold"
+                >
+                  <div className="text-[7px] font-medium leading-none opacity-90">
                     {weekdayLetter(doc.year, doc.month, i + 1)}
                   </div>
-                  {i + 1}
+                  <div className="text-[9px] leading-tight">{i + 1}</div>
                 </th>
               ))}
               {isEnf ? (
                 <>
-                  <th className="border border-navy px-0.5 py-1">Turnos</th>
-                  <th className="border border-navy px-0.5 py-1">H.plan</th>
-                  <th className="border border-navy px-0.5 py-1">Vac</th>
-                  <th className="border border-navy px-0.5 py-1">Total</th>
+                  <th className="border border-navy/80 px-0.5 py-1">Turnos</th>
+                  <th className="border border-navy/80 px-0.5 py-1">H.plan</th>
+                  <th className="border border-navy/80 px-0.5 py-1">Vac</th>
+                  <th className="border border-navy/80 px-0.5 py-1">Total</th>
                 </>
               ) : (
-                <th className="border border-navy px-0.5 py-1">Horas</th>
+                <th className="border border-navy/80 px-0.5 py-1">Horas</th>
               )}
             </tr>
           </thead>
@@ -142,7 +213,7 @@ export function InstitutionalPrintBody({
             {staff.length === 0 && (
               <tr>
                 <td
-                  colSpan={5 + days + (isEnf ? 4 : 1)}
+                  colSpan={metaCols + days}
                   className="border border-line px-3 py-4 text-center text-muted"
                 >
                   Sin personal con nombre. Complete la lista antes de imprimir.
@@ -150,16 +221,20 @@ export function InstitutionalPrintBody({
               </tr>
             )}
             {staff.map((s, idx) => (
-              <tr key={s.id}>
-                <td className="border border-line px-1 text-center">
+              <tr key={s.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-sand/25'}>
+                <td className="border border-line px-0.5 text-center">
                   {idx + 1}
                 </td>
-                <td className="border border-line px-1 text-center font-semibold">
+                <td className="border border-line px-0.5 text-center font-semibold">
                   {s.fun}
                 </td>
-                <td className="border border-line px-1 font-medium">{s.name}</td>
-                <td className="border border-line px-1">{s.relacionLaboral}</td>
-                <td className="border border-line px-1 text-center font-bold">
+                <td className="border border-line px-1 text-left font-semibold">
+                  {s.name}
+                </td>
+                <td className="border border-line px-0.5 text-center text-[8px]">
+                  {s.relacionLaboral}
+                </td>
+                <td className="border border-line px-0.5 text-center font-bold">
                   {s.codigoPersonal}
                 </td>
                 {Array.from({ length: days }, (_, i) => {
@@ -171,10 +246,13 @@ export function InstitutionalPrintBody({
                   return (
                     <td
                       key={d}
-                      className="border border-line px-0 text-center font-bold"
+                      className="print-day-cell border border-line px-0 text-center font-bold"
                       style={
                         meta
-                          ? { background: meta.color, color: meta.text }
+                          ? {
+                              backgroundColor: meta.color,
+                              color: meta.text,
+                            }
                           : undefined
                       }
                     >
@@ -208,44 +286,65 @@ export function InstitutionalPrintBody({
         </table>
       </div>
 
-      <div className="print-footer grid gap-3 border-t border-line p-4 text-xs sm:grid-cols-2">
-        <div>
-          <p className="mb-1 font-semibold text-navy">Feriados {doc.year}</p>
-          <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
-
-          {doc.notes ? (
-            <>
-              <p className="mb-1 mt-3 font-semibold text-navy">Observaciones</p>
-              <p className="print-notes-text">{doc.notes}</p>
-            </>
-          ) : null}
-          {doc.contingencyPlan ? (
-            <>
-              <p className="mb-1 mt-3 font-semibold text-navy">
-                Plan de contingencia
-              </p>
-              <p className="print-notes-text">{doc.contingencyPlan}</p>
-            </>
-          ) : null}
-
-          <div className="mt-3 max-w-xs">
-            <SignatureStampBox
-              label={admisionesBox.label}
-              value={admisionesBox.value}
-              designatedName={admisionesBox.designatedName}
-              slot={admisionesBox.slot}
-              electronic={admisionesElectronic}
-              scheduleId={doc.id}
-              unitName={doc.unitName}
-            />
-          </div>
-
-          <p className="mt-3 text-[10px] text-muted">
-            Estado: {STATUS_LABEL[doc.status]} · v{doc.version}
+      <div className="print-footer border-t-2 border-navy/15 px-3 py-2 text-[10px]">
+        <div className="print-holidays mb-2 rounded-md bg-sand/60 px-2 py-1.5 ring-1 ring-line">
+          <p className="mb-1 text-[9px] font-bold uppercase tracking-wide text-navy">
+            Feriados {doc.year}
           </p>
+          <div className="flex flex-wrap gap-1">
+            {holidays.length === 0 ? (
+              <span className="text-muted">Sin feriados registrados</span>
+            ) : (
+              holidays.map((h) => {
+                const [, m, d] = h.date.split('-')
+                return (
+                  <span
+                    key={h.date}
+                    className="inline-flex items-center gap-1 rounded border border-line bg-white px-1.5 py-0.5 text-[8px] leading-tight text-ink"
+                  >
+                    <strong className="text-navy">
+                      {d}/{m}
+                    </strong>
+                    <span className="text-muted">{h.name}</span>
+                  </span>
+                )
+              })
+            )}
+          </div>
         </div>
-        <div className={`grid items-start gap-2 ${cols}`}>
-          {signatures.map((s) => (
+
+        {(doc.notes || doc.contingencyPlan) && (
+          <div className="mb-2 grid gap-2 sm:grid-cols-2">
+            {doc.notes ? (
+              <div className="rounded-md border border-line bg-white px-2 py-1">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-navy">
+                  Observaciones
+                </p>
+                <p className="print-notes-text mt-0.5 text-[9px] leading-snug text-ink">
+                  {doc.notes}
+                </p>
+              </div>
+            ) : null}
+            {doc.contingencyPlan ? (
+              <div className="rounded-md border border-line bg-white px-2 py-1">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-navy">
+                  Plan de contingencia
+                </p>
+                <p className="print-notes-text mt-0.5 text-[9px] leading-snug text-ink">
+                  {doc.contingencyPlan}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        <div
+          className="print-signs-row grid items-stretch gap-1.5"
+          style={{
+            gridTemplateColumns: `repeat(${signCols}, minmax(0, 1fr))`,
+          }}
+        >
+          {allSigns.map((s) => (
             <SignatureStampBox
               key={s.key}
               label={s.label}
@@ -258,6 +357,10 @@ export function InstitutionalPrintBody({
             />
           ))}
         </div>
+
+        <p className="mt-1.5 text-[9px] text-muted">
+          Estado: {STATUS_LABEL[doc.status]} · v{doc.version}
+        </p>
       </div>
     </div>
   )
