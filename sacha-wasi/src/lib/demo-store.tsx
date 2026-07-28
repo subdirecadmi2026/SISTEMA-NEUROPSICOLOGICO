@@ -118,6 +118,7 @@ type DemoContextValue = {
   sucursales: typeof DEMO_SUCURSALES;
   users: typeof DEMO_USERS;
   login: (email: string, password: string) => { ok: boolean; message: string; redirect?: string };
+  loginAsProfile: (profile: Profile) => { ok: boolean; message: string; redirect?: string };
   logout: () => void;
   setSucursalId: (id: string) => void;
   addToCart: (productId: string) => void;
@@ -298,6 +299,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       ok: true,
       message: "Bienvenido",
       redirect: homeForRole(found.role as Role),
+    };
+  }, []);
+
+  const loginAsProfile = useCallback((profile: Profile) => {
+    setUser(profile);
+    if (profile.sucursal_id) setSucursalId(profile.sucursal_id);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+    setStore((prev) => ({
+      ...prev,
+      audits: pushAudit(prev.audits, profile, "login_supabase", "session", null),
+    }));
+    return {
+      ok: true,
+      message: "Sesión cloud iniciada",
+      redirect: homeForRole(profile.role),
     };
   }, []);
 
@@ -994,6 +1010,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       sucursales: DEMO_SUCURSALES,
       users: DEMO_USERS,
       login,
+      loginAsProfile,
       logout,
       setSucursalId,
       addToCart,
@@ -1026,6 +1043,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       store,
       alerts,
       login,
+      loginAsProfile,
       logout,
       addToCart,
       updateCartLine,

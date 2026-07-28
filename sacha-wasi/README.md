@@ -15,8 +15,9 @@ Login demo: `admin@sachawasi.pe` / `sacha2026`
 > Si el túnel se reinicia, el agente te pasará un link nuevo.
 
 Supabase destino: `https://jmpebicnieuvmjpfjyud.supabase.co`  
-Estado actual: **Auth conectado**. Falta ejecutar [`SETUP.sql`](./supabase/SETUP.sql) en el SQL Editor  
-(ver [`SETUP_SUPABASE.md`](./SETUP_SUPABASE.md)).
+Estado actual: **Auth + esquema listos**.  
+Siguiente: ejecuta [`SETUP_PART2.sql`](./supabase/SETUP_PART2.sql) (políticas + seed visible)  
+y crea un usuario en Authentication → Users.
 
 ## Modo demo (sin Supabase)
 

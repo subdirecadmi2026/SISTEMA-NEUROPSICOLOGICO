@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { DEMO_PASSWORD, DEMO_USERS } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
+import { bootstrapProfile, signInWithSupabase } from "@/lib/supabase/auth";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import type { Role } from "@/types";
 
 type HealthPayload = {
   mode: string;
@@ -17,12 +20,20 @@ type HealthPayload = {
 };
 
 export function LoginPage() {
-  const { ready, user, login } = useDemo();
+  const { ready, user, login, loginAsProfile } = useDemo();
   const router = useRouter();
   const [email, setEmail] = useState("admin@sachawasi.pe");
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<"demo" | "cloud">(
+    isSupabaseConfigured ? "cloud" : "demo",
+  );
   const [health, setHealth] = useState<HealthPayload | null>(null);
+  const [pendingBootstrap, setPendingBootstrap] = useState<{
+    userId: string;
+    email: string;
+  } | null>(null);
 
   useEffect(() => {
     if (ready && user) router.replace("/");
@@ -43,14 +54,65 @@ export function LoginPage() {
     };
   }, []);
 
-  function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const result = login(email, password);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+    setError(null);
+    setBusy(true);
+    try {
+      if (mode === "cloud" && isSupabaseConfigured) {
+        const cloud = await signInWithSupabase(email, password);
+        if (cloud.ok) {
+          const result = loginAsProfile(cloud.profile);
+          router.push(result.redirect ?? "/");
+          return;
+        }
+        if (cloud.needsProfile && cloud.userId && cloud.email) {
+          setPendingBootstrap({ userId: cloud.userId, email: cloud.email });
+          setError(cloud.message);
+          return;
+        }
+        // fallback demo if cloud fails with invalid credentials style
+        const demo = login(email, password);
+        if (demo.ok) {
+          router.push(demo.redirect ?? "/");
+          return;
+        }
+        setError(cloud.message);
+        return;
+      }
+
+      const result = login(email, password);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      router.push(result.redirect ?? "/");
+    } finally {
+      setBusy(false);
     }
-    router.push(result.redirect ?? "/");
+  }
+
+  async function createAdminProfile() {
+    if (!pendingBootstrap) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await bootstrapProfile({
+        userId: pendingBootstrap.userId,
+        email: pendingBootstrap.email,
+        fullName: "Admin Sacha Wasi",
+        role: "admin" as Role,
+        sucursalId: null,
+      });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      const local = loginAsProfile(result.profile);
+      router.push(local.redirect ?? "/");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const sb = health?.supabase;
@@ -88,8 +150,7 @@ export function LoginPage() {
                   Operación de comida rápida, controlada desde la selva hasta la caja.
                 </h1>
                 <p className="mt-4 max-w-sm text-sm text-white/80">
-                  POS, cocina, recetas, inventario y reportes multi‑sucursal. Listo
-                  para Vercel + Supabase.
+                  POS, cocina, recetas, inventario y reportes multi‑sucursal.
                 </p>
               </div>
             </div>
@@ -101,36 +162,58 @@ export function LoginPage() {
             <BrandLogo variant="principal" size={120} priority />
           </div>
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--sw-muted)]">
-            Acceso demo
+            Acceso
           </p>
           <h2 className="mt-2 font-[family-name:var(--font-display)] text-3xl text-[var(--sw-ink)]">
             Entrar al sistema
           </h2>
-          <p className="mt-2 text-sm text-[var(--sw-muted)]">
-            Usa un usuario demo. Contraseña: <code>{DEMO_PASSWORD}</code>
-          </p>
 
           {sb ? (
             <div
               className={`mt-4 rounded-2xl border px-3 py-2 text-xs ${
-                sb.reachable
+                sb.schemaReady
                   ? "border-[var(--sw-forest)]/30 bg-[var(--sw-leaf)]/20"
                   : "border-[var(--sw-chili)]/30 bg-[var(--sw-chili)]/10"
               }`}
             >
               <p className="font-semibold">
                 Supabase: {sb.reachable ? "conectado" : "sin respuesta"}
+                {sb.schemaReady ? " · esquema listo" : ""}
               </p>
               <p className="mt-1 text-[var(--sw-muted)]">
                 {sb.schemaReady
-                  ? "Esquema listo."
-                  : (sb.detail ??
-                    "Auth OK. Ejecuta supabase/SETUP.sql en el SQL Editor.")}
+                  ? "Puedes entrar en modo Cloud (Auth) o Demo local."
+                  : (sb.detail ?? "Ejecuta SETUP.sql")}
               </p>
             </div>
           ) : null}
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4">
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setMode("demo")}
+              className={`rounded-xl px-3 py-2 text-sm ${
+                mode === "demo"
+                  ? "bg-[var(--sw-forest)] text-white"
+                  : "bg-white border border-[var(--sw-line)]"
+              }`}
+            >
+              Demo local
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("cloud")}
+              className={`rounded-xl px-3 py-2 text-sm ${
+                mode === "cloud"
+                  ? "bg-[var(--sw-gold)] text-[var(--sw-ink)]"
+                  : "bg-white border border-[var(--sw-line)]"
+              }`}
+            >
+              Cloud Supabase
+            </button>
+          </div>
+
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <label className="block text-xs text-[var(--sw-muted)]">
               Email
               <input
@@ -155,28 +238,52 @@ export function LoginPage() {
             ) : null}
             <button
               type="submit"
-              className="w-full rounded-2xl bg-[var(--sw-forest)] py-3.5 text-sm font-semibold text-white"
+              disabled={busy}
+              className="w-full rounded-2xl bg-[var(--sw-forest)] py-3.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              Iniciar sesión
+              {busy ? "Entrando…" : "Iniciar sesión"}
             </button>
           </form>
 
-          <div className="mt-6 grid gap-2">
-            {DEMO_USERS.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => {
-                  setEmail(u.email);
-                  setPassword(DEMO_PASSWORD);
-                }}
-                className="rounded-xl border border-[var(--sw-line)] bg-white/70 px-3 py-2 text-left text-xs hover:border-[var(--sw-forest)]"
-              >
-                <span className="font-medium">{u.full_name}</span>
-                <span className="text-[var(--sw-muted)]"> · {u.email}</span>
-              </button>
-            ))}
-          </div>
+          {pendingBootstrap ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={createAdminProfile}
+              className="mt-3 w-full rounded-2xl border border-[var(--sw-gold)] bg-[var(--sw-gold)]/20 py-3 text-sm font-semibold"
+            >
+              Crear perfil admin en Supabase
+            </button>
+          ) : null}
+
+          {mode === "demo" ? (
+            <div className="mt-6 grid gap-2">
+              <p className="text-xs text-[var(--sw-muted)]">
+                Usuarios demo · contraseña <code>{DEMO_PASSWORD}</code>
+              </p>
+              {DEMO_USERS.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => {
+                    setEmail(u.email);
+                    setPassword(DEMO_PASSWORD);
+                    setMode("demo");
+                  }}
+                  className="rounded-xl border border-[var(--sw-line)] bg-white/70 px-3 py-2 text-left text-xs hover:border-[var(--sw-forest)]"
+                >
+                  <span className="font-medium">{u.full_name}</span>
+                  <span className="text-[var(--sw-muted)]"> · {u.email}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-[var(--sw-muted)]">
+              Crea el usuario en Supabase → Authentication → Users (confirma email
+              OFF para pruebas). Luego ejecuta{" "}
+              <code>SETUP_PART2.sql</code> y entra aquí en modo Cloud.
+            </p>
+          )}
         </section>
       </div>
     </div>
