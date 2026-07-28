@@ -17,7 +17,8 @@ export function AppShell({
   title: string;
   subtitle?: string;
 }) {
-  const { ready, user, logout, sucursalId, sucursales, setSucursalId } = useDemo();
+  const { ready, user, logout, sucursalId, sucursales, setSucursalId, alerts } =
+    useDemo();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -124,20 +125,30 @@ export function AppShell({
                 <p className="mt-2 max-w-2xl text-sm text-[var(--sw-muted)]">{subtitle}</p>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-2 md:hidden">
-              {links.slice(0, 5).map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`rounded-full px-3 py-1.5 text-xs ${
-                    pathname === item.href
-                      ? "bg-[var(--sw-forest)] text-white"
-                      : "bg-white/70 text-[var(--sw-ink)]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+            <div className="flex flex-col items-end gap-2">
+              {alerts.length > 0 ? (
+                <div className="max-w-xs rounded-2xl border border-[var(--sw-chili)]/30 bg-[var(--sw-chili)]/10 px-3 py-2 text-xs">
+                  <p className="font-semibold">
+                    {alerts.length} alerta{alerts.length > 1 ? "s" : ""}
+                  </p>
+                  <p className="text-[var(--sw-muted)]">{alerts[0].title}: {alerts[0].body}</p>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2 md:hidden">
+                {links.slice(0, 5).map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`rounded-full px-3 py-1.5 text-xs ${
+                      pathname === item.href
+                        ? "bg-[var(--sw-forest)] text-white"
+                        : "bg-white/70 text-[var(--sw-ink)]"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </header>
 

@@ -5,6 +5,18 @@ Multi‑sucursal, roles RBAC, POS, KDS, recetas/escandallos, inventario, caja y 
 
 Stack: **Next.js (TypeScript) + Vercel + Supabase**. Independiente de NeuroSys.
 
+## Preview en vivo (desarrollo)
+
+Mientras el agente trabaja, el preview público es:
+
+**https://promotion-dishes-worked-willing.trycloudflare.com**
+
+Login demo: `admin@sachawasi.pe` / `sacha2026`
+
+> El link de Cloudflare puede renovarse si se reinicia el túnel; también
+> está disponible `https://sachawasi.loca.lt` (puede pedir un click de
+> confirmación).
+
 ## Modo demo (sin Supabase)
 
 ```bash

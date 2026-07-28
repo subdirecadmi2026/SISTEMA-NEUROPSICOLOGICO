@@ -601,3 +601,67 @@ export function recipeCost(recetaId: string) {
     return sum + (insumo?.cost_unit ?? 0) * line.cantidad;
   }, 0);
 }
+
+export const DEMO_PROVEEDORES = [
+  {
+    id: "prov-1",
+    name: "Mercado Belén Abastos",
+    contact: "Luis Rengifo",
+    phone: "+51 965 111 222",
+    email: "compras@belen.pe",
+  },
+  {
+    id: "prov-2",
+    name: "Pescados del Itaya",
+    contact: "María Panduro",
+    phone: "+51 965 333 444",
+    email: "ventas@itaya.pe",
+  },
+  {
+    id: "prov-3",
+    name: "Selva Insumos SAC",
+    contact: "Jorge Vásquez",
+    phone: "+51 965 555 666",
+    email: "pedidos@selvainsumos.pe",
+  },
+];
+
+export const DEMO_MESAS = [
+  { id: "mesa-1", label: "Mesa 1", seats: 4, status: "libre" as const },
+  { id: "mesa-2", label: "Mesa 2", seats: 2, status: "ocupada" as const },
+  { id: "mesa-3", label: "Mesa 3", seats: 4, status: "libre" as const },
+  { id: "mesa-4", label: "Mesa 4", seats: 6, status: "libre" as const },
+  { id: "mesa-5", label: "Barra A", seats: 3, status: "libre" as const },
+];
+
+export function createInitialPurchases() {
+  return [
+    {
+      id: "po-1",
+      numero: "OC-2401",
+      proveedor_id: "prov-1",
+      sucursal_id: "suc-centro",
+      status: "enviada" as const,
+      lines: [
+        { insumo_id: "ins-arroz", cantidad: 25, costo_unit: 4.1 },
+        { insumo_id: "ins-yuca", cantidad: 20, costo_unit: 2.7 },
+      ],
+      total: 25 * 4.1 + 20 * 2.7,
+      created_at: minutesAgo(1800),
+      created_by: "usr-inv",
+      notes: "Pedido semanal de abarrotes",
+    },
+    {
+      id: "po-2",
+      numero: "OC-2402",
+      proveedor_id: "prov-2",
+      sucursal_id: "suc-centro",
+      status: "borrador" as const,
+      lines: [{ insumo_id: "ins-doncella", cantidad: 8, costo_unit: 31 }],
+      total: 248,
+      created_at: minutesAgo(120),
+      created_by: "usr-inv",
+      notes: null,
+    },
+  ];
+}

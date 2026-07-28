@@ -142,3 +142,51 @@ export interface AuditLog {
   entity_id: string | null;
   timestamp: string;
 }
+
+export type PurchaseStatus = "borrador" | "enviada" | "recibida" | "cancelada";
+
+export interface Proveedor {
+  id: string;
+  name: string;
+  contact: string;
+  phone: string;
+  email: string;
+}
+
+export interface PurchaseLine {
+  insumo_id: string;
+  cantidad: number;
+  costo_unit: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  numero: string;
+  proveedor_id: string;
+  sucursal_id: string;
+  status: PurchaseStatus;
+  lines: PurchaseLine[];
+  total: number;
+  created_at: string;
+  created_by: string;
+  notes: string | null;
+}
+
+export type AlertLevel = "info" | "warn" | "critical";
+
+export interface AppAlert {
+  id: string;
+  level: AlertLevel;
+  title: string;
+  body: string;
+  href?: string;
+  created_at: string;
+  read: boolean;
+}
+
+export interface Mesa {
+  id: string;
+  label: string;
+  seats: number;
+  status: "libre" | "ocupada";
+}

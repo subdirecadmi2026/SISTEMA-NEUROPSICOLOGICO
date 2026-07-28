@@ -15,32 +15,41 @@ import {
   createInitialCashSession,
   createInitialMovements,
   createInitialOrders,
+  createInitialPurchases,
   DEMO_CATEGORIES,
   DEMO_INSUMOS,
+  DEMO_MESAS,
   DEMO_PRODUCTS,
+  DEMO_PROVEEDORES,
   DEMO_RECETA_INGREDIENTES,
   DEMO_RECETAS,
   DEMO_SUCURSALES,
   DEMO_USERS,
   recipeCost,
 } from "@/lib/demo-data";
+import { buildAlerts, calcPurchaseTotal } from "@/lib/ops-helpers";
 import { homeForRole } from "@/lib/roles";
 import type {
+  AppAlert,
   AuditLog,
   CashSession,
   Insumo,
   InventoryMovement,
+  Mesa,
   Order,
   OrderChannel,
   OrderItem,
   OrderStatus,
   PaymentMethod,
   Profile,
+  Proveedor,
+  PurchaseOrder,
+  PurchaseStatus,
   Role,
 } from "@/types";
 
 const SESSION_KEY = "sacha-wasi-session";
-const STORE_KEY = "sacha-wasi-store-v1";
+const STORE_KEY = "sacha-wasi-store-v2";
 
 type CartLine = {
   productId: string;
@@ -55,7 +64,11 @@ type DemoStoreState = {
   movements: InventoryMovement[];
   cash: CashSession;
   audits: AuditLog[];
+  purchases: PurchaseOrder[];
+  mesas: Mesa[];
   orderSeq: number;
+  purchaseSeq: number;
+  lastTicket: Order | null;
 };
 
 type DemoContextValue = {
@@ -68,6 +81,11 @@ type DemoContextValue = {
   movements: InventoryMovement[];
   cash: CashSession;
   audits: AuditLog[];
+  purchases: PurchaseOrder[];
+  mesas: Mesa[];
+  proveedores: Proveedor[];
+  alerts: AppAlert[];
+  lastTicket: Order | null;
   products: typeof DEMO_PRODUCTS;
   categories: typeof DEMO_CATEGORIES;
   recetas: typeof DEMO_RECETAS;
@@ -81,7 +99,12 @@ type DemoContextValue = {
   updateCartLine: (productId: string, patch: Partial<CartLine>) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
-  checkout: (payment: PaymentMethod, channel: OrderChannel) => { ok: boolean; message: string; order?: Order };
+  clearLastTicket: () => void;
+  checkout: (
+    payment: PaymentMethod,
+    channel: OrderChannel,
+    mesaId?: string | null,
+  ) => { ok: boolean; message: string; order?: Order };
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   adjustInventory: (
     insumoId: string,
@@ -91,6 +114,15 @@ type DemoContextValue = {
   ) => { ok: boolean; message: string };
   closeCash: (closingAmount: number, notes: string) => { ok: boolean; message: string };
   openCash: (openingFloat: number) => void;
+  createPurchase: (input: {
+    proveedor_id: string;
+    lines: PurchaseOrder["lines"];
+    notes?: string;
+  }) => { ok: boolean; message: string };
+  updatePurchaseStatus: (
+    purchaseId: string,
+    status: PurchaseStatus,
+  ) => { ok: boolean; message: string };
   recipeCost: (recetaId: string) => number;
 };
 
@@ -103,7 +135,11 @@ function initialStore(): DemoStoreState {
     movements: createInitialMovements(),
     cash: createInitialCashSession(),
     audits: createInitialAuditLogs(),
+    purchases: createInitialPurchases(),
+    mesas: structuredClone(DEMO_MESAS),
     orderSeq: 1004,
+    purchaseSeq: 2403,
+    lastTicket: null,
   };
 }
 
@@ -153,9 +189,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     return saved?.sucursal_id ?? "suc-centro";
   });
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [store, setStore] = useState<DemoStoreState>(() =>
-    readJson(STORE_KEY, initialStore()),
-  );
+  const [store, setStore] = useState<DemoStoreState>(() => {
+    const saved = readJson<Partial<DemoStoreState> | null>(STORE_KEY, null);
+    return { ...initialStore(), ...(saved ?? {}) };
+  });
 
   useEffect(() => {
     if (!ready) return;
@@ -220,9 +257,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearCart = useCallback(() => setCart([]), []);
+  const clearLastTicket = useCallback(() => {
+    setStore((prev) => ({ ...prev, lastTicket: null }));
+  }, []);
 
   const checkout = useCallback(
-    (payment: PaymentMethod, channel: OrderChannel) => {
+    (payment: PaymentMethod, channel: OrderChannel, mesaId?: string | null) => {
       if (!user) return { ok: false, message: "Debes iniciar sesión" };
       if (cart.length === 0) return { ok: false, message: "Carrito vacío" };
       if (store.cash.closed_at) {
@@ -322,6 +362,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         orders: [order, ...prev.orders],
         insumos: nextInsumos,
         movements: [...saleMovements, ...prev.movements],
+        lastTicket: order,
+        mesas:
+          channel === "mesa" && mesaId
+            ? prev.mesas.map((m) =>
+                m.id === mesaId ? { ...m, status: "ocupada" } : m,
+              )
+            : prev.mesas,
         cash: {
           ...prev.cash,
           expected_cash: prev.cash.expected_cash + cashIncrement,
@@ -435,6 +482,118 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     [sucursalId, user],
   );
 
+  const createPurchase = useCallback(
+    (input: {
+      proveedor_id: string;
+      lines: PurchaseOrder["lines"];
+      notes?: string;
+    }) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      if (input.lines.length === 0) {
+        return { ok: false, message: "Agrega al menos un insumo" };
+      }
+      const purchase: PurchaseOrder = {
+        id: `po-${Date.now()}`,
+        numero: `OC-${store.purchaseSeq}`,
+        proveedor_id: input.proveedor_id,
+        sucursal_id: sucursalId,
+        status: "enviada",
+        lines: input.lines,
+        total: calcPurchaseTotal(input.lines),
+        created_at: new Date().toISOString(),
+        created_by: user.id,
+        notes: input.notes || null,
+      };
+      setStore((prev) => ({
+        ...prev,
+        purchaseSeq: prev.purchaseSeq + 1,
+        purchases: [purchase, ...prev.purchases],
+        audits: pushAudit(prev.audits, user, "create_purchase", "compras", purchase.id),
+      }));
+      return { ok: true, message: `Orden ${purchase.numero} creada` };
+    },
+    [store.purchaseSeq, sucursalId, user],
+  );
+
+  const updatePurchaseStatus = useCallback(
+    (purchaseId: string, status: PurchaseStatus) => {
+      if (!user) return { ok: false, message: "Sin sesión" };
+      setStore((prev) => {
+        const purchase = prev.purchases.find((p) => p.id === purchaseId);
+        if (!purchase) return prev;
+
+        let insumos = prev.insumos;
+        let movements = prev.movements;
+
+        if (status === "recibida" && purchase.status !== "recibida") {
+          const now = new Date().toISOString();
+          insumos = prev.insumos.map((insumo) => {
+            const line = purchase.lines.find((l) => l.insumo_id === insumo.id);
+            if (!line) return insumo;
+            return {
+              ...insumo,
+              stock: Number((insumo.stock + line.cantidad).toFixed(3)),
+              cost_unit: line.costo_unit,
+            };
+          });
+          movements = [
+            ...purchase.lines.map((line, idx) => ({
+              id: `mov-po-${Date.now()}-${idx}`,
+              insumo_id: line.insumo_id,
+              tipo: "entrada" as const,
+              cantidad: line.cantidad,
+              motivo: `Recepción ${purchase.numero}`,
+              referencia_id: purchase.id,
+              created_by: user.id,
+              created_at: now,
+            })),
+            ...prev.movements,
+          ];
+        }
+
+        return {
+          ...prev,
+          insumos,
+          movements,
+          purchases: prev.purchases.map((p) =>
+            p.id === purchaseId ? { ...p, status } : p,
+          ),
+          audits: pushAudit(
+            prev.audits,
+            user,
+            `purchase_${status}`,
+            "compras",
+            purchaseId,
+          ),
+        };
+      });
+      return { ok: true, message: `Compra marcada como ${status}` };
+    },
+    [user],
+  );
+
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const alerts = useMemo(() => {
+    const critical = store.insumos
+      .filter((i) => i.sucursal_id === sucursalId && i.stock <= i.min_stock)
+      .map((i) => i.name);
+    const lateKitchenCount = store.orders.filter((o) => {
+      if (o.sucursal_id !== sucursalId) return false;
+      if (!["recibido", "en_preparacion"].includes(o.status)) return false;
+      return nowMs - new Date(o.created_at).getTime() > 12 * 60_000;
+    }).length;
+    return buildAlerts({
+      cashClosed: Boolean(store.cash.closed_at),
+      criticalStockNames: critical,
+      lateKitchenCount,
+    });
+  }, [nowMs, store.cash.closed_at, store.insumos, store.orders, sucursalId]);
+
   const value = useMemo<DemoContextValue>(
     () => ({
       ready,
@@ -446,6 +605,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       movements: store.movements,
       cash: store.cash,
       audits: store.audits,
+      purchases: store.purchases ?? [],
+      mesas: store.mesas ?? DEMO_MESAS,
+      proveedores: DEMO_PROVEEDORES,
+      alerts,
+      lastTicket: store.lastTicket ?? null,
       products: DEMO_PRODUCTS,
       categories: DEMO_CATEGORIES,
       recetas: DEMO_RECETAS,
@@ -459,11 +623,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       updateCartLine,
       removeFromCart,
       clearCart,
+      clearLastTicket,
       checkout,
       updateOrderStatus,
       adjustInventory,
       closeCash,
       openCash,
+      createPurchase,
+      updatePurchaseStatus,
       recipeCost,
     }),
     [
@@ -472,17 +639,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       sucursalId,
       cart,
       store,
+      alerts,
       login,
       logout,
       addToCart,
       updateCartLine,
       removeFromCart,
       clearCart,
+      clearLastTicket,
       checkout,
       updateOrderStatus,
       adjustInventory,
       closeCash,
       openCash,
+      createPurchase,
+      updatePurchaseStatus,
     ],
   );
 

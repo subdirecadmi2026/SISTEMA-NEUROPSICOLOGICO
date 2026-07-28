@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { TicketModal } from "@/components/ticket-modal";
 import { formatMoney, formatTime } from "@/lib/currency";
 import { useDemo } from "@/lib/demo-store";
 import type { OrderChannel, PaymentMethod } from "@/types";
@@ -17,10 +18,14 @@ export function PosPage() {
     clearCart,
     checkout,
     cash,
+    mesas,
+    lastTicket,
+    clearLastTicket,
   } = useDemo();
   const [categoryId, setCategoryId] = useState<string>("all");
   const [payment, setPayment] = useState<PaymentMethod>("efectivo");
   const [channel, setChannel] = useState<OrderChannel>("mostrador");
+  const [mesaId, setMesaId] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
 
   const filtered = useMemo(
@@ -39,12 +44,16 @@ export function PosPage() {
   return (
     <AppShell
       title="Punto de venta"
-      subtitle="Toma pedidos rápida con combos, notas y cobro. El inventario se descuenta por receta."
+      subtitle="Toma pedidos rápida con combos, mesas, notas y cobro. El inventario se descuenta por receta."
     >
       {cash.closed_at ? (
         <div className="mb-4 rounded-2xl border border-[var(--sw-chili)]/40 bg-[var(--sw-chili)]/10 px-4 py-3 text-sm">
           La caja está cerrada. Ábrela en el módulo Caja para vender.
         </div>
+      ) : null}
+
+      {lastTicket ? (
+        <TicketModal order={lastTicket} onClose={clearLastTicket} />
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[1.4fr_0.9fr]">
@@ -109,7 +118,7 @@ export function PosPage() {
             </button>
           </div>
 
-          <div className="max-h-[42vh] space-y-3 overflow-auto pr-1">
+          <div className="max-h-[38vh] space-y-3 overflow-auto pr-1">
             {cart.length === 0 ? (
               <p className="py-10 text-center text-sm text-[var(--sw-muted)]">
                 Toca un producto para agregar
@@ -190,6 +199,25 @@ export function PosPage() {
                 <option value="delivery">Delivery</option>
               </select>
             </label>
+
+            {channel === "mesa" ? (
+              <label className="block text-xs text-[var(--sw-muted)]">
+                Mesa
+                <select
+                  className="mt-1 w-full rounded-xl border border-[var(--sw-line)] bg-white px-3 py-2.5 text-sm"
+                  value={mesaId}
+                  onChange={(e) => setMesaId(e.target.value)}
+                >
+                  <option value="">Seleccionar…</option>
+                  {mesas.map((mesa) => (
+                    <option key={mesa.id} value={mesa.id}>
+                      {mesa.label} · {mesa.seats} pax · {mesa.status}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             <div className="grid grid-cols-3 gap-2">
               {(["efectivo", "tarjeta", "wallet"] as PaymentMethod[]).map((method) => (
                 <button
@@ -219,14 +247,22 @@ export function PosPage() {
             </div>
             <button
               type="button"
-              disabled={cart.length === 0 || Boolean(cash.closed_at)}
+              disabled={
+                cart.length === 0 ||
+                Boolean(cash.closed_at) ||
+                (channel === "mesa" && !mesaId)
+              }
               onClick={() => {
-                const result = checkout(payment, channel);
+                const result = checkout(
+                  payment,
+                  channel,
+                  channel === "mesa" ? mesaId : null,
+                );
                 setMessage(result.message);
               }}
               className="w-full rounded-2xl bg-[var(--sw-forest)] px-4 py-4 text-base font-semibold text-white disabled:opacity-40"
             >
-              Cobrar y enviar a cocina
+              Cobrar, ticket y cocina
             </button>
             {message ? (
               <p className="text-center text-sm text-[var(--sw-forest)]">{message}</p>
