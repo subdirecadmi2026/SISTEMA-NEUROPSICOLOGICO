@@ -87,7 +87,7 @@ export function InstitutionalPrintBody({
             <p className="text-[11px] uppercase tracking-wider text-muted">
               {doc.provincial}
             </p>
-            <p className="print-title font-display text-xl text-navy">
+            <p className="print-title font-display text-xl" style={{ color: '#1c3a5c' }}>
               {doc.hospital}
             </p>
             <p>{doc.department}</p>
@@ -110,17 +110,44 @@ export function InstitutionalPrintBody({
       <div className="print-table-wrap p-2">
         <table className="print-schedule-table w-full border-collapse text-[10px]">
           <thead>
-            <tr className="bg-navy text-white">
-              <th className="border border-navy px-1 py-1">N°</th>
-              <th className="border border-navy px-1 py-1">FUN</th>
-              <th className="border border-navy px-1 py-1 text-left">
+            <tr className="text-white" style={{ backgroundColor: '#1c3a5c' }}>
+              <th
+                className="px-1 py-1"
+                style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+              >
+                N°
+              </th>
+              <th
+                className="px-1 py-1"
+                style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+              >
+                FUN
+              </th>
+              <th
+                className="px-1 py-1 text-left"
+                style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+              >
                 Nombres y apellidos
               </th>
-              <th className="border border-navy px-1 py-1">Rel. lab.</th>
-              <th className="border border-navy px-1 py-1">Cód.</th>
+              <th
+                className="px-1 py-1"
+                style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+              >
+                Rel. lab.
+              </th>
+              <th
+                className="px-1 py-1"
+                style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+              >
+                Cód.
+              </th>
               {Array.from({ length: days }, (_, i) => (
-                <th key={i + 1} className="border border-navy px-0 py-1">
-                  <div className="text-[8px] font-normal opacity-80">
+                <th
+                  key={i + 1}
+                  className="px-0 py-1"
+                  style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+                >
+                  <div className="text-[8px] font-normal" style={{ opacity: 0.85 }}>
                     {weekdayLetter(doc.year, doc.month, i + 1)}
                   </div>
                   {i + 1}
@@ -128,13 +155,38 @@ export function InstitutionalPrintBody({
               ))}
               {isEnf ? (
                 <>
-                  <th className="border border-navy px-0.5 py-1">Turnos</th>
-                  <th className="border border-navy px-0.5 py-1">H.plan</th>
-                  <th className="border border-navy px-0.5 py-1">Vac</th>
-                  <th className="border border-navy px-0.5 py-1">Total</th>
+                  <th
+                    className="px-0.5 py-1"
+                    style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+                  >
+                    Turnos
+                  </th>
+                  <th
+                    className="px-0.5 py-1"
+                    style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+                  >
+                    H.plan
+                  </th>
+                  <th
+                    className="px-0.5 py-1"
+                    style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+                  >
+                    Vac
+                  </th>
+                  <th
+                    className="px-0.5 py-1"
+                    style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+                  >
+                    Total
+                  </th>
                 </>
               ) : (
-                <th className="border border-navy px-0.5 py-1">Horas</th>
+                <th
+                  className="px-0.5 py-1"
+                  style={{ border: '1px solid #1c3a5c', backgroundColor: '#1c3a5c' }}
+                >
+                  Horas
+                </th>
               )}
             </tr>
           </thead>
@@ -171,11 +223,15 @@ export function InstitutionalPrintBody({
                   return (
                     <td
                       key={d}
-                      className="border border-line px-0 text-center font-bold"
+                      className="px-0 text-center font-bold"
                       style={
                         meta
-                          ? { background: meta.color, color: meta.text }
-                          : undefined
+                          ? {
+                              border: '1px solid #d5dee6',
+                              backgroundColor: meta.color,
+                              color: meta.text,
+                            }
+                          : { border: '1px solid #d5dee6' }
                       }
                     >
                       {code}
@@ -210,18 +266,22 @@ export function InstitutionalPrintBody({
 
       <div className="print-footer grid gap-3 border-t border-line p-4 text-xs sm:grid-cols-2">
         <div>
-          <p className="mb-1 font-semibold text-navy">Feriados {doc.year}</p>
-          <p className="text-muted">{formatHolidaysLabel(doc.year)}</p>
+          <p className="mb-1 font-semibold" style={{ color: '#1c3a5c' }}>
+            Feriados {doc.year}
+          </p>
+          <p style={{ color: '#5a6b7a' }}>{formatHolidaysLabel(doc.year)}</p>
 
           {doc.notes ? (
             <>
-              <p className="mb-1 mt-3 font-semibold text-navy">Observaciones</p>
+              <p className="mb-1 mt-3 font-semibold" style={{ color: '#1c3a5c' }}>
+                Observaciones
+              </p>
               <p className="print-notes-text">{doc.notes}</p>
             </>
           ) : null}
           {doc.contingencyPlan ? (
             <>
-              <p className="mb-1 mt-3 font-semibold text-navy">
+              <p className="mb-1 mt-3 font-semibold" style={{ color: '#1c3a5c' }}>
                 Plan de contingencia
               </p>
               <p className="print-notes-text">{doc.contingencyPlan}</p>

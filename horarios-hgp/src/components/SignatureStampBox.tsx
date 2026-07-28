@@ -90,8 +90,14 @@ export function SignatureStampBox({
   const primaryName = responsibleName || certName
 
   return (
-    <div className="print-sign-box flex min-h-[4.75rem] flex-col overflow-hidden rounded border border-line bg-white px-1.5 py-1">
-      <p className="print-sign-role shrink-0 text-[8px] font-semibold uppercase leading-tight tracking-wide text-navy">
+    <div
+      className="print-sign-box flex min-h-[4.75rem] flex-col overflow-hidden rounded px-1.5 py-1"
+      style={{ border: '1px solid #d5dee6', backgroundColor: '#ffffff' }}
+    >
+      <p
+        className="print-sign-role shrink-0 text-[8px] font-semibold uppercase leading-tight tracking-wide"
+        style={{ color: '#1c3a5c' }}
+      >
         <span className="line-clamp-2 break-words">{label}</span>
       </p>
 
@@ -106,7 +112,8 @@ export function SignatureStampBox({
             />
           ) : (
             <div
-              className="print-sign-qr-placeholder flex h-9 w-9 shrink-0 items-center justify-center border border-dashed border-line text-[7px] text-muted"
+              className="print-sign-qr-placeholder flex h-9 w-9 shrink-0 items-center justify-center text-[7px]"
+              style={{ border: '1px dashed #d5dee6', color: '#5a6b7a' }}
               aria-hidden
             >
               QR
@@ -123,24 +130,32 @@ export function SignatureStampBox({
             ) : null}
             {primaryName ? (
               <p
-                className="print-sign-name text-[8px] font-semibold leading-tight text-ink"
+                className="print-sign-name text-[8px] font-semibold leading-tight"
+                style={{ color: '#1e2a36' }}
                 title={primaryName}
               >
                 <span className="line-clamp-2 break-words">{primaryName}</span>
               </p>
             ) : null}
-            <p className="print-sign-firmado mt-0.5 text-[7px] font-bold uppercase leading-none tracking-wide text-teal">
+            <p
+              className="print-sign-firmado mt-0.5 text-[7px] font-bold uppercase leading-none tracking-wide"
+              style={{ color: '#2e7d84' }}
+            >
               Firmado electrónicamente
             </p>
             {showCertAsExtra ? (
               <p
-                className="print-sign-cert mt-0.5 text-[7px] leading-tight text-muted"
+                className="print-sign-cert mt-0.5 text-[7px] leading-tight"
+                style={{ color: '#5a6b7a' }}
                 title={certName}
               >
                 <span className="line-clamp-1 break-words">Cert: {certName}</span>
               </p>
             ) : null}
-            <p className="print-sign-meta-line mt-0.5 text-[7px] leading-tight text-muted">
+            <p
+              className="print-sign-meta-line mt-0.5 text-[7px] leading-tight"
+              style={{ color: '#5a6b7a' }}
+            >
               <span className="line-clamp-2 break-words">
                 {shortDate(electronic.signedAt)}
                 {methodTag(electronic.method)
@@ -148,7 +163,10 @@ export function SignatureStampBox({
                   : ''}
               </span>
             </p>
-            <p className="print-sign-verify text-[7px] font-medium leading-tight text-navy">
+            <p
+              className="print-sign-verify text-[7px] font-medium leading-tight"
+              style={{ color: '#1c3a5c' }}
+            >
               Verifique con QR
             </p>
           </div>
@@ -156,19 +174,23 @@ export function SignatureStampBox({
       ) : primaryName ? (
         <div className="mt-2 flex flex-col overflow-hidden">
           <p
-            className="text-[9px] font-semibold leading-tight text-ink"
+            className="text-[9px] font-semibold leading-tight"
+            style={{ color: '#1e2a36' }}
             title={primaryName}
           >
             <span className="line-clamp-2 break-words">{primaryName}</span>
           </p>
-          <p className="mt-2 border-t border-line pt-0.5 text-center text-[7px] leading-tight text-muted">
+          <p
+            className="mt-2 border-t pt-0.5 text-center text-[7px] leading-tight"
+            style={{ borderColor: '#d5dee6', color: '#5a6b7a' }}
+          >
             {plainName && !signedElectronic
               ? 'Pendiente sello electrónico'
               : 'Pendiente de firma'}
           </p>
         </div>
       ) : (
-        <p className="print-sign-empty mt-3 text-[8px] text-muted">
+        <p className="print-sign-empty mt-3 text-[8px]" style={{ color: '#5a6b7a' }}>
           Pendiente de firma
         </p>
       )}

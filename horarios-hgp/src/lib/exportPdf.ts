@@ -107,7 +107,9 @@ const COLOR_PROPS = [
 function sanitizeCssValue(value: string): string | null {
   if (!/oklab|oklch|color-mix\(/i.test(value)) return null
   if (/^(oklab|oklch)\(/i.test(value.trim())) return cssColorToRgb(value)
-  return 'transparent'
+  // color-mix u otras: no borrar; el bake inline lo corrige
+  if (/color-mix\(/i.test(value)) return '#ffffff'
+  return cssColorToRgb(value)
 }
 
 function sanitizeStyleDeclaration(style: CSSStyleDeclaration) {
@@ -139,6 +141,22 @@ function sanitizeCssRule(rule: CSSRule) {
 /** Evita el crash de html2canvas con colores oklab de Tailwind v4. */
 function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement) {
   const doc = clonedRoot.ownerDocument
+
+  // 1) Convertir oklab/oklch → rgb (NUNCA transparent: eso dejaba el PDF “sin nada”)
+  const convertCssText = (text: string) =>
+    text
+      .replace(/oklab\([^)]+\)/gi, (m) => cssColorToRgb(m))
+      .replace(/oklch\([^)]+\)/gi, (m) => cssColorToRgb(m))
+
+  doc.querySelectorAll('style').forEach((styleEl) => {
+    const text = styleEl.textContent ?? ''
+    if (!/oklab|oklch|color-mix\(/i.test(text)) return
+    styleEl.textContent = convertCssText(text).replace(
+      /color-mix\([^)]+\)/gi,
+      '#ffffff',
+    )
+  })
+
   for (const sheet of [...doc.styleSheets]) {
     try {
       for (const rule of [...sheet.cssRules]) sanitizeCssRule(rule)
@@ -147,15 +165,7 @@ function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement
     }
   }
 
-  doc.querySelectorAll('style').forEach((styleEl) => {
-    const text = styleEl.textContent ?? ''
-    if (!/oklab|oklch|color-mix\(/i.test(text)) return
-    styleEl.textContent = text
-      .replace(/oklab\([^)]+\)/gi, 'transparent')
-      .replace(/oklch\([^)]+\)/gi, 'transparent')
-      .replace(/color-mix\([^)]+\)/gi, 'transparent')
-  })
-
+  // 2) Colores computados del original → inline rgb en el clon
   const srcEls = [sourceRoot, ...sourceRoot.querySelectorAll<HTMLElement>('*')]
   const dstEls = [clonedRoot, ...clonedRoot.querySelectorAll<HTMLElement>('*')]
   const n = Math.min(srcEls.length, dstEls.length)
@@ -167,12 +177,18 @@ function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement
     for (const prop of COLOR_PROPS) {
       const raw = cs.getPropertyValue(prop)
       if (!raw) continue
-      dst.style.setProperty(prop, cssColorToRgb(raw))
+      dst.style.setProperty(prop, cssColorToRgb(raw), 'important')
     }
     const bgImage = cs.backgroundImage
-    if (bgImage && /oklab|oklch|color-mix\(/i.test(bgImage)) {
-      dst.style.backgroundImage = 'none'
-      dst.style.backgroundColor = cssColorToRgb(cs.backgroundColor)
+    if (bgImage && bgImage !== 'none') {
+      if (/oklab|oklch|color-mix\(/i.test(bgImage)) {
+        dst.style.setProperty('background-image', 'none', 'important')
+        dst.style.setProperty(
+          'background-color',
+          cssColorToRgb(cs.backgroundColor),
+          'important',
+        )
+      }
     }
   }
 }
