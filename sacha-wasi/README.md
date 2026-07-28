@@ -7,15 +7,15 @@ Stack: **Next.js (TypeScript) + Vercel + Supabase**. Independiente de NeuroSys.
 
 ## Preview en vivo (desarrollo)
 
-Mientras el agente trabaja, el preview público es:
-
-**https://promotion-dishes-worked-willing.trycloudflare.com**
+**https://marshall-guidelines-knowing-dts.trycloudflare.com/login**
 
 Login demo: `admin@sachawasi.pe` / `sacha2026`
 
-> El link de Cloudflare puede renovarse si se reinicia el túnel; también
-> está disponible `https://sachawasi.loca.lt` (puede pedir un click de
-> confirmación).
+> Evita `loca.lt` (pide IP y suele bloquear). Usa el link de Cloudflare de arriba.
+> Si el túnel se reinicia, el agente te pasará un link nuevo.
+
+Supabase destino: `https://jmpebicnieuvmjpfjyud.supabase.co`  
+(Falta configurar la clave `anon` / publishable en `.env.local` y Vercel.)
 
 ## Modo demo (sin Supabase)
 

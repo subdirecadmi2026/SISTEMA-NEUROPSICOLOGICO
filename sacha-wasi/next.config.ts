@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Permite previews vía túneles públicos durante desarrollo/demo.
   allowedDevOrigins: [
-    "promotion-dishes-worked-willing.trycloudflare.com",
     "*.trycloudflare.com",
+    "*.loca.lt",
     "sachawasi.loca.lt",
   ],
 };

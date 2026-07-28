@@ -27,10 +27,24 @@ export function AppShell({
     if (!user) router.replace("/login");
   }, [ready, user, router]);
 
-  if (!ready || !user) {
+  if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--sw-bg)] text-[var(--sw-ink)]">
         <p className="text-sm tracking-wide opacity-70">Cargando Sacha Wasi…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[var(--sw-bg)] text-[var(--sw-ink)]">
+        <p className="text-sm tracking-wide opacity-70">Redirigiendo al login…</p>
+        <Link
+          href="/login"
+          className="rounded-xl bg-[var(--sw-forest)] px-4 py-2 text-sm text-white"
+        >
+          Ir a iniciar sesión
+        </Link>
       </div>
     );
   }
