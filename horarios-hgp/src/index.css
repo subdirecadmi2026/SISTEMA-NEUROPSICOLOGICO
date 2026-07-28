@@ -1,0 +1,228 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "DM Sans", "Segoe UI", sans-serif;
+  --color-navy: #1c3a5c;
+  --color-navy-deep: #132844;
+  --color-teal: #2e7d84;
+  --color-teal-soft: #5bb8b0;
+  --color-sand: #f3efe6;
+  --color-ink: #1e2a36;
+  --color-muted: #5a6b7a;
+  --color-line: #d5dee6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #d9ebe9 0%, transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, #e7eef5 0%, transparent 50%),
+    linear-gradient(180deg, #f7f4ee 0%, #eef2f5 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Planilla lista para imprimir pero oculta en otras pestañas */
+@media screen {
+  .print-sheet-offscreen {
+    position: fixed;
+    left: -120vw;
+    top: 0;
+    width: 277mm;
+    height: 202mm;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    z-index: -1;
+  }
+}
+
+/* Impresión: anclado arriba, 1 hoja por planilla (o 2 si es completo). */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 6mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Oculta la UI; el contenido imprimible se ancla arriba (absolute). */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-root,
+  .print-root * {
+    visibility: visible !important;
+  }
+
+  .print-root,
+  .print-root.print-sheet-offscreen {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    background: white !important;
+    z-index: 9999 !important;
+  }
+
+  .print-stack {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .print-area {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: white !important;
+    overflow: hidden !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Solo horario o solo distribución → una página */
+  body[data-print-only='turno'] .print-area[data-print-grid='area'],
+  body[data-print-only='area'] .print-area[data-print-grid='turno'] {
+    display: none !important;
+  }
+
+  body[data-print-only='turno'] .print-area[data-print-grid='turno'],
+  body[data-print-only='area'] .print-area[data-print-grid='area'] {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .print-area.print-sheet-page:last-child,
+  .print-stack > .print-area:last-of-type {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  .print-fit-one-page {
+    transform-origin: top left !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    min-width: 0 !important;
+  }
+
+  .print-header {
+    padding: 4px 8px !important;
+  }
+
+  .print-header .print-title {
+    font-size: 14px !important;
+    line-height: 1.1 !important;
+  }
+
+  .print-header img {
+    height: 34px !important;
+    width: auto !important;
+  }
+
+  .print-table-wrap {
+    padding: 2px 4px !important;
+  }
+
+  .print-schedule-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 8px !important;
+  }
+
+  .print-schedule-table th,
+  .print-schedule-table td {
+    padding: 1px 2px !important;
+    line-height: 1.1 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .print-footer {
+    padding: 4px 8px !important;
+    gap: 6px !important;
+    font-size: 8px !important;
+  }
+
+  .print-footer .print-sign-box {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: 5.25rem !important;
+  }
+
+  .print-footer .print-sign {
+    padding: 3px 5px !important;
+  }
+
+  .print-footer .print-sign .mt-6 {
+    margin-top: 8px !important;
+  }
+
+  .print-qr {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* Captura PDF: colores exactos (html2canvas) */
+[data-pdf-capture] {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

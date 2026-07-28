@@ -1,0 +1,228 @@
+import type { ScheduleDoc, StaffMember } from '../types'
+import { DEFAULT_COVERAGE, uid } from '../types'
+
+export function demoNursingStaff(): StaffMember[] {
+  const rows: Array<[string, string, string, string, string, string]> = [
+    ['Lic. María Guatatuca', 'ENF', 'Enfermera', 'LOSEP', 'D1', 'Enfermeras/os y Auxiliar de Enfermería'],
+    ['Lic. Ana Chimbo', 'ENF', 'Enfermera', 'LOSEP', 'D1', 'Enfermeras/os y Auxiliar de Enfermería'],
+    ['Lic. Rosa Tanguila', 'ENF', 'Enfermera', 'LOSEP', 'N1', 'Enfermeras/os y Auxiliar de Enfermería'],
+    ['Lic. Julio Andi', 'ENF', 'Enfermero', 'LOSEP', 'A2', 'Enfermeras/os y Auxiliar de Enfermería'],
+    ['Lic. Patricia Yumbo', 'ENF', 'Enfermera', 'Código de Trabajo', 'D1', 'Enfermeras/os y Auxiliar de Enfermería'],
+    ['Int. Carla Shiguango', 'INT', 'Interna de enfermería', 'Internado', 'M', 'Internos de Enfermería'],
+    ['Int. Diego Grefa', 'INT', 'Interno de enfermería', 'Internado', 'T', 'Internos de Enfermería'],
+    ['Int. Elena Vargas', 'INT', 'Interna de enfermería', 'Internado', 'M', 'Internos de Enfermería'],
+    ['Aux. Pedro Shiguango', 'AUX', 'Auxiliar de enfermería', 'Código de Trabajo', 'M', 'Auxiliar de Enfermería'],
+    ['Aux. Carmen Grefa', 'AUX', 'Auxiliar de enfermería', 'Código de Trabajo', 'T', 'Auxiliar de Enfermería'],
+    ['Aux. Luis Cerda', 'AUX', 'Auxiliar de enfermería', 'Código de Trabajo', 'MN', 'Auxiliar de Enfermería'],
+  ]
+  return rows.map(([name, fun, role, relacionLaboral, codigoPersonal, section], i) => ({
+    id: uid('enf'),
+    name,
+    fun,
+    role,
+    relacionLaboral,
+    codigoPersonal,
+    section,
+    serviceUnit: 'Centro Obstétrico',
+    active: true,
+    order: i + 1,
+    horasMedicas: 0,
+    horasViolenciaDomestica: 0,
+    horasLactancia: fun === 'ENF' && i === 1 ? 2 : 0,
+    horasExtras: 0,
+    observaciones: '',
+  }))
+}
+
+export function demoMedicalStaff(): StaffMember[] {
+  const rows: Array<[string, string, string, string, string]> = [
+    ['Dr. Carlos Vargas', 'MED', 'Médico tratante', 'LOSEP', 'PT1'],
+    ['Dra. Elena Ruiz', 'MED', 'Médica tratante', 'LOSEP', 'CE'],
+    ['Dr. Luis Paredes', 'MED', 'Médico residente', 'Código de Trabajo', 'PT2'],
+    ['Dra. Sofía Mera', 'MED', 'Médica tratante', 'LOSEP', 'CE'],
+    ['Dr. Andrés López', 'MED', 'Médico residente', 'Código de Trabajo', 'X'],
+    ['Dra. Gabriela Cerda', 'MED', 'Especialista', 'LOSEP', 'CE'],
+  ]
+  return rows.map(([name, fun, role, relacionLaboral, codigoPersonal], i) => ({
+    id: uid('med'),
+    name,
+    fun,
+    role,
+    relacionLaboral,
+    codigoPersonal,
+    section: 'Personal médico',
+    serviceUnit: 'Medicina interna',
+    active: true,
+    order: i + 1,
+    horasMedicas: 0,
+    horasViolenciaDomestica: 0,
+    horasLactancia: 0,
+    horasExtras: 0,
+    observaciones: '',
+  }))
+}
+
+export function seedDemoCells(
+  staff: StaffMember[],
+  year: number,
+  month: number,
+  patternByFun: Record<string, string[]>,
+  fallback: string[],
+): Record<string, string> {
+  const days = new Date(year, month, 0).getDate()
+  const cells: Record<string, string> = {}
+  staff.forEach((s, si) => {
+    const pattern = patternByFun[s.fun] ?? fallback
+    for (let d = 1; d <= days; d++) {
+      const code = pattern[(si + d - 1) % pattern.length]
+      if (code) cells[`${s.id}:${d}`] = code
+    }
+  })
+  return cells
+}
+
+export function createBlankSchedule(
+  serviceType: ScheduleDoc['serviceType'],
+  year: number,
+  month: number,
+  options?: { withDemo?: boolean; unitName?: string; staff?: StaffMember[] },
+): ScheduleDoc {
+  const withDemo = options?.withDemo ?? true
+  const staff =
+    options?.staff ??
+    (withDemo
+      ? serviceType === 'enfermeria'
+        ? demoNursingStaff()
+        : demoMedicalStaff()
+      : [])
+
+  const cells =
+    withDemo && staff.length > 0
+      ? serviceType === 'enfermeria'
+        ? seedDemoCells(
+            staff,
+            year,
+            month,
+            {
+              ENF: ['D1', 'D1', 'N1', 'N1', 'L', 'L', 'D1', 'N1'],
+              INT: ['M', 'M', 'T', 'T', 'L', 'L', 'M', 'T'],
+              AUX: ['M', 'T', 'MN', 'L', 'M', 'T', 'L', 'MN'],
+            },
+            ['D1', 'N1', 'L'],
+          )
+        : seedDemoCells(
+            staff,
+            year,
+            month,
+            {
+              // Horario de turnos / consulta (no áreas)
+              MED: ['CE', 'CE', 'CE', 'PT1', 'L', 'CE', 'PT2', 'L'],
+            },
+            ['CE', 'PT1', 'L'],
+          )
+      : {}
+
+  const areaCells =
+    withDemo && staff.length > 0 && serviceType === 'medico'
+      ? seedDemoCells(
+          staff,
+          year,
+          month,
+          {
+            MED: ['CX', 'CX', 'H', 'E', '', 'IN', 'QX', ''],
+          },
+          ['CX', 'H', 'E'],
+        )
+      : {}
+
+  const base = {
+    id: uid('sch'),
+    hospital: 'Hospital General Puyo',
+    provincial: 'Dirección Provincial de Salud de Pastaza',
+    serviceType,
+    month,
+    year,
+    staff,
+    cells,
+    areaCells,
+    contingencyStaff: [
+      {
+        id: uid('cont'),
+        name: '',
+        coverage: '',
+        phone: '',
+      },
+    ],
+    llamado: false,
+    vacacionesFlag: false,
+    status: 'BORRADOR' as const,
+    version: 1,
+    signatures: [],
+    reviewComments: [],
+    audit: [
+      {
+        id: uid('aud'),
+        at: new Date().toISOString(),
+        userName: 'Sistema',
+        action: 'creado',
+        detail: 'Horario creado',
+      },
+    ],
+    coverageRule: { ...DEFAULT_COVERAGE },
+    updatedAt: new Date().toISOString(),
+  }
+
+  if (serviceType === 'enfermeria') {
+    return {
+      ...base,
+      department: 'Gestión de Cuidados de Enfermería',
+      unitName: options?.unitName ?? 'Centro Obstétrico',
+      jefeServicio: withDemo ? 'Lic. Ana Parra' : '',
+      notes: '',
+      contingencyPlan: '',
+      elaboradoPor: withDemo
+        ? 'Lic. Ana Parra — Líder del servicio'
+        : '',
+      revisadoPor: withDemo
+        ? 'Lic. Irma Naveda — Gestión de Enfermería'
+        : '',
+      aprobadoPor: withDemo
+        ? 'Mgs. Alex Naranjo — Dirección Asistencial'
+        : '',
+      talentoHumano: withDemo
+        ? 'Ing. Elizabeth Yánez — Talento Humano'
+        : '',
+      admisionesPor: '',
+      admisionesApprovedAt: undefined,
+      revisorApprovedAt: undefined,
+      electronicSigns: [],
+    }
+  }
+
+  return {
+    ...base,
+    department: 'Unidad de Administración de Talento Humano',
+    unitName: options?.unitName ?? 'Medicina interna',
+    jefeServicio: '',
+    notes: withDemo
+      ? 'Todas las actividades extras deben anotarse y enviarse mensualmente. Registrar interconsultas en la matriz.'
+      : '',
+    contingencyPlan: withDemo
+      ? 'Todo permiso o vacaciones del personal médico debe incluir plan de contingencia de cobertura.'
+      : '',
+    elaboradoPor: withDemo ? 'Líder del servicio' : '',
+    revisadoPor: withDemo
+      ? 'Dr. Santiago Pacheco — Dirección Asistencial'
+      : '',
+    aprobadoPor: withDemo
+      ? 'Mgs. Alex Naranjo — Subdirección Médica'
+      : '',
+    talentoHumano: withDemo
+      ? 'Ing. Lourdes Yánez — Talento Humano'
+      : '',
+    admisionesPor: '',
+    admisionesApprovedAt: undefined,
+    revisorApprovedAt: undefined,
+    electronicSigns: [],
+  }
+}

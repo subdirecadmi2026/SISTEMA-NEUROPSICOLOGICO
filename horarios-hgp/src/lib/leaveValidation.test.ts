@@ -1,0 +1,356 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createBlankSchedule } from '../data/demo'
+import { cellKey } from './calendar'
+import {
+  cancelLeave,
+  defaultHoursPerDay,
+  estimateAuthorizedHours,
+  inclusiveDayCount,
+  listLeaves,
+  upsertLeave,
+} from './leavesStore'
+import {
+  applyLeaveCodesToEmpty,
+  computeLeaveUsage,
+  validateLeaves,
+} from './leaveValidation'
+import { runAllValidations } from './validation'
+
+const KEY = 'hgp-staff-leaves-v1'
+
+function installMemoryStorage() {
+  const store = new Map<string, string>()
+  const memory = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      store.set(k, String(v))
+    },
+    removeItem: (k: string) => {
+      store.delete(k)
+    },
+    clear: () => store.clear(),
+    key: (i: number) => [...store.keys()][i] ?? null,
+    get length() {
+      return store.size
+    },
+  }
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: memory,
+    configurable: true,
+  })
+}
+
+describe('permisos / vacaciones', () => {
+  beforeEach(() => {
+    installMemoryStorage()
+  })
+
+  it('estima horas autorizadas por días × jornada', () => {
+    expect(inclusiveDayCount('2026-07-01', '2026-07-05')).toBe(5)
+    expect(estimateAuthorizedHours('2026-07-01', '2026-07-05', 8)).toBe(40)
+    expect(estimateAuthorizedHours('2026-07-01', '2026-07-01', 13)).toBe(13)
+    expect(estimateAuthorizedHours('2026-07-01', '2026-07-02', 24)).toBe(48)
+  })
+
+  it('convierte horas autorizadas a días según jornada', async () => {
+    const {
+      equivalentDaysFromHours,
+      formatLeaveDaysAndHours,
+    } = await import('./leavesStore')
+    expect(equivalentDaysFromHours(40, 8)).toBe(5)
+    expect(equivalentDaysFromHours(26, 13)).toBe(2)
+    expect(equivalentDaysFromHours(24, 24)).toBe(1)
+    expect(equivalentDaysFromHours(20, 8)).toBe(2.5)
+    expect(formatLeaveDaysAndHours(40, 8, 5)).toContain('5 días')
+    expect(formatLeaveDaysAndHours(40, 8, 5)).toContain('40 h')
+    expect(formatLeaveDaysAndHours(40, 8, 5)).toContain('8 h/día')
+  })
+
+  it('usa horas de clave habitual (X=24, HE=13) y no fija 8 h', () => {
+    expect(defaultHoursPerDay('medico', 'X')).toBe(24)
+    expect(defaultHoursPerDay('medico', 'HE')).toBe(13)
+    expect(defaultHoursPerDay('medico', 'PT1')).toBe(12)
+    expect(defaultHoursPerDay('medico', 'CE')).toBe(8)
+    expect(defaultHoursPerDay('enfermeria', 'D1')).toBe(12)
+
+    const guardia = upsertLeave({
+      staffId: 'med-x',
+      staffName: 'Dr. Guardia',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'otro',
+      startDate: '2026-07-10',
+      endDate: '2026-07-10',
+      hoursPerDay: 24,
+      authorizedHours: 24,
+    })
+    expect(guardia.hoursPerDay).toBe(24)
+    expect(guardia.authorizedHours).toBe(24)
+
+    const he = upsertLeave({
+      staffId: 'med-he',
+      staffName: 'Dra. HE',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'otro',
+      startDate: '2026-07-11',
+      endDate: '2026-07-12',
+      hoursPerDay: 13,
+    })
+    expect(he.hoursPerDay).toBe(13)
+    expect(he.authorizedHours).toBe(26)
+  })
+
+  it('permiso temporal solo hasta 3 h; más requiere hoja de permiso', async () => {
+    const {
+      TEMPORAL_MAX_HOURS,
+      HOJA_PERMISO_MESSAGE,
+      hoursFromMinutes,
+      formatHoursMinutes,
+      requiresHojaPermiso,
+      buildStaffLeaveReport,
+      ANNUAL_VACATION_DAYS,
+    } = await import('./leavesStore')
+
+    expect(TEMPORAL_MAX_HOURS).toBe(3)
+    expect(hoursFromMinutes(90)).toBe(1.5)
+    expect(formatHoursMinutes(1.5)).toBe('1 h 30 min')
+    expect(requiresHojaPermiso('permiso_temporal', 3.5)).toBe(true)
+    expect(requiresHojaPermiso('permiso_temporal', 3)).toBe(false)
+
+    const short = upsertLeave({
+      staffId: 'med-t',
+      staffName: 'Dr. Temporal',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'permiso_temporal',
+      startDate: '2026-07-10',
+      endDate: '2026-07-10',
+      hoursPerDay: 8,
+      authorizedHours: hoursFromMinutes(90),
+    })
+    expect(short.authorizedHours).toBe(1.5)
+
+    expect(() =>
+      upsertLeave({
+        staffId: 'med-t',
+        staffName: 'Dr. Temporal',
+        serviceType: 'medico',
+        unitName: 'UCI',
+        kind: 'permiso_temporal',
+        startDate: '2026-07-11',
+        endDate: '2026-07-11',
+        hoursPerDay: 8,
+        authorizedHours: 4,
+      }),
+    ).toThrow(HOJA_PERMISO_MESSAGE)
+
+    upsertLeave({
+      staffId: 'med-vac',
+      staffName: 'Dra. Vacaciones',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'vacaciones',
+      startDate: '2026-03-01',
+      endDate: '2026-03-10',
+      hoursPerDay: 8,
+      authorizedHours: 80,
+    })
+    upsertLeave({
+      staffId: 'med-vac',
+      staffName: 'Dra. Vacaciones',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'permiso_temporal',
+      startDate: '2026-04-01',
+      endDate: '2026-04-01',
+      hoursPerDay: 8,
+      authorizedHours: 2,
+    })
+    const report = buildStaffLeaveReport({
+      staffId: 'med-vac',
+      staffName: 'Dra. Vacaciones',
+      year: 2026,
+      hoursPerDay: 8,
+    })
+    expect(report.vacationDaysEntitled).toBe(ANNUAL_VACATION_DAYS)
+    expect(report.vacationDaysUsed).toBe(10)
+    expect(report.vacationDaysRemaining).toBe(20)
+    expect(report.vacationHoursRemaining).toBe(160)
+    expect(report.leaves.length).toBe(2)
+    expect(report.temporalHoursUsed).toBe(2)
+  })
+
+  it('rechaza jornada mayor a 24 h', () => {
+    expect(() =>
+      upsertLeave({
+        staffId: 'med-1',
+        staffName: 'Dr. Pérez',
+        serviceType: 'medico',
+        unitName: 'Medicina Interna',
+        kind: 'vacaciones',
+        startDate: '2026-07-01',
+        endDate: '2026-07-01',
+        hoursPerDay: 25,
+      }),
+    ).toThrow(/1 y 24/)
+  })
+
+  it('registra permiso y lo lista por unidad', () => {
+    const leave = upsertLeave({
+      staffId: 'med-1',
+      staffName: 'Dr. Pérez',
+      serviceType: 'medico',
+      unitName: 'Medicina Interna',
+      kind: 'vacaciones',
+      startDate: '2026-07-01',
+      endDate: '2026-07-05',
+      authorizedHours: 40,
+      hoursPerDay: 8,
+    })
+    expect(leave.absenceCode).toBe('V')
+    expect(listLeaves({ unitName: 'Medicina Interna' })).toHaveLength(1)
+    cancelLeave(leave.id)
+    expect(listLeaves({ status: 'activo' })).toHaveLength(0)
+    expect(localStorage.getItem(KEY)).toBeTruthy()
+  })
+
+  it('detecta turno productivo en días de vacaciones', () => {
+    upsertLeave({
+      staffId: 'a',
+      staffName: 'Dra. Vega',
+      serviceType: 'medico',
+      unitName: 'UCI',
+      kind: 'vacaciones',
+      startDate: '2026-07-01',
+      endDate: '2026-07-03',
+      authorizedHours: 24,
+      hoursPerDay: 8,
+    })
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.unitName = 'UCI'
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dra. Vega',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'CE', [cellKey('a', 2)]: 'V' }
+
+    const usage = computeLeaveUsage(
+      listLeaves({ unitName: 'UCI', status: 'activo' })[0],
+      doc,
+    )
+    expect(usage.conflictDays).toContain(1)
+    expect(usage.markedDays).toContain(2)
+    expect(usage.usedHours).toBe(8)
+
+    const alerts = validateLeaves(doc)
+    expect(alerts.some((a) => a.code === 'permiso_conflicto_turno')).toBe(true)
+    expect(runAllValidations(doc).some((a) => a.code === 'permiso_conflicto_turno')).toBe(
+      true,
+    )
+  })
+
+  it('detecta exceso de horas de permiso marcadas', () => {
+    upsertLeave({
+      staffId: 'a',
+      staffName: 'Enf. Ruiz',
+      serviceType: 'enfermeria',
+      unitName: 'Emergencia',
+      kind: 'otro',
+      startDate: '2026-07-01',
+      endDate: '2026-07-10',
+      authorizedHours: 16,
+      hoursPerDay: 8,
+      absenceCode: 'P',
+    })
+    const doc = createBlankSchedule('enfermeria', 2026, 7, { withDemo: false })
+    doc.unitName = 'Emergencia'
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Enf. Ruiz',
+        fun: 'ENF',
+        role: 'Enfermera',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'D1',
+        order: 1,
+      },
+    ]
+    doc.cells = {
+      [cellKey('a', 1)]: 'P',
+      [cellKey('a', 2)]: 'P',
+      [cellKey('a', 3)]: 'P',
+    }
+    const alerts = validateLeaves(doc)
+    expect(alerts.some((a) => a.code === 'permiso_exceso_horas')).toBe(true)
+  })
+
+  it('aplica claves de permiso a días vacíos', () => {
+    upsertLeave({
+      staffId: 'a',
+      staffName: 'Dr. Sol',
+      serviceType: 'medico',
+      unitName: 'Pediatría',
+      kind: 'vacaciones',
+      startDate: '2026-07-01',
+      endDate: '2026-07-03',
+      authorizedHours: 24,
+      hoursPerDay: 8,
+    })
+    const doc = createBlankSchedule('medico', 2026, 7, { withDemo: false })
+    doc.unitName = 'Pediatría'
+    doc.staff = [
+      {
+        id: 'a',
+        name: 'Dr. Sol',
+        fun: 'MED',
+        role: 'Médico',
+        relacionLaboral: 'LOSEP',
+        codigoPersonal: 'CE',
+        order: 1,
+      },
+    ]
+    doc.cells = { [cellKey('a', 1)]: 'CE' }
+    const { painted, doc: next } = applyLeaveCodesToEmpty(doc)
+    expect(painted).toBe(2)
+    expect(next.cells[cellKey('a', 1)]).toBe('CE')
+    expect(next.cells[cellKey('a', 2)]).toBe('V')
+    expect(next.cells[cellKey('a', 3)]).toBe('V')
+  })
+
+  it('detecta solapes de permisos del mismo personal', async () => {
+    const { findOverlappingLeaves } = await import('./leavesStore')
+    upsertLeave({
+      staffId: 'a',
+      staffName: 'Dr. Sol',
+      serviceType: 'medico',
+      unitName: 'Pediatría',
+      kind: 'vacaciones',
+      startDate: '2026-07-01',
+      endDate: '2026-07-10',
+      authorizedHours: 80,
+      hoursPerDay: 8,
+    })
+    const overlap = findOverlappingLeaves({
+      staffId: 'a',
+      staffName: 'Dr. Sol',
+      unitName: 'Pediatría',
+      startDate: '2026-07-08',
+      endDate: '2026-07-15',
+    })
+    expect(overlap.length).toBe(1)
+  })
+
+  it('rechaza fechas inválidas (sin rollover)', async () => {
+    const { parseYmd } = await import('./leavesStore')
+    expect(parseYmd('2026-02-31')).toBeNull()
+    expect(parseYmd('2026-02-28')).not.toBeNull()
+  })
+})
