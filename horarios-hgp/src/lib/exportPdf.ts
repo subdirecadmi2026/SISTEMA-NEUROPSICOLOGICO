@@ -6,10 +6,6 @@ import type { ScheduleDoc } from '../types'
 import { InstitutionalPrintBody } from '../components/PrintSheet'
 import { ensureElectronicQr } from './signatureQr'
 
-/** A4 landscape a 96 dpi (mismo criterio que la hoja de impresión). */
-const PAGE_W_PX = Math.round((297 * 96) / 25.4) // ≈1123
-const MARGIN_MM = 5
-
 function safeName(s: string): string {
   return s
     .normalize('NFD')
@@ -104,18 +100,13 @@ const COLOR_PROPS = [
   'border-left-color',
   'outline-color',
   'text-decoration-color',
-  'column-rule-color',
-  'caret-color',
   'fill',
   'stroke',
 ] as const
 
 function sanitizeCssValue(value: string): string | null {
   if (!/oklab|oklch|color-mix\(/i.test(value)) return null
-  // Intenta normalizar colores simples; si es complejo, elimina la declaración
-  if (/^(oklab|oklch)\(/i.test(value.trim())) {
-    return cssColorToRgb(value)
-  }
+  if (/^(oklab|oklch)\(/i.test(value.trim())) return cssColorToRgb(value)
   return 'transparent'
 }
 
@@ -145,11 +136,7 @@ function sanitizeCssRule(rule: CSSRule) {
   }
 }
 
-/**
- * Prepara el DOM clonado para html2canvas:
- * 1) elimina oklab/oklch de las hojas CSS
- * 2) fija colores inline en rgb desde el nodo original
- */
+/** Evita el crash de html2canvas con colores oklab de Tailwind v4. */
 function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement) {
   const doc = clonedRoot.ownerDocument
   for (const sheet of [...doc.styleSheets]) {
@@ -160,11 +147,9 @@ function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement
     }
   }
 
-  // Estilos embebidos en <style>
   doc.querySelectorAll('style').forEach((styleEl) => {
     const text = styleEl.textContent ?? ''
     if (!/oklab|oklch|color-mix\(/i.test(text)) return
-    // Neutraliza funciones no soportadas dejando el resto del CSS
     styleEl.textContent = text
       .replace(/oklab\([^)]+\)/gi, 'transparent')
       .replace(/oklch\([^)]+\)/gi, 'transparent')
@@ -184,40 +169,24 @@ function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement
       if (!raw) continue
       dst.style.setProperty(prop, cssColorToRgb(raw))
     }
-    // Fondos con gradientes oklab → sólido seguro
     const bgImage = cs.backgroundImage
     if (bgImage && /oklab|oklch|color-mix\(/i.test(bgImage)) {
       dst.style.backgroundImage = 'none'
       dst.style.backgroundColor = cssColorToRgb(cs.backgroundColor)
     }
   }
-
-  clonedRoot.querySelectorAll<HTMLElement>('.print-day-cell').forEach((td) => {
-    td.style.setProperty('-webkit-print-color-adjust', 'exact')
-    td.style.setProperty('print-color-adjust', 'exact')
-    td.style.fontWeight = '800'
-  })
 }
 
 async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
   const target =
     (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host
-  const w = PAGE_W_PX
-  const h = Math.ceil(
-    Math.max(target.scrollHeight, target.offsetHeight, 1),
-  )
-  host.style.height = `${h}px`
-
   return html2canvas(target, {
-    scale: 3,
+    scale: 2,
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
     logging: false,
-    width: w,
-    height: h,
-    windowWidth: w,
-    windowHeight: h,
+    windowWidth: 1123,
     onclone: (_doc, cloned) => {
       prepareCloneForCapture(target, cloned)
     },
@@ -229,22 +198,21 @@ function addCanvasPage(
   canvas: HTMLCanvasElement,
   isFirst: boolean,
 ) {
-  if (!isFirst) pdf.addPage('a4', 'landscape')
+  if (!isFirst) pdf.addPage()
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
-  const imgData = canvas.toDataURL('image/png')
-  const usableW = pageW - MARGIN_MM * 2
-  const usableH = pageH - MARGIN_MM * 2
-  const ratio = Math.min(usableW / canvas.width, usableH / canvas.height)
+  const imgData = canvas.toDataURL('image/jpeg', 0.93)
+  const ratio = Math.min(pageW / canvas.width, pageH / canvas.height)
   const w = canvas.width * ratio
   const h = canvas.height * ratio
-  const x = MARGIN_MM + (usableW - w) / 2
-  const y = MARGIN_MM
-  pdf.addImage(imgData, 'PNG', x, y, w, h)
+  // Anclado arriba (no centrado) para coincidir con la impresión
+  const x = (pageW - w) / 2
+  const y = 0
+  pdf.addImage(imgData, 'JPEG', x, y, w, h)
 }
 
 /**
- * Genera PDF A4 horizontal institucional.
+ * Genera PDF A4 horizontal institucional (formato clásico).
  * `grids`: qué hojas incluir (turno, área o ambas).
  */
 export async function buildSchedulePdfBlob(
@@ -262,11 +230,10 @@ export async function buildSchedulePdfBlob(
     'position:fixed',
     'left:-12000px',
     'top:0',
-    `width:${PAGE_W_PX}px`,
+    'width:1123px',
     'background:#ffffff',
     'z-index:-1',
     'pointer-events:none',
-    'overflow:hidden',
   ].join(';')
   document.body.appendChild(host)
 
@@ -275,7 +242,6 @@ export async function buildSchedulePdfBlob(
     orientation: 'landscape',
     unit: 'mm',
     format: 'a4',
-    compress: true,
   })
 
   try {
@@ -287,9 +253,9 @@ export async function buildSchedulePdfBlob(
           gridMode: mode,
         }),
       )
-      await waitFrames(i === 0 ? 420 : 320)
+      await waitFrames(i === 0 ? 350 : 280)
       await waitForImages(host)
-      await waitFrames(100)
+      await waitFrames(80)
       const canvas = await captureRoot(host)
       addCanvasPage(pdf, canvas, i === 0)
     }
