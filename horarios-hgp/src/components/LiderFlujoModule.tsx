@@ -67,37 +67,97 @@ function stepIndex(status?: ScheduleStatus): number {
 function FlowStepper({ status }: { status: ScheduleStatus }) {
   const current = stepIndex(status)
   return (
-    <ol className="flex items-center gap-1" aria-label="Progreso del flujo">
-      {FLOW_STEPS.map((step, i) => {
-        const done = i < current
-        const active = i === current
-        return (
-          <li key={step.status} className="flex items-center gap-1">
-            {i > 0 ? (
+    <div className="mt-3 rounded-xl bg-sand/50 px-2.5 py-3 ring-1 ring-line/70" aria-label="Progreso del flujo">
+      {/* Círculos + línea: el flujo completo siempre cabe */}
+      <ol className="relative grid grid-cols-4">
+        <span
+          className="pointer-events-none absolute left-[12.5%] right-[12.5%] top-[14px] h-0.5 -translate-y-1/2 bg-line"
+          aria-hidden
+        />
+        <span
+          className="pointer-events-none absolute left-[12.5%] top-[14px] h-0.5 -translate-y-1/2 bg-gradient-to-r from-navy to-teal transition-all duration-300"
+          style={{
+            width: `${(current / Math.max(FLOW_STEPS.length - 1, 1)) * 75}%`,
+          }}
+          aria-hidden
+        />
+        {FLOW_STEPS.map((step, i) => {
+          const done = i < current
+          const active = i === current
+          return (
+            <li key={step.status} className="relative z-[1] flex min-w-0 flex-col items-center gap-1.5 text-center">
               <span
-                className={`h-px w-2 sm:w-3 ${
-                  done || active ? 'bg-teal' : 'bg-line'
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold shadow-sm transition ${
+                  active
+                    ? 'bg-navy text-white ring-4 ring-navy/15'
+                    : done
+                      ? 'bg-teal text-white'
+                      : 'bg-white text-muted ring-1 ring-line'
                 }`}
-                aria-hidden
-              />
-            ) : null}
-            <span
-              className={`inline-flex h-6 items-center justify-center rounded-md px-1.5 text-[10px] font-bold uppercase tracking-wide sm:px-2 ${
-                active
-                  ? 'bg-navy text-white'
-                  : done
-                    ? 'bg-teal/15 text-teal'
-                    : 'bg-sand text-muted'
-              }`}
-              title={`${step.label}: ${step.hint}`}
-            >
-              <span className="sm:hidden">{i + 1}</span>
-              <span className="hidden sm:inline">{step.label}</span>
-            </span>
-          </li>
-        )
-      })}
-    </ol>
+                title={`${step.label}: ${step.hint}`}
+              >
+                {done && !active ? (
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden>
+                    <path
+                      d="M3.5 8.5 6.5 11.5 12.5 4.5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : (
+                  i + 1
+                )}
+              </span>
+              <span
+                className={`w-full px-0.5 text-[11px] font-semibold leading-tight ${
+                  active
+                    ? 'text-navy'
+                    : done
+                      ? 'text-teal'
+                      : 'text-muted'
+                }`}
+              >
+                {/* Sin truncate: el texto se parte en 2 líneas si hace falta */}
+                <span className="block break-words hyphens-auto">{step.label}</span>
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
+/** Icono de horario (calendario + reloj). */
+function ScheduleCardIcon({ validated }: { validated: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+        validated
+          ? 'bg-gradient-to-br from-teal/20 to-teal/5 text-teal ring-1 ring-teal/30'
+          : 'bg-gradient-to-br from-navy/12 to-navy/[0.03] text-navy ring-1 ring-navy/20'
+      }`}
+      aria-hidden
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className="h-[22px] w-[22px]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="4.5" width="18" height="16.5" rx="2.5" />
+        <path d="M3 9.5h18" />
+        <path d="M8 2.5v4" />
+        <path d="M16 2.5v4" />
+        <circle cx="15.25" cy="15.25" r="3.75" />
+        <path d="M15.25 13.6v1.75l1.15.7" />
+      </svg>
+    </span>
   )
 }
 
@@ -395,17 +455,18 @@ export function LiderFlujoModule({
                   </span>
                   <div className="h-px flex-1 bg-gradient-to-r from-line to-transparent" />
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {list.map((item) => {
                     const st = normalizeStatus(item.status)
                     const isValidated = st === 'ARCHIVADO'
+                    const currentStep = FLOW_STEPS[stepIndex(st)]
                     return (
                       <article
                         key={item.id}
-                        className={`group flex min-h-[12rem] flex-col overflow-hidden rounded-2xl border bg-gradient-to-b from-white via-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md ${
+                        className={`group flex min-h-[16rem] flex-col overflow-hidden rounded-2xl border bg-gradient-to-b from-white via-white shadow-[0_8px_24px_-12px_rgba(15,40,70,0.18)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_16px_32px_-14px_rgba(15,40,70,0.28)] ${
                           isValidated
-                            ? 'border-teal/25 to-teal/[0.06] hover:border-teal/45'
-                            : 'border-line to-sand/20 hover:border-navy/30'
+                            ? 'border-teal/30 to-teal/[0.07] hover:border-teal/50'
+                            : 'border-line to-sand/30 hover:border-navy/35'
                         }`}
                       >
                         <div
@@ -416,38 +477,45 @@ export function LiderFlujoModule({
                           }`}
                           aria-hidden
                         />
-                        <div className="flex flex-1 flex-col p-4">
-                          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <h3
-                                className="line-clamp-2 font-display text-lg leading-snug text-navy transition group-hover:text-teal"
-                                title={item.unitName}
-                              >
-                                {item.unitName}
-                              </h3>
-                              <p className="text-xs text-muted">
-                                {SERVICE_LABEL[item.serviceType]}
-                              </p>
+                        <div className="flex flex-1 flex-col p-4 sm:p-5">
+                          <div className="mb-1 flex items-start gap-3">
+                            <ScheduleCardIcon validated={isValidated} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <h3
+                                    className="line-clamp-2 font-display text-xl leading-snug text-navy transition group-hover:text-teal"
+                                    title={item.unitName}
+                                  >
+                                    {item.unitName}
+                                  </h3>
+                                  <p className="mt-0.5 text-xs font-medium text-muted">
+                                    {SERVICE_LABEL[item.serviceType]} ·{' '}
+                                    {periodLabel(item)}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`shrink-0 rounded-lg px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                                    isValidated
+                                      ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100'
+                                      : st === 'EN_REVISION'
+                                        ? 'bg-amber-100 text-amber-950 ring-1 ring-amber-200/70'
+                                        : st === 'APROBADO'
+                                          ? 'bg-sky-100 text-sky-950 ring-1 ring-sky-200/70'
+                                          : 'bg-sand text-navy/70 ring-1 ring-line'
+                                  }`}
+                                >
+                                  {currentStep?.label ?? STATUS_LABEL[st]}
+                                </span>
+                              </div>
                             </div>
-                            <span
-                              className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                isValidated
-                                  ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100'
-                                  : st === 'EN_REVISION'
-                                    ? 'bg-amber-100 text-amber-950'
-                                    : st === 'APROBADO'
-                                      ? 'bg-sky-100 text-sky-950'
-                                      : 'bg-sand text-muted'
-                              }`}
-                            >
-                              {FLOW_STEPS[stepIndex(st)]?.label ??
-                                STATUS_LABEL[st]}
-                            </span>
                           </div>
 
                           <FlowStepper status={st} />
 
-                          <p className="mt-2 text-[11px] text-muted">
+                          <p className="mt-3 text-[11px] leading-relaxed text-muted">
+                            {currentStep?.hint ?? 'Estado del horario'}
+                            <span className="mx-1.5 text-line">·</span>
                             Actualizado{' '}
                             {new Date(item.updatedAt).toLocaleString('es-EC', {
                               dateStyle: 'short',
@@ -455,14 +523,14 @@ export function LiderFlujoModule({
                             })}
                           </p>
 
-                          <div className="mt-auto flex flex-wrap gap-2 pt-3">
+                          <div className="mt-auto flex flex-wrap gap-2 pt-4">
                             {isValidated ? (
                               <>
                                 <button
                                   type="button"
                                   disabled={loadingDetail}
                                   onClick={() => void openValidated(item.id)}
-                                  className="rounded-xl bg-navy px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                                  className="rounded-xl bg-navy px-3.5 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
                                 >
                                   Ver firmado
                                 </button>
@@ -479,7 +547,7 @@ export function LiderFlujoModule({
                                       await downloadCompleto(doc)
                                     })()
                                   }}
-                                  className="rounded-xl bg-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                                  className="rounded-xl bg-teal px-3.5 py-2 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
                                 >
                                   Descargar completo
                                 </button>
@@ -488,7 +556,7 @@ export function LiderFlujoModule({
                               <button
                                 type="button"
                                 onClick={() => onOpenInEditor(item.id)}
-                                className="rounded-xl bg-navy px-3 py-1.5 text-xs font-semibold text-white"
+                                className="rounded-xl bg-navy px-3.5 py-2 text-xs font-semibold text-white transition hover:brightness-110"
                               >
                                 {st === 'BORRADOR'
                                   ? 'Abrir y editar'
@@ -499,7 +567,7 @@ export function LiderFlujoModule({
                               <button
                                 type="button"
                                 onClick={() => onDelete(item.id)}
-                                className="rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:bg-sand"
+                                className="rounded-xl border border-line px-3.5 py-2 text-xs font-semibold text-muted transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800"
                               >
                                 Eliminar
                               </button>
