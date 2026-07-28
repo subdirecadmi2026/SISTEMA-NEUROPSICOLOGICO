@@ -21,7 +21,8 @@ import {
 function PrintScheduleIcon() {
   return (
     <span
-      className="print-schedule-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-navy/8 text-navy ring-1 ring-navy/15"
+      className="print-schedule-icon inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-navy ring-1"
+      style={{ backgroundColor: '#e8eef4', boxShadow: 'inset 0 0 0 1px #c5d0dc' }}
       aria-hidden
     >
       <svg
@@ -108,7 +109,7 @@ export function InstitutionalPrintBody({
 
   return (
     <div className="print-capture-root bg-white text-ink">
-      <div className="print-header border-b-2 border-navy/20 px-3 py-2">
+      <div className="print-header border-b-2 px-3 py-2" style={{ borderColor: '#d0dae4' }}>
         <div className="flex items-start gap-2.5">
           <img
             src="/logo_msp.png"
@@ -171,25 +172,25 @@ export function InstitutionalPrintBody({
           </colgroup>
           <thead>
             <tr className="bg-navy text-white">
-              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+              <th className="border border-navy px-0.5 py-1 font-semibold">
                 N°
               </th>
-              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+              <th className="border border-navy px-0.5 py-1 font-semibold">
                 FUN
               </th>
-              <th className="border border-navy/80 px-1 py-1 text-left font-semibold">
+              <th className="border border-navy px-1 py-1 text-left font-semibold">
                 Nombres y apellidos
               </th>
-              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+              <th className="border border-navy px-0.5 py-1 font-semibold">
                 Rel. lab.
               </th>
-              <th className="border border-navy/80 px-0.5 py-1 font-semibold">
+              <th className="border border-navy px-0.5 py-1 font-semibold">
                 Cód.
               </th>
               {Array.from({ length: days }, (_, i) => (
                 <th
                   key={i + 1}
-                  className="border border-navy/80 px-0 py-0.5 font-semibold"
+                  className="border border-navy px-0 py-0.5 font-semibold"
                 >
                   <div className="text-[7px] font-medium leading-none opacity-90">
                     {weekdayLetter(doc.year, doc.month, i + 1)}
@@ -199,13 +200,13 @@ export function InstitutionalPrintBody({
               ))}
               {isEnf ? (
                 <>
-                  <th className="border border-navy/80 px-0.5 py-1">Turnos</th>
-                  <th className="border border-navy/80 px-0.5 py-1">H.plan</th>
-                  <th className="border border-navy/80 px-0.5 py-1">Vac</th>
-                  <th className="border border-navy/80 px-0.5 py-1">Total</th>
+                  <th className="border border-navy px-0.5 py-1">Turnos</th>
+                  <th className="border border-navy px-0.5 py-1">H.plan</th>
+                  <th className="border border-navy px-0.5 py-1">Vac</th>
+                  <th className="border border-navy px-0.5 py-1">Total</th>
                 </>
               ) : (
-                <th className="border border-navy/80 px-0.5 py-1">Horas</th>
+                <th className="border border-navy px-0.5 py-1">Horas</th>
               )}
             </tr>
           </thead>
@@ -221,7 +222,10 @@ export function InstitutionalPrintBody({
               </tr>
             )}
             {staff.map((s, idx) => (
-              <tr key={s.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-sand/25'}>
+              <tr
+                key={s.id}
+                style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f7f4ee' }}
+              >
                 <td className="border border-line px-0.5 text-center">
                   {idx + 1}
                 </td>
@@ -286,8 +290,14 @@ export function InstitutionalPrintBody({
         </table>
       </div>
 
-      <div className="print-footer border-t-2 border-navy/15 px-2.5 py-1.5 text-[10px]">
-        <div className="print-holidays mb-1.5 rounded-md bg-sand/60 px-2 py-1 ring-1 ring-line">
+      <div
+        className="print-footer border-t-2 px-2.5 py-1.5 text-[10px]"
+        style={{ borderColor: '#d5dee6' }}
+      >
+        <div
+          className="print-holidays mb-1.5 rounded-md px-2 py-1 ring-1 ring-line"
+          style={{ backgroundColor: '#f3efe6' }}
+        >
           <p className="mb-0.5 text-[8px] font-bold uppercase tracking-wide text-navy">
             Feriados {doc.year}
           </p>

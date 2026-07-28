@@ -80,6 +80,125 @@ async function waitForImages(root: HTMLElement, timeoutMs = 2500) {
   )
 }
 
+/** html2canvas no entiende oklab/oklch de Tailwind v4 → convierte a rgb/hex. */
+function cssColorToRgb(color: string): string {
+  const v = color.trim()
+  if (!v || v === 'transparent' || v === 'rgba(0, 0, 0, 0)') return 'transparent'
+  if (/^#|^rgba?\(/i.test(v)) return v
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return '#000000'
+  ctx.fillStyle = '#000000'
+  ctx.fillStyle = v
+  return ctx.fillStyle || '#000000'
+}
+
+const COLOR_PROPS = [
+  'color',
+  'background-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'outline-color',
+  'text-decoration-color',
+  'column-rule-color',
+  'caret-color',
+  'fill',
+  'stroke',
+] as const
+
+function sanitizeCssValue(value: string): string | null {
+  if (!/oklab|oklch|color-mix\(/i.test(value)) return null
+  // Intenta normalizar colores simples; si es complejo, elimina la declaración
+  if (/^(oklab|oklch)\(/i.test(value.trim())) {
+    return cssColorToRgb(value)
+  }
+  return 'transparent'
+}
+
+function sanitizeStyleDeclaration(style: CSSStyleDeclaration) {
+  for (const prop of [...style]) {
+    const val = style.getPropertyValue(prop)
+    if (!val) continue
+    const next = sanitizeCssValue(val)
+    if (next !== null) {
+      style.setProperty(prop, next, style.getPropertyPriority(prop))
+    }
+  }
+}
+
+function sanitizeCssRule(rule: CSSRule) {
+  if (rule instanceof CSSStyleRule) {
+    sanitizeStyleDeclaration(rule.style)
+    return
+  }
+  const group = rule as CSSGroupingRule
+  if ('cssRules' in group) {
+    try {
+      for (const nested of [...group.cssRules]) sanitizeCssRule(nested)
+    } catch {
+      /* hojas cross-origin */
+    }
+  }
+}
+
+/**
+ * Prepara el DOM clonado para html2canvas:
+ * 1) elimina oklab/oklch de las hojas CSS
+ * 2) fija colores inline en rgb desde el nodo original
+ */
+function prepareCloneForCapture(sourceRoot: HTMLElement, clonedRoot: HTMLElement) {
+  const doc = clonedRoot.ownerDocument
+  for (const sheet of [...doc.styleSheets]) {
+    try {
+      for (const rule of [...sheet.cssRules]) sanitizeCssRule(rule)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Estilos embebidos en <style>
+  doc.querySelectorAll('style').forEach((styleEl) => {
+    const text = styleEl.textContent ?? ''
+    if (!/oklab|oklch|color-mix\(/i.test(text)) return
+    // Neutraliza funciones no soportadas dejando el resto del CSS
+    styleEl.textContent = text
+      .replace(/oklab\([^)]+\)/gi, 'transparent')
+      .replace(/oklch\([^)]+\)/gi, 'transparent')
+      .replace(/color-mix\([^)]+\)/gi, 'transparent')
+  })
+
+  const srcEls = [sourceRoot, ...sourceRoot.querySelectorAll<HTMLElement>('*')]
+  const dstEls = [clonedRoot, ...clonedRoot.querySelectorAll<HTMLElement>('*')]
+  const n = Math.min(srcEls.length, dstEls.length)
+
+  for (let i = 0; i < n; i++) {
+    const src = srcEls[i]
+    const dst = dstEls[i]
+    const cs = getComputedStyle(src)
+    for (const prop of COLOR_PROPS) {
+      const raw = cs.getPropertyValue(prop)
+      if (!raw) continue
+      dst.style.setProperty(prop, cssColorToRgb(raw))
+    }
+    // Fondos con gradientes oklab → sólido seguro
+    const bgImage = cs.backgroundImage
+    if (bgImage && /oklab|oklch|color-mix\(/i.test(bgImage)) {
+      dst.style.backgroundImage = 'none'
+      dst.style.backgroundColor = cssColorToRgb(cs.backgroundColor)
+    }
+  }
+
+  clonedRoot.querySelectorAll<HTMLElement>('.print-day-cell').forEach((td) => {
+    td.style.setProperty('-webkit-print-color-adjust', 'exact')
+    td.style.setProperty('print-color-adjust', 'exact')
+    td.style.fontWeight = '800'
+  })
+}
+
 async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
   const target =
     (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host
@@ -100,11 +219,7 @@ async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
     windowWidth: w,
     windowHeight: h,
     onclone: (_doc, cloned) => {
-      cloned.querySelectorAll<HTMLElement>('.print-day-cell').forEach((td) => {
-        td.style.setProperty('-webkit-print-color-adjust', 'exact')
-        td.style.setProperty('print-color-adjust', 'exact')
-        td.style.fontWeight = '800'
-      })
+      prepareCloneForCapture(target, cloned)
     },
   })
 }
@@ -117,7 +232,6 @@ function addCanvasPage(
   if (!isFirst) pdf.addPage('a4', 'landscape')
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
-  // PNG: texto nítido (JPEG difumina códigos de turno)
   const imgData = canvas.toDataURL('image/png')
   const usableW = pageW - MARGIN_MM * 2
   const usableH = pageH - MARGIN_MM * 2
@@ -163,10 +277,6 @@ export async function buildSchedulePdfBlob(
     format: 'a4',
     compress: true,
   })
-  // Garantiza A4 horizontal aunque el viewer ignore metadata
-  if (pdf.internal.pageSize.getWidth() < pdf.internal.pageSize.getHeight()) {
-    pdf.setPage(1)
-  }
 
   try {
     for (let i = 0; i < modes.length; i++) {
