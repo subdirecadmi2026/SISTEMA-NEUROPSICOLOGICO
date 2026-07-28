@@ -188,7 +188,7 @@ textarea {
     min-width: 0 !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 8.5px !important;
+    font-size: 9.5px !important;
   }
 
   .print-schedule-table th,
@@ -201,8 +201,8 @@ textarea {
   }
 
   .print-day-cell {
-    font-size: 8px !important;
-    font-weight: 700 !important;
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -266,7 +266,7 @@ textarea {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 [data-pdf-capture] .print-schedule-table th,
@@ -279,8 +279,8 @@ textarea {
 }
 
 [data-pdf-capture] .print-day-cell {
-  font-size: 8.5px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }

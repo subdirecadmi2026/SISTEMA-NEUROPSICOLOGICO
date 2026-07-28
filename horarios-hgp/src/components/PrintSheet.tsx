@@ -102,9 +102,9 @@ export function InstitutionalPrintBody({
   ]
   const signCols = Math.min(Math.max(allSigns.length, 1), 6)
   const holidays = holidaysForYear(doc.year)
-  const nameColPct = isEnf ? 16 : 18
+  const nameColPct = isEnf ? 14 : 15
   const metaCols = 5 + (isEnf ? 4 : 1)
-  const dayPct = Math.max(1.35, (100 - nameColPct - 14) / days)
+  const dayPct = Math.max(1.55, (100 - nameColPct - 13) / days)
 
   return (
     <div className="print-capture-root bg-white text-ink">
@@ -147,26 +147,26 @@ export function InstitutionalPrintBody({
         </div>
       </div>
 
-      <div className="print-table-wrap px-2 py-1.5">
-        <table className="print-schedule-table w-full border-collapse text-[9px]">
+      <div className="print-table-wrap px-2 py-1">
+        <table className="print-schedule-table w-full border-collapse text-[10px]">
           <colgroup>
-            <col style={{ width: '2.4%' }} />
-            <col style={{ width: '3.2%' }} />
+            <col style={{ width: '2.2%' }} />
+            <col style={{ width: '3%' }} />
             <col style={{ width: `${nameColPct}%` }} />
-            <col style={{ width: '5%' }} />
-            <col style={{ width: '3.4%' }} />
+            <col style={{ width: '4.5%' }} />
+            <col style={{ width: '3.2%' }} />
             {Array.from({ length: days }, (_, i) => (
               <col key={i} style={{ width: `${dayPct}%` }} />
             ))}
             {isEnf ? (
               <>
+                <col style={{ width: '3%' }} />
+                <col style={{ width: '3%' }} />
+                <col style={{ width: '2.4%' }} />
                 <col style={{ width: '3.2%' }} />
-                <col style={{ width: '3.2%' }} />
-                <col style={{ width: '2.6%' }} />
-                <col style={{ width: '3.4%' }} />
               </>
             ) : (
-              <col style={{ width: '4%' }} />
+              <col style={{ width: '3.8%' }} />
             )}
           </colgroup>
           <thead>
@@ -194,7 +194,7 @@ export function InstitutionalPrintBody({
                   <div className="text-[7px] font-medium leading-none opacity-90">
                     {weekdayLetter(doc.year, doc.month, i + 1)}
                   </div>
-                  <div className="text-[9px] leading-tight">{i + 1}</div>
+                  <div className="text-[10px] leading-tight">{i + 1}</div>
                 </th>
               ))}
               {isEnf ? (
@@ -231,7 +231,7 @@ export function InstitutionalPrintBody({
                 <td className="border border-line px-1 text-left font-semibold">
                   {s.name}
                 </td>
-                <td className="border border-line px-0.5 text-center text-[8px]">
+                <td className="border border-line px-0.5 text-center text-[9px]">
                   {s.relacionLaboral}
                 </td>
                 <td className="border border-line px-0.5 text-center font-bold">
@@ -246,7 +246,7 @@ export function InstitutionalPrintBody({
                   return (
                     <td
                       key={d}
-                      className="print-day-cell border border-line px-0 text-center font-bold"
+                      className="print-day-cell border border-line px-0 text-center text-[10px] font-extrabold leading-none"
                       style={
                         meta
                           ? {
@@ -286,9 +286,9 @@ export function InstitutionalPrintBody({
         </table>
       </div>
 
-      <div className="print-footer border-t-2 border-navy/15 px-3 py-2 text-[10px]">
-        <div className="print-holidays mb-2 rounded-md bg-sand/60 px-2 py-1.5 ring-1 ring-line">
-          <p className="mb-1 text-[9px] font-bold uppercase tracking-wide text-navy">
+      <div className="print-footer border-t-2 border-navy/15 px-2.5 py-1.5 text-[10px]">
+        <div className="print-holidays mb-1.5 rounded-md bg-sand/60 px-2 py-1 ring-1 ring-line">
+          <p className="mb-0.5 text-[8px] font-bold uppercase tracking-wide text-navy">
             Feriados {doc.year}
           </p>
           <div className="flex flex-wrap gap-1">
@@ -300,7 +300,7 @@ export function InstitutionalPrintBody({
                 return (
                   <span
                     key={h.date}
-                    className="inline-flex items-center gap-1 rounded border border-line bg-white px-1.5 py-0.5 text-[8px] leading-tight text-ink"
+                    className="inline-flex items-center gap-1 rounded border border-line bg-white px-1 py-0.5 text-[8px] leading-tight text-ink"
                   >
                     <strong className="text-navy">
                       {d}/{m}
@@ -314,20 +314,22 @@ export function InstitutionalPrintBody({
         </div>
 
         {(doc.notes || doc.contingencyPlan) && (
-          <div className="mb-2 grid gap-2 sm:grid-cols-2">
+          <div className="mb-1.5 grid gap-1.5 grid-cols-2">
             {doc.notes ? (
               <div className="rounded-md border border-line bg-white px-2 py-1">
-                <p className="text-[9px] font-bold uppercase tracking-wide text-navy">
+                <p className="text-[8px] font-bold uppercase tracking-wide text-navy">
                   Observaciones
                 </p>
                 <p className="print-notes-text mt-0.5 text-[9px] leading-snug text-ink">
                   {doc.notes}
                 </p>
               </div>
-            ) : null}
+            ) : (
+              <div />
+            )}
             {doc.contingencyPlan ? (
               <div className="rounded-md border border-line bg-white px-2 py-1">
-                <p className="text-[9px] font-bold uppercase tracking-wide text-navy">
+                <p className="text-[8px] font-bold uppercase tracking-wide text-navy">
                   Plan de contingencia
                 </p>
                 <p className="print-notes-text mt-0.5 text-[9px] leading-snug text-ink">
@@ -358,7 +360,7 @@ export function InstitutionalPrintBody({
           ))}
         </div>
 
-        <p className="mt-1.5 text-[9px] text-muted">
+        <p className="mt-1 text-[8px] text-muted">
           Estado: {STATUS_LABEL[doc.status]} · v{doc.version}
         </p>
       </div>

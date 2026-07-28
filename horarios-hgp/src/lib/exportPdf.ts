@@ -85,12 +85,12 @@ async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
     (host.querySelector('.print-capture-root') as HTMLElement | null) ?? host
   const w = PAGE_W_PX
   const h = Math.ceil(
-    Math.max(target.scrollHeight, target.offsetHeight, host.offsetHeight, 1),
+    Math.max(target.scrollHeight, target.offsetHeight, 1),
   )
   host.style.height = `${h}px`
 
   return html2canvas(target, {
-    scale: 2.5,
+    scale: 3,
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
@@ -103,6 +103,7 @@ async function captureRoot(host: HTMLElement): Promise<HTMLCanvasElement> {
       cloned.querySelectorAll<HTMLElement>('.print-day-cell').forEach((td) => {
         td.style.setProperty('-webkit-print-color-adjust', 'exact')
         td.style.setProperty('print-color-adjust', 'exact')
+        td.style.fontWeight = '800'
       })
     },
   })
@@ -113,19 +114,19 @@ function addCanvasPage(
   canvas: HTMLCanvasElement,
   isFirst: boolean,
 ) {
-  if (!isFirst) pdf.addPage()
+  if (!isFirst) pdf.addPage('a4', 'landscape')
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
+  // PNG: texto nítido (JPEG difumina códigos de turno)
+  const imgData = canvas.toDataURL('image/png')
   const usableW = pageW - MARGIN_MM * 2
   const usableH = pageH - MARGIN_MM * 2
   const ratio = Math.min(usableW / canvas.width, usableH / canvas.height)
   const w = canvas.width * ratio
   const h = canvas.height * ratio
-  // Anclado arriba, centrado horizontalmente
   const x = MARGIN_MM + (usableW - w) / 2
   const y = MARGIN_MM
-  pdf.addImage(imgData, 'JPEG', x, y, w, h, undefined, 'FAST')
+  pdf.addImage(imgData, 'PNG', x, y, w, h)
 }
 
 /**
@@ -160,7 +161,12 @@ export async function buildSchedulePdfBlob(
     orientation: 'landscape',
     unit: 'mm',
     format: 'a4',
+    compress: true,
   })
+  // Garantiza A4 horizontal aunque el viewer ignore metadata
+  if (pdf.internal.pageSize.getWidth() < pdf.internal.pageSize.getHeight()) {
+    pdf.setPage(1)
+  }
 
   try {
     for (let i = 0; i < modes.length; i++) {
