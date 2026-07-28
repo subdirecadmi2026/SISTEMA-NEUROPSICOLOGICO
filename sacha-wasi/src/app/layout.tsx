@@ -19,6 +19,10 @@ export const metadata: Metadata = {
   title: "Sacha Wasi | Gestión multi-sucursal",
   description:
     "Sistema web de comida rápida: POS, KDS, recetas, inventario, caja y reportes. Vercel + Supabase.",
+  icons: {
+    icon: "/brand/logo-mark.png",
+    apple: "/brand/logo-principal.png",
+  },
 };
 
 export default function RootLayout({

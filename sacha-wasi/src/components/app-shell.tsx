@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { LogOut, Leaf } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { useDemo } from "@/lib/demo-store";
 import { canAccess, NAV_ITEMS, ROLE_LABELS } from "@/lib/roles";
 import type { Role } from "@/types";
@@ -59,9 +60,7 @@ export function AppShell({
       <div className="relative mx-auto flex min-h-screen max-w-[1600px]">
         <aside className="hidden w-64 shrink-0 flex-col border-r border-[var(--sw-line)] bg-[var(--sw-panel)]/90 p-5 backdrop-blur md:flex">
           <Link href="/" className="mb-8 flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--sw-forest)] text-[var(--sw-leaf)]">
-              <Leaf className="h-6 w-6" />
-            </span>
+            <BrandLogo variant="mark" size={48} className="shrink-0 drop-shadow-sm" />
             <div>
               <p className="font-[family-name:var(--font-display)] text-xl leading-none tracking-tight">
                 Sacha Wasi

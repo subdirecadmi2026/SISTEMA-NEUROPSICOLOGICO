@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Leaf } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { DEMO_PASSWORD, DEMO_USERS } from "@/lib/demo-data";
 import { useDemo } from "@/lib/demo-store";
 
@@ -62,29 +62,44 @@ export function LoginPage() {
 
       <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-[var(--sw-line)] bg-[var(--sw-panel)]/90 shadow-[0_30px_80px_rgba(20,50,40,0.18)] backdrop-blur md:grid-cols-[1.1fr_0.9fr]">
         <section className="relative hidden min-h-[520px] md:block">
-          <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(27,77,62,0.92),rgba(14,40,32,0.75)),url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1400&q=80')] bg-cover bg-center" />
+          <div className="absolute inset-0 bg-[linear-gradient(155deg,#0b5a2a_0%,#134d2a_45%,#1a3d24_100%)]" />
+          <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,rgba(183,227,90,0.45),transparent_45%),radial-gradient(circle_at_80%_80%,rgba(212,175,55,0.25),transparent_40%)]" />
           <div className="relative flex h-full flex-col justify-between p-10 text-[var(--sw-cream)]">
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
-                <Leaf className="h-6 w-6" />
-              </span>
+              <BrandLogo
+                variant="mark"
+                size={56}
+                className="rounded-xl bg-white/95 p-1.5"
+                priority
+              />
               <p className="font-[family-name:var(--font-display)] text-3xl">
                 Sacha Wasi
               </p>
             </div>
-            <div>
-              <h1 className="max-w-sm font-[family-name:var(--font-display)] text-4xl leading-tight">
-                Operación de comida rápida, controlada desde la selva hasta la caja.
-              </h1>
-              <p className="mt-4 max-w-sm text-sm text-white/80">
-                POS, cocina, recetas, inventario y reportes multi‑sucursal. Listo
-                para Vercel + Supabase.
-              </p>
+            <div className="flex flex-col items-start gap-6">
+              <BrandLogo
+                variant="principal"
+                size={210}
+                className="drop-shadow-[0_20px_40px_rgba(0,0,0,0.35)]"
+                priority
+              />
+              <div>
+                <h1 className="max-w-sm font-[family-name:var(--font-display)] text-4xl leading-tight">
+                  Operación de comida rápida, controlada desde la selva hasta la caja.
+                </h1>
+                <p className="mt-4 max-w-sm text-sm text-white/80">
+                  POS, cocina, recetas, inventario y reportes multi‑sucursal. Listo
+                  para Vercel + Supabase.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
         <section className="p-8 md:p-10">
+          <div className="mb-4 flex justify-center md:hidden">
+            <BrandLogo variant="principal" size={120} priority />
+          </div>
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--sw-muted)]">
             Acceso demo
           </p>

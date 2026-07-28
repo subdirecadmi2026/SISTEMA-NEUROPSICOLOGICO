@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --sw-bg: #e8f0ea;
-  --sw-panel: #f4faf5;
-  --sw-ink: #142820;
-  --sw-muted: #5d7268;
-  --sw-forest: #1b4d3e;
-  --sw-leaf: #9fd1a8;
+  --sw-bg: #eef6e8;
+  --sw-panel: #f7fbf2;
+  --sw-ink: #0b3a22;
+  --sw-muted: #5a7260;
+  --sw-forest: #0b5a2a;
+  --sw-leaf: #a4d65e;
+  --sw-lime: #b7e35a;
+  --sw-gold: #d4af37;
   --sw-chili: #d9480f;
-  --sw-cream: #f7f3e8;
-  --sw-line: rgba(27, 77, 62, 0.14);
+  --sw-cream: #f7f1e3;
+  --sw-line: rgba(11, 90, 42, 0.14);
   --background: var(--sw-bg);
   --foreground: var(--sw-ink);
 }
@@ -33,9 +35,9 @@ body {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 18%, rgba(159, 209, 168, 0.45), transparent 34%),
-    radial-gradient(circle at 88% 10%, rgba(217, 72, 15, 0.12), transparent 28%),
-    linear-gradient(160deg, #d9ebe0 0%, #eef5ef 42%, #e4efe7 100%);
+    radial-gradient(circle at 12% 18%, rgba(164, 214, 94, 0.38), transparent 34%),
+    radial-gradient(circle at 88% 10%, rgba(212, 175, 55, 0.16), transparent 28%),
+    linear-gradient(160deg, #dcefc8 0%, #eef6e8 42%, #e4f0dc 100%);
 }
 
 .sw-atmosphere::after {
