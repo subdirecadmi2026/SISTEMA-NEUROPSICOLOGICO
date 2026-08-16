@@ -19,6 +19,24 @@ type HealthPayload = {
   };
 };
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  fallback: T,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export function LoginPage() {
   const { ready, user, login, loginAsProfile } = useDemo();
   const router = useRouter();
@@ -26,9 +44,7 @@ export function LoginPage() {
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"demo" | "cloud">(
-    isSupabaseConfigured ? "cloud" : "demo",
-  );
+  const [mode, setMode] = useState<"demo" | "cloud">("demo");
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [pendingBootstrap, setPendingBootstrap] = useState<{
     userId: string;
@@ -44,49 +60,77 @@ export function LoginPage() {
     fetch("/api/health")
       .then((r) => r.json())
       .then((data: HealthPayload) => {
-        if (!cancelled) setHealth(data);
+        if (cancelled) return;
+        setHealth(data);
+        // Only suggest cloud when Supabase answers.
+        if (data.supabase?.reachable && data.supabase.schemaReady) {
+          setMode("cloud");
+        } else {
+          setMode("demo");
+        }
       })
       .catch(() => {
-        if (!cancelled) setHealth(null);
+        if (!cancelled) {
+          setHealth(null);
+          setMode("demo");
+        }
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  function enterDemo(nextEmail = email, nextPassword = password) {
+    const result = login(nextEmail, nextPassword);
+    if (!result.ok) {
+      setError(result.message);
+      return false;
+    }
+    router.push(result.redirect ?? "/");
+    return true;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      if (mode === "cloud" && isSupabaseConfigured) {
-        const cloud = await signInWithSupabase(email, password);
-        if (cloud.ok) {
-          const result = loginAsProfile(cloud.profile);
-          router.push(result.redirect ?? "/");
-          return;
-        }
-        if (cloud.needsProfile && cloud.userId && cloud.email) {
-          setPendingBootstrap({ userId: cloud.userId, email: cloud.email });
-          setError(cloud.message);
-          return;
-        }
-        // fallback demo if cloud fails with invalid credentials style
-        const demo = login(email, password);
-        if (demo.ok) {
-          router.push(demo.redirect ?? "/");
-          return;
-        }
+      if (mode === "demo" || !isSupabaseConfigured) {
+        enterDemo();
+        return;
+      }
+
+      const cloud = await withTimeout(
+        signInWithSupabase(email, password),
+        4000,
+        {
+          ok: false as const,
+          message:
+            "Supabase no responde. Usa Demo local o revisa la conexión.",
+        },
+      );
+
+      if (cloud.ok) {
+        const result = loginAsProfile(cloud.profile);
+        router.push(result.redirect ?? "/");
+        return;
+      }
+
+      if ("needsProfile" in cloud && cloud.needsProfile && cloud.userId && cloud.email) {
+        setPendingBootstrap({ userId: cloud.userId, email: cloud.email });
         setError(cloud.message);
         return;
       }
 
-      const result = login(email, password);
-      if (!result.ok) {
-        setError(result.message);
+      // Fallback automático a demo con las mismas credenciales demo.
+      const demo = login(email, password);
+      if (demo.ok) {
+        setMode("demo");
+        router.push(demo.redirect ?? "/");
         return;
       }
-      router.push(result.redirect ?? "/");
+
+      setError(cloud.message);
     } finally {
       setBusy(false);
     }
@@ -171,19 +215,21 @@ export function LoginPage() {
           {sb ? (
             <div
               className={`mt-4 rounded-2xl border px-3 py-2 text-xs ${
-                sb.schemaReady
+                sb.reachable && sb.schemaReady
                   ? "border-[var(--sw-forest)]/30 bg-[var(--sw-leaf)]/20"
-                  : "border-[var(--sw-chili)]/30 bg-[var(--sw-chili)]/10"
+                  : "border-amber-300/50 bg-amber-50"
               }`}
             >
               <p className="font-semibold">
-                Supabase: {sb.reachable ? "conectado" : "sin respuesta"}
-                {sb.schemaReady ? " · esquema listo" : ""}
+                {sb.reachable
+                  ? `Supabase conectado${sb.schemaReady ? " · esquema listo" : ""}`
+                  : "Supabase sin respuesta — usa Demo local"}
               </p>
               <p className="mt-1 text-[var(--sw-muted)]">
-                {sb.schemaReady
-                  ? "Puedes entrar en modo Cloud (Auth) o Demo local."
-                  : (sb.detail ?? "Ejecuta SETUP.sql")}
+                {sb.reachable && sb.schemaReady
+                  ? "Puedes entrar en Cloud o Demo local."
+                  : (sb.detail ??
+                    "El sistema demo funciona sin internet a Supabase.")}
               </p>
             </div>
           ) : null}
@@ -191,7 +237,10 @@ export function LoginPage() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setMode("demo")}
+              onClick={() => {
+                setMode("demo");
+                setError(null);
+              }}
               className={`rounded-xl px-3 py-2 text-sm ${
                 mode === "demo"
                   ? "bg-[var(--sw-forest)] text-white"
@@ -202,7 +251,10 @@ export function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => setMode("cloud")}
+              onClick={() => {
+                setMode("cloud");
+                setError(null);
+              }}
               className={`rounded-xl px-3 py-2 text-sm ${
                 mode === "cloud"
                   ? "bg-[var(--sw-gold)] text-[var(--sw-ink)]"
@@ -256,34 +308,34 @@ export function LoginPage() {
             </button>
           ) : null}
 
-          {mode === "demo" ? (
-            <div className="mt-6 grid gap-2">
-              <p className="text-xs text-[var(--sw-muted)]">
-                Usuarios demo · contraseña <code>{DEMO_PASSWORD}</code>
-              </p>
-              {DEMO_USERS.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => {
-                    setEmail(u.email);
-                    setPassword(DEMO_PASSWORD);
-                    setMode("demo");
-                  }}
-                  className="rounded-xl border border-[var(--sw-line)] bg-white/70 px-3 py-2 text-left text-xs hover:border-[var(--sw-forest)]"
-                >
-                  <span className="font-medium">{u.full_name}</span>
-                  <span className="text-[var(--sw-muted)]"> · {u.email}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 text-xs text-[var(--sw-muted)]">
-              Crea el usuario en Supabase → Authentication → Users (confirma email
-              OFF para pruebas). Luego ejecuta{" "}
-              <code>SETUP_PART2.sql</code> y entra aquí en modo Cloud.
+          <div className="mt-6 grid gap-2">
+            <p className="text-xs text-[var(--sw-muted)]">
+              Acceso rápido demo · contraseña <code>{DEMO_PASSWORD}</code>
             </p>
-          )}
+            {DEMO_USERS.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setEmail(u.email);
+                  setPassword(DEMO_PASSWORD);
+                  setMode("demo");
+                  setError(null);
+                  setBusy(true);
+                  try {
+                    enterDemo(u.email, DEMO_PASSWORD);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="rounded-xl border border-[var(--sw-line)] bg-white/70 px-3 py-2 text-left text-xs hover:border-[var(--sw-forest)] disabled:opacity-50"
+              >
+                <span className="font-medium">{u.full_name}</span>
+                <span className="text-[var(--sw-muted)]"> · {u.email}</span>
+              </button>
+            ))}
+          </div>
         </section>
       </div>
     </div>

@@ -5,58 +5,44 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 
+/**
+ * Hybrid auth: demo uses localStorage (client), cloud uses Supabase cookies.
+ * Do NOT gate routes server-side — AppShell redirects when there is no local session.
+ * When Supabase is configured we only refresh the auth cookie if a session exists.
+ */
 export async function proxy(request: NextRequest) {
-  // Modo demo: sin Supabase no hay gate server-side (auth es localStorage).
-  if (!isSupabaseConfigured) {
-    return NextResponse.next();
-  }
-
   let response = NextResponse.next({ request });
-  const { url, publishableKey } = getSupabaseConfig();
-  const supabase = createServerClient(url, publishableKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
+
+  if (!isSupabaseConfigured) {
+    return response;
+  }
+
+  try {
+    const { url, publishableKey } = getSupabaseConfig();
+    const supabase = createServerClient(url, publishableKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
+          );
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
+        },
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
-  const isHealthRoute = request.nextUrl.pathname === "/api/health";
-
-  if (isHealthRoute) return response;
-
-  function redirectWithCookies(pathname: string, next?: string) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = pathname;
-    redirectUrl.search = "";
-    if (next) redirectUrl.searchParams.set("next", next);
-    const redirectResponse = NextResponse.redirect(redirectUrl);
-    response.cookies.getAll().forEach((cookie) => {
-      redirectResponse.cookies.set(cookie);
     });
-    return redirectResponse;
-  }
 
-  if (!user && !isAuthRoute) {
-    return redirectWithCookies("/login", request.nextUrl.pathname);
-  }
-
-  if (user && isAuthRoute) {
-    return redirectWithCookies("/");
+    // Refresh session if present; ignore failures (demo mode still works).
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  } catch {
+    // Network / DNS failures must not block the app.
   }
 
   return response;
