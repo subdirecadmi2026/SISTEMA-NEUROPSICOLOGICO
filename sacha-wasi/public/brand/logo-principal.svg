@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Sacha Wasi">
+  <defs>
+    <linearGradient id="peak" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#B7E35A"/>
+      <stop offset="55%" stop-color="#3F9A3A"/>
+      <stop offset="100%" stop-color="#0B5A2A"/>
+    </linearGradient>
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C8F06A"/>
+      <stop offset="100%" stop-color="#2F8B34"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F0D56A"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#A8841E"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0B3A22" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <!-- Outer gold frame -->
+    <path d="M256 36 L430 170 L390 430 L122 430 L82 170 Z" fill="url(#gold)"/>
+    <path d="M256 58 L408 174 L374 408 L138 408 L104 174 Z" fill="#F7F1E3"/>
+
+    <!-- Mountains -->
+    <path d="M118 250 L190 120 L256 210 L322 95 L394 250 Z" fill="url(#peak)"/>
+    <path d="M190 120 L230 185 L205 250 L155 250 Z" fill="#0E6B32" opacity="0.35"/>
+    <path d="M322 95 L360 180 L340 250 L280 250 Z" fill="#0E6B32" opacity="0.28"/>
+    <path d="M240 160 L256 130 L278 168 L256 210 Z" fill="#DFF58A" opacity="0.55"/>
+
+    <!-- Cream arch / family area -->
+    <path d="M168 250 C168 250 190 210 256 210 C322 210 344 250 344 250 L344 318 C344 318 310 350 256 350 C202 350 168 318 168 318 Z" fill="#F4EBDA"/>
+
+    <!-- Family silhouette -->
+    <g fill="#142820">
+      <!-- father -->
+      <circle cx="214" cy="248" r="12"/>
+      <path d="M198 265 C198 265 204 258 214 258 C224 258 230 265 230 265 L236 318 L192 318 Z"/>
+      <!-- mother -->
+      <circle cx="268" cy="246" r="12"/>
+      <path d="M250 264 C250 264 258 256 268 256 C278 256 286 264 286 264 L292 318 L244 318 Z"/>
+      <!-- child -->
+      <circle cx="240" cy="268" r="8"/>
+      <path d="M230 280 C230 280 235 276 240 276 C245 276 250 280 250 280 L254 318 L226 318 Z"/>
+      <!-- toddler -->
+      <circle cx="296" cy="278" r="7"/>
+      <path d="M287 289 C287 289 291 286 296 286 C301 286 305 289 305 289 L308 318 L284 318 Z"/>
+      <!-- joined hands suggestion -->
+      <rect x="228" y="272" width="24" height="4" rx="2"/>
+      <rect x="282" y="286" width="16" height="3.5" rx="1.5"/>
+    </g>
+
+    <!-- Base leaves forming W -->
+    <path d="M120 330 C150 300 210 320 256 370 C210 350 150 360 120 400 C100 370 100 350 120 330 Z" fill="url(#leafGrad)" stroke="url(#gold)" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M392 330 C362 300 302 320 256 370 C302 350 362 360 392 400 C412 370 412 350 392 330 Z" fill="url(#leafGrad)" stroke="url(#gold)" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M150 345 C175 335 205 350 230 372" fill="none" stroke="#0B5A2A" stroke-width="4" stroke-linecap="round" opacity="0.45"/>
+    <path d="M362 345 C337 335 307 350 282 372" fill="none" stroke="#0B5A2A" stroke-width="4" stroke-linecap="round" opacity="0.45"/>
+  </g>
+</svg>

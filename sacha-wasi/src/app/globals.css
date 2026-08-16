@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --sw-bg: #eef6e8;
+  --sw-panel: #f7fbf2;
+  --sw-ink: #0b3a22;
+  --sw-muted: #5a7260;
+  --sw-forest: #0b5a2a;
+  --sw-leaf: #a4d65e;
+  --sw-lime: #b7e35a;
+  --sw-gold: #d4af37;
+  --sw-chili: #d9480f;
+  --sw-cream: #f7f1e3;
+  --sw-line: rgba(11, 90, 42, 0.14);
+  --background: var(--sw-bg);
+  --foreground: var(--sw-ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--sw-bg);
+  color: var(--sw-ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.sw-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(164, 214, 94, 0.38), transparent 34%),
+    radial-gradient(circle at 88% 10%, rgba(212, 175, 55, 0.16), transparent 28%),
+    linear-gradient(160deg, #dcefc8 0%, #eef6e8 42%, #e4f0dc 100%);
+}
+
+.sw-atmosphere::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 40c12-18 28-18 40 0-12 18-28 18-40 0zm40 0c12-18 28-18 40 0' fill='none' stroke='%231b4d3e' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+.sw-login-glow {
+  position: absolute;
+  width: 40rem;
+  height: 40rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(159, 209, 168, 0.35), transparent 65%);
+  filter: blur(10px);
+  animation: sw-pulse 7s ease-in-out infinite;
+}
+
+.sw-lift {
+  animation: sw-rise 0.55s ease both;
+}
+
+@keyframes sw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sw-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}

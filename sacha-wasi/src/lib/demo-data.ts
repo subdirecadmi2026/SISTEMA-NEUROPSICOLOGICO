@@ -1,0 +1,802 @@
+import type {
+  AuditLog,
+  CashSession,
+  Category,
+  Insumo,
+  InventoryMovement,
+  Order,
+  Product,
+  Profile,
+  Receta,
+  RecetaIngrediente,
+  Sucursal,
+} from "@/types";
+
+export const DEMO_PASSWORD = "sacha2026";
+
+export const DEMO_SUCURSALES: Sucursal[] = [
+  {
+    id: "suc-centro",
+    name: "Sacha Wasi Centro",
+    address: "Jr. Amazonas 120, Iquitos",
+    timezone: "America/Lima",
+    active: true,
+  },
+  {
+    id: "suc-norte",
+    name: "Sacha Wasi Norte",
+    address: "Av. La Marina 880, Iquitos",
+    timezone: "America/Lima",
+    active: true,
+  },
+];
+
+export const DEMO_USERS: Array<Profile & { password: string }> = [
+  {
+    id: "usr-admin",
+    email: "admin@sachawasi.pe",
+    full_name: "Ana Admin",
+    role: "admin",
+    sucursal_id: null,
+    active: true,
+    password: DEMO_PASSWORD,
+  },
+  {
+    id: "usr-super",
+    email: "supervisor@sachawasi.pe",
+    full_name: "Samuel Supervisor",
+    role: "supervisor",
+    sucursal_id: "suc-centro",
+    active: true,
+    password: DEMO_PASSWORD,
+  },
+  {
+    id: "usr-caja",
+    email: "caja@sachawasi.pe",
+    full_name: "Carla Caja",
+    role: "caja",
+    sucursal_id: "suc-centro",
+    active: true,
+    password: DEMO_PASSWORD,
+  },
+  {
+    id: "usr-cocina",
+    email: "cocina@sachawasi.pe",
+    full_name: "Coco Cocina",
+    role: "cocina",
+    sucursal_id: "suc-centro",
+    active: true,
+    password: DEMO_PASSWORD,
+  },
+  {
+    id: "usr-inv",
+    email: "inventario@sachawasi.pe",
+    full_name: "Inés Inventario",
+    role: "inventario",
+    sucursal_id: "suc-centro",
+    active: true,
+    password: DEMO_PASSWORD,
+  },
+];
+
+export const DEMO_CATEGORIES: Category[] = [
+  { id: "cat-platos", name: "Platos", sort_order: 1 },
+  { id: "cat-combos", name: "Combos", sort_order: 2 },
+  { id: "cat-bebidas", name: "Bebidas", sort_order: 3 },
+  { id: "cat-extras", name: "Extras", sort_order: 4 },
+];
+
+export const DEMO_PRODUCTS: Product[] = [
+  {
+    id: "prod-juane",
+    name: "Juane Clásico",
+    sku: "PL-JUANE",
+    price: 18.5,
+    category_id: "cat-platos",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 12,
+  },
+  {
+    id: "prod-tacacho",
+    name: "Tacacho con Cecina",
+    sku: "PL-TACA",
+    price: 22,
+    category_id: "cat-platos",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 10,
+  },
+  {
+    id: "prod-patarashca",
+    name: "Patarashca de Doncella",
+    sku: "PL-PATA",
+    price: 28,
+    category_id: "cat-platos",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 15,
+  },
+  {
+    id: "prod-combo-selva",
+    name: "Combo Selva",
+    sku: "CB-SELVA",
+    price: 32,
+    category_id: "cat-combos",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 14,
+  },
+  {
+    id: "prod-aguaje",
+    name: "Jugo de Aguaje",
+    sku: "BE-AGUA",
+    price: 8,
+    category_id: "cat-bebidas",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 3,
+  },
+  {
+    id: "prod-camu",
+    name: "Limonada de Camu Camu",
+    sku: "BE-CAMU",
+    price: 7.5,
+    category_id: "cat-bebidas",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 3,
+  },
+  {
+    id: "prod-yuca",
+    name: "Yuca Frita",
+    sku: "EX-YUCA",
+    price: 6,
+    category_id: "cat-extras",
+    sucursal_id: null,
+    active: true,
+    prep_minutes: 8,
+  },
+];
+
+export const DEMO_INSUMOS: Insumo[] = [
+  {
+    id: "ins-arroz",
+    name: "Arroz",
+    sku: "IN-ARROZ",
+    unit: "kg",
+    cost_unit: 4.2,
+    stock: 48,
+    min_stock: 10,
+    sucursal_id: "suc-centro",
+    lot: "L-AR-2401",
+    expiry_date: "2026-12-01",
+  },
+  {
+    id: "ins-pollo",
+    name: "Pollo",
+    sku: "IN-POLLO",
+    unit: "kg",
+    cost_unit: 12.5,
+    stock: 22,
+    min_stock: 8,
+    sucursal_id: "suc-centro",
+    lot: "L-PO-2408",
+    expiry_date: "2026-08-05",
+  },
+  {
+    id: "ins-platano",
+    name: "Plátano",
+    sku: "IN-PLAT",
+    unit: "kg",
+    cost_unit: 3.5,
+    stock: 35,
+    min_stock: 12,
+    sucursal_id: "suc-centro",
+    lot: "L-PL-2410",
+    expiry_date: "2026-08-02",
+  },
+  {
+    id: "ins-cecina",
+    name: "Cecina",
+    sku: "IN-CECI",
+    unit: "kg",
+    cost_unit: 28,
+    stock: 9,
+    min_stock: 5,
+    sucursal_id: "suc-centro",
+    lot: "L-CE-2407",
+    expiry_date: "2026-09-15",
+  },
+  {
+    id: "ins-doncella",
+    name: "Doncella",
+    sku: "IN-DONC",
+    unit: "kg",
+    cost_unit: 32,
+    stock: 6.5,
+    min_stock: 4,
+    sucursal_id: "suc-centro",
+    lot: "L-DO-2411",
+    expiry_date: "2026-07-31",
+  },
+  {
+    id: "ins-bijao",
+    name: "Hoja de Bijao",
+    sku: "IN-BIJA",
+    unit: "und",
+    cost_unit: 0.4,
+    stock: 180,
+    min_stock: 40,
+    sucursal_id: "suc-centro",
+    lot: null,
+    expiry_date: null,
+  },
+  {
+    id: "ins-aguaje",
+    name: "Pulpa de Aguaje",
+    sku: "IN-AGUA",
+    unit: "L",
+    cost_unit: 9,
+    stock: 14,
+    min_stock: 5,
+    sucursal_id: "suc-centro",
+    lot: "L-AG-2409",
+    expiry_date: "2026-08-20",
+  },
+  {
+    id: "ins-yuca",
+    name: "Yuca",
+    sku: "IN-YUCA",
+    unit: "kg",
+    cost_unit: 2.8,
+    stock: 3.2,
+    min_stock: 8,
+    sucursal_id: "suc-centro",
+    lot: "L-YU-2412",
+    expiry_date: "2026-08-01",
+  },
+  {
+    id: "ins-aceite",
+    name: "Aceite",
+    sku: "IN-ACEI",
+    unit: "L",
+    cost_unit: 8.5,
+    stock: 18,
+    min_stock: 6,
+    sucursal_id: "suc-centro",
+    lot: "L-AC-2403",
+    expiry_date: "2027-01-01",
+  },
+];
+
+export const DEMO_RECETAS: Receta[] = [
+  {
+    id: "rec-juane",
+    producto_id: "prod-juane",
+    name: "Juane Clásico v1",
+    version: 1,
+    yield_portions: 1,
+    active: true,
+    notes: "Arroz, pollo y bijao",
+  },
+  {
+    id: "rec-tacacho",
+    producto_id: "prod-tacacho",
+    name: "Tacacho con Cecina v1",
+    version: 1,
+    yield_portions: 1,
+    active: true,
+    notes: null,
+  },
+  {
+    id: "rec-patarashca",
+    producto_id: "prod-patarashca",
+    name: "Patarashca v1",
+    version: 1,
+    yield_portions: 1,
+    active: true,
+    notes: null,
+  },
+  {
+    id: "rec-combo",
+    producto_id: "prod-combo-selva",
+    name: "Combo Selva v1",
+    version: 1,
+    yield_portions: 1,
+    active: true,
+    notes: "Juane + jugo + yuca",
+  },
+  {
+    id: "rec-aguaje",
+    producto_id: "prod-aguaje",
+    name: "Jugo Aguaje v1",
+    version: 1,
+    yield_portions: 1,
+    active: true,
+    notes: null,
+  },
+  {
+    id: "rec-yuca",
+    producto_id: "prod-yuca",
+    name: "Yuca Frita v1",
+    version: 1,
+    yield_portions: 1,
+    active: true,
+    notes: null,
+  },
+];
+
+export const DEMO_RECETA_INGREDIENTES: RecetaIngrediente[] = [
+  {
+    id: "ri-1",
+    receta_id: "rec-juane",
+    insumo_id: "ins-arroz",
+    cantidad: 0.25,
+    unidad: "kg",
+  },
+  {
+    id: "ri-2",
+    receta_id: "rec-juane",
+    insumo_id: "ins-pollo",
+    cantidad: 0.18,
+    unidad: "kg",
+  },
+  {
+    id: "ri-3",
+    receta_id: "rec-juane",
+    insumo_id: "ins-bijao",
+    cantidad: 1,
+    unidad: "und",
+  },
+  {
+    id: "ri-4",
+    receta_id: "rec-tacacho",
+    insumo_id: "ins-platano",
+    cantidad: 0.35,
+    unidad: "kg",
+  },
+  {
+    id: "ri-5",
+    receta_id: "rec-tacacho",
+    insumo_id: "ins-cecina",
+    cantidad: 0.12,
+    unidad: "kg",
+  },
+  {
+    id: "ri-6",
+    receta_id: "rec-patarashca",
+    insumo_id: "ins-doncella",
+    cantidad: 0.28,
+    unidad: "kg",
+  },
+  {
+    id: "ri-7",
+    receta_id: "rec-patarashca",
+    insumo_id: "ins-bijao",
+    cantidad: 2,
+    unidad: "und",
+  },
+  {
+    id: "ri-8",
+    receta_id: "rec-combo",
+    insumo_id: "ins-arroz",
+    cantidad: 0.25,
+    unidad: "kg",
+  },
+  {
+    id: "ri-9",
+    receta_id: "rec-combo",
+    insumo_id: "ins-pollo",
+    cantidad: 0.18,
+    unidad: "kg",
+  },
+  {
+    id: "ri-10",
+    receta_id: "rec-combo",
+    insumo_id: "ins-aguaje",
+    cantidad: 0.25,
+    unidad: "L",
+  },
+  {
+    id: "ri-11",
+    receta_id: "rec-combo",
+    insumo_id: "ins-yuca",
+    cantidad: 0.2,
+    unidad: "kg",
+  },
+  {
+    id: "ri-12",
+    receta_id: "rec-aguaje",
+    insumo_id: "ins-aguaje",
+    cantidad: 0.3,
+    unidad: "L",
+  },
+  {
+    id: "ri-13",
+    receta_id: "rec-yuca",
+    insumo_id: "ins-yuca",
+    cantidad: 0.25,
+    unidad: "kg",
+  },
+  {
+    id: "ri-14",
+    receta_id: "rec-yuca",
+    insumo_id: "ins-aceite",
+    cantidad: 0.05,
+    unidad: "L",
+  },
+];
+
+function minutesAgo(mins: number) {
+  return new Date(Date.now() - mins * 60_000).toISOString();
+}
+
+export function createInitialOrders(): Order[] {
+  return [
+    {
+      id: "ord-1001",
+      numero: "SW-1001",
+      sucursal_id: "suc-centro",
+      channel: "mostrador",
+      status: "en_preparacion",
+      payment_method: "efectivo",
+      total: 40.5,
+      subtotal: 40.5,
+      discount: 0,
+      coupon_code: null,
+      customer_id: "cus-1",
+      items: [
+        {
+          id: "oi-1",
+          producto_id: "prod-juane",
+          producto_name: "Juane Clásico",
+          qty: 1,
+          unit_price: 18.5,
+          notes: "Sin ají",
+          modifiers: [],
+        },
+        {
+          id: "oi-2",
+          producto_id: "prod-tacacho",
+          producto_name: "Tacacho con Cecina",
+          qty: 1,
+          unit_price: 22,
+          notes: null,
+          modifiers: ["Extra cecina"],
+        },
+      ],
+      created_at: minutesAgo(8),
+      updated_at: minutesAgo(7),
+      created_by: "usr-caja",
+      station_priority: 1,
+      estimated_ready_at: minutesAgo(-4),
+    },
+    {
+      id: "ord-1002",
+      numero: "SW-1002",
+      sucursal_id: "suc-centro",
+      channel: "takeaway",
+      status: "recibido",
+      payment_method: "tarjeta",
+      total: 32,
+      subtotal: 32,
+      discount: 0,
+      coupon_code: null,
+      customer_id: null,
+      items: [
+        {
+          id: "oi-3",
+          producto_id: "prod-combo-selva",
+          producto_name: "Combo Selva",
+          qty: 1,
+          unit_price: 32,
+          notes: "Para llevar",
+          modifiers: [],
+        },
+      ],
+      created_at: minutesAgo(3),
+      updated_at: minutesAgo(3),
+      created_by: "usr-caja",
+      station_priority: 2,
+      estimated_ready_at: minutesAgo(-11),
+    },
+    {
+      id: "ord-1003",
+      numero: "SW-1003",
+      sucursal_id: "suc-centro",
+      channel: "delivery",
+      status: "listo",
+      payment_method: "wallet",
+      total: 36,
+      subtotal: 36,
+      discount: 0,
+      coupon_code: null,
+      customer_id: "cus-2",
+      items: [
+        {
+          id: "oi-4",
+          producto_id: "prod-patarashca",
+          producto_name: "Patarashca de Doncella",
+          qty: 1,
+          unit_price: 28,
+          notes: null,
+          modifiers: [],
+        },
+        {
+          id: "oi-5",
+          producto_id: "prod-aguaje",
+          producto_name: "Jugo de Aguaje",
+          qty: 1,
+          unit_price: 8,
+          notes: null,
+          modifiers: [],
+        },
+      ],
+      created_at: minutesAgo(18),
+      updated_at: minutesAgo(2),
+      created_by: "usr-caja",
+      station_priority: 0,
+      estimated_ready_at: minutesAgo(3),
+    },
+  ];
+}
+
+export function createInitialCashSession(): CashSession {
+  return {
+    id: "cash-1",
+    sucursal_id: "suc-centro",
+    opened_by: "usr-caja",
+    opened_at: minutesAgo(240),
+    closed_at: null,
+    opening_float: 150,
+    closing_amount: null,
+    expected_cash: 190.5,
+    notes: null,
+  };
+}
+
+export function createInitialMovements(): InventoryMovement[] {
+  return [
+    {
+      id: "mov-1",
+      insumo_id: "ins-arroz",
+      tipo: "entrada",
+      cantidad: 50,
+      motivo: "Compra semanal",
+      referencia_id: null,
+      created_by: "usr-inv",
+      created_at: minutesAgo(1440),
+    },
+    {
+      id: "mov-2",
+      insumo_id: "ins-yuca",
+      tipo: "merma",
+      cantidad: 1.5,
+      motivo: "Producto oxidado",
+      referencia_id: null,
+      created_by: "usr-inv",
+      created_at: minutesAgo(300),
+    },
+  ];
+}
+
+export function createInitialAuditLogs(): AuditLog[] {
+  return [
+    {
+      id: "log-1",
+      user_id: "usr-admin",
+      user_name: "Ana Admin",
+      role: "admin",
+      action: "login",
+      entity: "session",
+      entity_id: null,
+      timestamp: minutesAgo(260),
+    },
+    {
+      id: "log-2",
+      user_id: "usr-caja",
+      user_name: "Carla Caja",
+      role: "caja",
+      action: "open_cash",
+      entity: "cash_session",
+      entity_id: "cash-1",
+      timestamp: minutesAgo(240),
+    },
+  ];
+}
+
+export function recipeCost(recetaId: string) {
+  const lines = DEMO_RECETA_INGREDIENTES.filter((r) => r.receta_id === recetaId);
+  return lines.reduce((sum, line) => {
+    const insumo = DEMO_INSUMOS.find((i) => i.id === line.insumo_id);
+    return sum + (insumo?.cost_unit ?? 0) * line.cantidad;
+  }, 0);
+}
+
+export const DEMO_PROVEEDORES = [
+  {
+    id: "prov-1",
+    name: "Mercado Belén Abastos",
+    contact: "Luis Rengifo",
+    phone: "+51 965 111 222",
+    email: "compras@belen.pe",
+  },
+  {
+    id: "prov-2",
+    name: "Pescados del Itaya",
+    contact: "María Panduro",
+    phone: "+51 965 333 444",
+    email: "ventas@itaya.pe",
+  },
+  {
+    id: "prov-3",
+    name: "Selva Insumos SAC",
+    contact: "Jorge Vásquez",
+    phone: "+51 965 555 666",
+    email: "pedidos@selvainsumos.pe",
+  },
+];
+
+export const DEMO_MESAS = [
+  { id: "mesa-1", label: "Mesa 1", seats: 4, status: "libre" as const },
+  { id: "mesa-2", label: "Mesa 2", seats: 2, status: "ocupada" as const },
+  { id: "mesa-3", label: "Mesa 3", seats: 4, status: "libre" as const },
+  { id: "mesa-4", label: "Mesa 4", seats: 6, status: "libre" as const },
+  { id: "mesa-5", label: "Barra A", seats: 3, status: "libre" as const },
+];
+
+export function createInitialPurchases() {
+  return [
+    {
+      id: "po-1",
+      numero: "OC-2401",
+      proveedor_id: "prov-1",
+      sucursal_id: "suc-centro",
+      status: "enviada" as const,
+      lines: [
+        { insumo_id: "ins-arroz", cantidad: 25, costo_unit: 4.1 },
+        { insumo_id: "ins-yuca", cantidad: 20, costo_unit: 2.7 },
+      ],
+      total: 25 * 4.1 + 20 * 2.7,
+      created_at: minutesAgo(1800),
+      created_by: "usr-inv",
+      notes: "Pedido semanal de abarrotes",
+    },
+    {
+      id: "po-2",
+      numero: "OC-2402",
+      proveedor_id: "prov-2",
+      sucursal_id: "suc-centro",
+      status: "borrador" as const,
+      lines: [{ insumo_id: "ins-doncella", cantidad: 8, costo_unit: 31 }],
+      total: 248,
+      created_at: minutesAgo(120),
+      created_by: "usr-inv",
+      notes: null,
+    },
+  ];
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function createInitialShifts() {
+  const day = todayISO();
+  return [
+    {
+      id: "sh-1",
+      employee_id: "usr-caja",
+      sucursal_id: "suc-centro",
+      date: day,
+      start: "08:00",
+      end: "16:00",
+      tipo: "apertura" as const,
+      role: "caja" as const,
+    },
+    {
+      id: "sh-2",
+      employee_id: "usr-cocina",
+      sucursal_id: "suc-centro",
+      date: day,
+      start: "09:00",
+      end: "17:00",
+      tipo: "intermedio" as const,
+      role: "cocina" as const,
+    },
+    {
+      id: "sh-3",
+      employee_id: "usr-inv",
+      sucursal_id: "suc-centro",
+      date: day,
+      start: "07:00",
+      end: "15:00",
+      tipo: "apertura" as const,
+      role: "inventario" as const,
+    },
+    {
+      id: "sh-4",
+      employee_id: "usr-super",
+      sucursal_id: "suc-norte",
+      date: day,
+      start: "10:00",
+      end: "18:00",
+      tipo: "intermedio" as const,
+      role: "supervisor" as const,
+    },
+  ];
+}
+
+export function createInitialAttendance() {
+  return [
+    {
+      id: "att-1",
+      employee_id: "usr-caja",
+      sucursal_id: "suc-centro",
+      clock_in: minutesAgo(240),
+      clock_out: null,
+    },
+    {
+      id: "att-2",
+      employee_id: "usr-cocina",
+      sucursal_id: "suc-centro",
+      clock_in: minutesAgo(200),
+      clock_out: null,
+    },
+  ];
+}
+
+export const DEMO_CUSTOMERS = [
+  {
+    id: "cus-1",
+    name: "Rosa Panduro",
+    phone: "965100200",
+    email: "rosa@correo.pe",
+    points: 120,
+    visits: 8,
+    created_at: minutesAgo(20000),
+  },
+  {
+    id: "cus-2",
+    name: "Diego Tapullima",
+    phone: "965300400",
+    email: "diego@correo.pe",
+    points: 45,
+    visits: 3,
+    created_at: minutesAgo(8000),
+  },
+];
+
+export const DEMO_COUPONS = [
+  {
+    id: "cp-1",
+    code: "SELVA10",
+    type: "percent" as const,
+    value: 10,
+    active: true,
+    min_ticket: 20,
+    uses: 4,
+    max_uses: 100,
+  },
+  {
+    id: "cp-2",
+    code: "JUANE5",
+    type: "fixed" as const,
+    value: 5,
+    active: true,
+    min_ticket: 15,
+    uses: 1,
+    max_uses: 50,
+  },
+  {
+    id: "cp-3",
+    code: "VIP20",
+    type: "percent" as const,
+    value: 20,
+    active: false,
+    min_ticket: 40,
+    uses: 0,
+    max_uses: 20,
+  },
+];
