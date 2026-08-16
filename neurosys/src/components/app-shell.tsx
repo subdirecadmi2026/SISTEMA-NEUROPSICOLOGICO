@@ -23,6 +23,10 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  CustomizationProvider,
+  useCustomization,
+} from "@/components/customization-provider";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -42,7 +46,19 @@ const navigation = [
   { label: "Caja y facturación", icon: WalletCards, href: "/facturacion" },
 ];
 
+function initials(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+}
+
 function Brand() {
+  const { settings } = useCustomization();
+
   return (
     <Link href="/" className="flex h-20 items-center gap-3 px-5">
       <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-200">
@@ -50,10 +66,10 @@ function Brand() {
       </div>
       <div>
         <p className="text-[17px] font-bold tracking-tight text-slate-950">
-          NeuroSys
+          {settings.brandName}
         </p>
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
-          Clinical ERP
+          {settings.brandTagline}
         </p>
       </div>
     </Link>
@@ -69,6 +85,7 @@ function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { settings } = useCustomization();
 
   async function signOut() {
     const supabase = createClient();
@@ -106,14 +123,14 @@ function Sidebar({
         <button className="mx-4 mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left">
           <span className="flex items-center gap-3">
             <span className="grid size-9 place-items-center rounded-lg bg-white text-xs font-bold text-indigo-600 shadow-sm">
-              NW
+              {initials(settings.organizationName)}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-slate-800">
-                Centro Ñampi Wasi
+                {settings.organizationName}
               </span>
               <span className="mt-0.5 block text-[10px] text-slate-500">
-                Sede principal
+                {settings.branchName}
               </span>
             </span>
             <ChevronDown size={14} className="text-slate-400" />
@@ -155,20 +172,28 @@ function Sidebar({
         </nav>
 
         <div className="border-t border-slate-100 p-3">
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50">
+          <Link
+            href="/configuracion"
+            onClick={close}
+            className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition ${
+              pathname.startsWith("/configuracion")
+                ? "bg-indigo-50 text-indigo-700"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
             <Settings size={18} className="text-slate-400" />
             Configuración
-          </button>
+          </Link>
           <div className="mt-2 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
             <div className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-indigo-100 to-violet-200 text-xs font-bold text-indigo-700">
-              DR
+              {initials(settings.fullName)}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-slate-800">
-                Dr. Diego Romero
+                {settings.fullName}
               </p>
               <p className="mt-0.5 text-[10px] text-slate-500">
-                Director clínico
+                {settings.role}
               </p>
             </div>
             {isSupabaseConfigured ? (
@@ -190,7 +215,7 @@ function Sidebar({
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+function AppShellContent({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -241,5 +266,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </div>
+  );
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <CustomizationProvider>
+      <AppShellContent>{children}</AppShellContent>
+    </CustomizationProvider>
   );
 }
