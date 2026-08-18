@@ -1,0 +1,28 @@
+name: Validadores HGP
+
+on:
+  pull_request:
+    paths:
+      - "validadores-hgp/**"
+      - ".github/workflows/validadores-hgp.yml"
+  push:
+    paths:
+      - "validadores-hgp/**"
+      - ".github/workflows/validadores-hgp.yml"
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: validadores-hgp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: validadores-hgp/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
