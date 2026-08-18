@@ -1,6 +1,9 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { mapHeaders } from "./headers";
-import { parseCsv } from "./parseFile";
+import { loadDataset, parseCsv } from "./parseFile";
 import { normalizeSexo } from "./normalize";
 import { parseDate } from "./dates";
 
@@ -41,6 +44,30 @@ describe("CSV", () => {
     );
     expect(rows[0]).toEqual(["Historia clínica", "Apellidos y nombres"]);
     expect(rows[1]).toEqual(["HC-1", "PEREZ, JUAN"]);
+  });
+});
+
+describe("Excel de entrega", () => {
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../archivos");
+
+  it("carga el demo de egresos y encuentra errores", async () => {
+    const buffer = await readFile(path.join(dir, "demo-egresos-hgp.xlsx"));
+    const dataset = await loadDataset(
+      "egresos",
+      new File([buffer], "demo-egresos-hgp.xlsx"),
+    );
+    expect(dataset.rows.length).toBe(14);
+    expect(dataset.issues.some((item) => item.code === "EG-CIE-002")).toBe(true);
+  });
+
+  it("carga el demo de emergencia y encuentra errores", async () => {
+    const buffer = await readFile(path.join(dir, "demo-emergencia-hgp.xlsx"));
+    const dataset = await loadDataset(
+      "emergencia",
+      new File([buffer], "demo-emergencia-hgp.xlsx"),
+    );
+    expect(dataset.rows.length).toBe(12);
+    expect(dataset.issues.some((item) => item.code === "EM-TRI-001")).toBe(true);
   });
 });
 

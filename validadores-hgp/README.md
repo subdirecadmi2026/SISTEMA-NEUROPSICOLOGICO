@@ -29,10 +29,18 @@ condición de salida, destino de hospitalización o referencia y duplicados.
 Clasificación: **Excelente** ≥ 95 · **Bueno** ≥ 85 · **Regular** ≥ 70 ·
 **Crítico** &lt; 70.
 
-## Uso
+## Cómo ocuparlos en su computador
+
+1. Instale Node.js 20 desde https://nodejs.org (versión LTS).
+2. Descomprima el ZIP `validadores-hgp-para-usar.zip`.
+3. Entre a la carpeta `validadores-hgp`.
+4. En Windows haga doble clic en `iniciar.bat`. En Linux o Mac ejecute `./iniciar.sh`.
+5. Abra http://localhost:5173
+6. Cargue su Excel o use los archivos de `archivos/`.
+
+Desde esta carpeta también puede:
 
 ```sh
-cd validadores-hgp
 npm install
 npm run dev
 ```
