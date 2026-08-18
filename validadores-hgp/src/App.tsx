@@ -438,7 +438,7 @@ export default function App() {
                                 {row.values.apellidosNombres || "Sin nombre"}
                               </p>
                               <span className="rounded-full bg-sand px-2 py-0.5 text-[10px] font-semibold text-muted">
-                                HC {row.values.historiaClinica || "—"}
+                                {row.values.historiaClinica || "Sin HC"}
                               </span>
                               {isReviewed && (
                                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
