@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import {
   DIMENSION_LABELS,
   FIELD_LABELS,
@@ -57,7 +58,6 @@ export async function exportErrorsExcel(
   score: QualityScore,
   reviewed: Map<string, ReviewedEntry>,
 ) {
-  const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Validadores HGP";
   workbook.created = new Date();
@@ -181,7 +181,6 @@ export function exportErrorsCsv(
 }
 
 export async function downloadTemplate(kind: ValidatorKind) {
-  const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(kind === "egresos" ? "Egresos" : "Emergencia");
   const headers =

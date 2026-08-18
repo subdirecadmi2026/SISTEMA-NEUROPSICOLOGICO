@@ -1,19 +1,10 @@
-VALIDADORES HGP — CÓMO USARLOS
-Hospital General Puyo · independientes de NeuroSys
+VALIDADORES HGP — LISTO PARA USAR
 
-1) Instale Node.js 20 desde https://nodejs.org (botón LTS).
-2) Descomprima validadores-hgp-para-usar.zip.
-3) Entre a la carpeta validadores-hgp.
-   - Windows: doble clic en iniciar.bat
-   - Linux/Mac: chmod +x iniciar.sh && ./iniciar.sh
-4) Abra http://localhost:5173
-5) Elija Egresos o Emergencia.
-6) Cargue su Excel/CSV, o use los archivos de la carpeta archivos/:
-   - plantilla-egresos-hgp.xlsx
-   - plantilla-emergencia-hgp.xlsx
-   - demo-egresos-hgp.xlsx        (ejemplo con errores para probar)
-   - demo-emergencia-hgp.xlsx
+No instale nada. No use comandos.
 
-Luego puede marcar filas revisadas y exportar los errores a Excel o CSV.
+1. Descargue DESCARGAR-Validadores-HGP.zip
+2. Descomprímalo
+3. Haga doble clic en ABRIR-Validadores-HGP.html
+4. Pulse "Usar datos de demostración" o cargue su Excel
 
-Los datos se quedan en su computador. No se envían a internet.
+También puede descargar solo ABRIR-Validadores-HGP.html y abrirlo.

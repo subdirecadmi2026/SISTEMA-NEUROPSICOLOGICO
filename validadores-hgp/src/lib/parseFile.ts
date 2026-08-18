@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import type { DataRow, Dataset, ValidatorKind } from "../types";
 import { fieldsFor, mapHeaders } from "./headers";
 import { formatDate, formatDateTime } from "./dates";
@@ -84,7 +85,6 @@ async function readGrid(file: File): Promise<string[][]> {
   if (name.endsWith(".csv") || name.endsWith(".txt")) {
     return parseCsv(await file.text());
   }
-  const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
   const sheet = workbook.worksheets[0];

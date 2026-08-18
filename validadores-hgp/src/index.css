@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Fraunces", Georgia, serif;
-  --font-sans: "DM Sans", "Segoe UI", sans-serif;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-sans: "Segoe UI", Tahoma, Arial, sans-serif;
   --color-navy: #1c3a5c;
   --color-navy-deep: #132844;
   --color-teal: #2e7d84;

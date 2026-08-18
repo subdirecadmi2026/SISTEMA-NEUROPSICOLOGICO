@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "archivos": "node scripts/generar-archivos.mjs"
+    "archivos": "node scripts/generar-archivos.mjs",
+    "listo": "vite build --config vite.listo.config.ts"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
@@ -27,6 +28,7 @@
     "tailwindcss": "^4.1.12",
     "typescript": "~5.9.2",
     "vite": "^7.1.5",
+    "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^3.2.4"
   }
 }
