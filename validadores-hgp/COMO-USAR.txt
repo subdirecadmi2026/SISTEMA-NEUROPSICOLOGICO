@@ -1,10 +1,8 @@
-VALIDADORES HGP — LISTO PARA USAR
+VALIDADORES HGP — CÓMO USARLOS
 
+Descargue el ZIP (se baja solo al abrir este enlace):
+https://github.com/subdirecadmi2026/SISTEMA-NEUROPSICOLOGICO/raw/cursor/validadores-egresos-emergencia-9fc5/validadores-hgp/archivos/Validadores-HGP-LISTO.zip
+
+Luego descomprima y haga doble clic en ABRIR-Validadores-HGP.html
 No instale nada. No use comandos.
 
-1. Descargue DESCARGAR-Validadores-HGP.zip
-2. Descomprímalo
-3. Haga doble clic en ABRIR-Validadores-HGP.html
-4. Pulse "Usar datos de demostración" o cargue su Excel
-
-También puede descargar solo ABRIR-Validadores-HGP.html y abrirlo.
