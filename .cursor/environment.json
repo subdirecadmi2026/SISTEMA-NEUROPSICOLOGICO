@@ -1,0 +1,17 @@
+{
+  "name": "NeuroSys",
+  "install": "cd neurosys && npm ci",
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "cd neurosys && npm run dev",
+      "description": "NeuroSys Next.js dev server on http://localhost:3000 (demo mode; set NEXT_PUBLIC_SUPABASE_* secrets to enable Supabase persistence)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "web",
+      "port": 3000
+    }
+  ]
+}
