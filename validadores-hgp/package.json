@@ -14,10 +14,10 @@
     "listo": "vite build --config vite.listo.config.ts"
   },
   "dependencies": {
-    "exceljs": "^4.4.0",
     "lucide-react": "^0.562.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.12",

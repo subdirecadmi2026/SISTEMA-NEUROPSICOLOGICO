@@ -35,6 +35,35 @@ describe("mapeo de encabezados", () => {
     expect(emergencia.mapping.Triage).toBe("triage");
     expect(emergencia.mapping.Llegada).toBe("fechaHoraLlegada");
   });
+
+  it("encuentra el encabezado aunque el Excel tenga título arriba", async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["Hospital General Puyo"],
+      ["Reporte de egresos julio 2026"],
+      [
+        "Número de historia",
+        "Cédula",
+        "Nombres y apellidos",
+        "Sexo",
+        "Fecha ingreso",
+        "Fecha egreso",
+        "CIE-10",
+        "Condición de egreso",
+      ],
+      ["HC-1", "1600123457", "PEREZ JUAN", "H", "01/07/2026", "03/07/2026", "J18.9", "Vivo"],
+    ]);
+    XLSX.utils.book_append_sheet(wb, sheet, "Reporte");
+    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const dataset = await loadDataset(
+      "egresos",
+      new File([buffer], "reporte-hospital.xlsx"),
+    );
+    expect(dataset.rows).toHaveLength(1);
+    expect(dataset.rows[0].values.historiaClinica).toBe("HC-1");
+    expect(dataset.rows[0].values.diagnosticoPrincipal).toBe("J18.9");
+  });
 });
 
 describe("CSV", () => {

@@ -284,7 +284,7 @@ export default function App() {
                 Cargar Excel o CSV
               </span>
               <span className="mt-1 text-[11px] text-muted">
-                El archivo no sale de este equipo. Encabezados en español.
+                Acepta .xlsx, .xls y CSV. Si el archivo tiene título arriba, también lo lee.
               </span>
               <input
                 ref={fileRef}
@@ -302,8 +302,22 @@ export default function App() {
               Usar datos de demostración
             </button>
           </div>
+          {busy && (
+            <p className="mt-4 rounded-xl bg-teal/10 px-3 py-2 text-sm font-semibold text-navy">
+              Leyendo el Excel…
+            </p>
+          )}
           {feedback && (
-            <p className="mt-4 rounded-xl bg-sand px-3 py-2 text-[11px] text-navy">{feedback}</p>
+            <p
+              role="status"
+              className={`mt-4 rounded-xl px-3 py-3 text-sm font-semibold ${
+                feedback.startsWith("No se") || feedback.includes("no tiene") || feedback.includes("No se reconoc")
+                  ? "bg-rose-50 text-rose-800"
+                  : "bg-sand text-navy"
+              }`}
+            >
+              {feedback}
+            </p>
           )}
         </section>
 

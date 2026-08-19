@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,29 +128,13 @@ const EMERGENCIA_KEYS = [
   "establecimiento",
 ];
 
-function styleHeader(sheet) {
-  sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-  sheet.getRow(1).fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF2E7D84" },
-  };
-  sheet.columns.forEach((col) => {
-    col.width = 24;
-  });
-}
-
 async function writeSheet(fileName, sheetName, headers, keys, rows) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Validadores HGP";
-  const sheet = workbook.addWorksheet(sheetName);
-  sheet.addRow(headers);
-  rows.forEach((row) => {
-    sheet.addRow(keys.map((key) => row[key] ?? ""));
-  });
-  styleHeader(sheet);
+  const workbook = XLSX.utils.book_new();
+  const data = [headers, ...rows.map((row) => keys.map((key) => row[key] ?? ""))];
+  const sheet = XLSX.utils.aoa_to_sheet(data);
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
   const target = path.join(outDir, fileName);
-  await workbook.xlsx.writeFile(target);
+  XLSX.writeFile(workbook, target);
   return target;
 }
 
