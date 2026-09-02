@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type ModuleId =
   | "inicio"
