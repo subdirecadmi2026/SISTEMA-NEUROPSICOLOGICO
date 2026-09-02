@@ -1,6 +1,6 @@
-# Sistema Neuropsicológico Ñampi Wasi
+# Control de Enfermería
 
-El MVP de NeuroSys se encuentra en [`neurosys/`](./neurosys).
+La aplicación se encuentra en [`neurosys/`](./neurosys).
 
-Consulta su [documentación de desarrollo](./neurosys/README.md) para ejecutar
-la aplicación localmente.
+Incluye planificación de horarios, personal, usuarios y perfiles, servicios
+hospitalarios y claves de turno.

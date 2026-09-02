@@ -1,5 +1,5 @@
 {
-  "name": "neurosys",
+  "name": "control-enfermeria",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -13,13 +13,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.3",
-    "@supabase/supabase-js": "^2.110.5",
     "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "zod": "^4.4.3"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
