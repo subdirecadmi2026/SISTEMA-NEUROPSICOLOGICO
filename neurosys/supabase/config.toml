@@ -1,0 +1,4 @@
+project_id = "control-enfermeria"
+
+[functions.invite-user]
+verify_jwt = true

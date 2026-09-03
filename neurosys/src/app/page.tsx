@@ -1,5 +1,5 @@
-import { NursingControlApp } from "@/components/nursing-control-app";
+import { AuthenticatedApp } from "@/components/authenticated-app";
 
 export default function Home() {
-  return <NursingControlApp />;
+  return <AuthenticatedApp />;
 }

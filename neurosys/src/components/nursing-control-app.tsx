@@ -15,6 +15,7 @@ import {
   Grid2X2,
   Hospital,
   KeyRound,
+  LogOut,
   Menu,
   MoreHorizontal,
   Plus,
@@ -27,7 +28,9 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
+import type { CurrentUser } from "./authenticated-app";
 
 type ModuleId =
   | "inicio"
@@ -38,9 +41,10 @@ type ModuleId =
   | "claves";
 
 type ModalType = Exclude<ModuleId, "inicio">;
+type EntityId = number | string;
 
 type Staff = {
-  id: number;
+  id: EntityId;
   name: string;
   document: string;
   position: string;
@@ -49,7 +53,7 @@ type Staff = {
 };
 
 type User = {
-  id: number;
+  id: EntityId;
   name: string;
   email: string;
   role: "Administrador" | "Supervisor" | "Jefe de enfermería";
@@ -58,8 +62,9 @@ type User = {
 };
 
 type Service = {
-  id: number;
+  id: EntityId;
   name: string;
+  code: string;
   leader: string;
   staff: number;
   coverage: string;
@@ -67,7 +72,7 @@ type Service = {
 };
 
 type Shift = {
-  id: number;
+  id: EntityId;
   code: string;
   name: string;
   time: string;
@@ -76,7 +81,7 @@ type Shift = {
 };
 
 type Schedule = {
-  id: number;
+  id: EntityId;
   name: string;
   service: string;
   period: string;
@@ -85,6 +90,14 @@ type Schedule = {
 };
 
 type FormState = Record<string, string>;
+
+type DbService = { id: string; name: string; code: string; leader_name: string; coverage: string; is_active: boolean };
+type DbStaff = { id: string; service_id: string; full_name: string; document: string; position: string; status: Staff["status"] };
+type DbProfile = { id: string; service_id: string | null; full_name: string; email: string; role: User["role"]; is_active: boolean };
+type DbShift = { id: string; code: string; name: string; start_time: string | null; end_time: string | null; hours: number; color: string };
+type DbSchedule = { id: string; service_id: string; name: string; month: number; year: number; status: Schedule["status"]; coverage_percentage: number };
+
+const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 const navigation: { id: ModuleId; label: string; icon: LucideIcon }[] = [
   { id: "inicio", label: "Inicio", icon: Grid2X2 },
@@ -112,10 +125,10 @@ const initialUsers: User[] = [
 ];
 
 const initialServices: Service[] = [
-  { id: 1, name: "Unidad de Cuidados Intensivos", leader: "Karina Pilamunga", staff: 14, coverage: "24 horas", status: "Activo" },
-  { id: 2, name: "Emergencia", leader: "María Guamán", staff: 22, coverage: "24 horas", status: "Activo" },
-  { id: 3, name: "Hospitalización", leader: "Lucía Chicaiza", staff: 18, coverage: "24 horas", status: "Activo" },
-  { id: 4, name: "Consulta externa", leader: "Diana Paredes", staff: 8, coverage: "07:00 — 17:00", status: "Activo" },
+  { id: 1, name: "Unidad de Cuidados Intensivos", code: "UCI", leader: "Karina Pilamunga", staff: 14, coverage: "24 horas", status: "Activo" },
+  { id: 2, name: "Emergencia", code: "EME", leader: "María Guamán", staff: 22, coverage: "24 horas", status: "Activo" },
+  { id: 3, name: "Hospitalización", code: "HOS", leader: "Lucía Chicaiza", staff: 18, coverage: "24 horas", status: "Activo" },
+  { id: 4, name: "Consulta externa", code: "CEX", leader: "Diana Paredes", staff: 8, coverage: "07:00 — 17:00", status: "Activo" },
 ];
 
 const initialShifts: Shift[] = [
@@ -174,6 +187,7 @@ const fieldConfig: Record<ModalType, { key: string; label: string; type?: string
   ],
   servicios: [
     { key: "name", label: "Nombre del servicio" },
+    { key: "code", label: "Código corto" },
     { key: "leader", label: "Jefe responsable" },
     { key: "staff", label: "Número de colaboradores", type: "number" },
     { key: "coverage", label: "Horario de cobertura" },
@@ -188,17 +202,100 @@ const fieldConfig: Record<ModalType, { key: string; label: string; type?: string
   ],
 };
 
-export function NursingControlApp() {
+export function NursingControlApp({ currentUser, onLogout }: { currentUser: CurrentUser; onLogout: () => void }) {
   const [active, setActive] = useState<ModuleId>("inicio");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [staff, setStaff] = useState(initialStaff);
-  const [users, setUsers] = useState(initialUsers);
-  const [services, setServices] = useState(initialServices);
-  const [shifts, setShifts] = useState(initialShifts);
-  const [schedules, setSchedules] = useState(initialSchedules);
+  const [staff, setStaff] = useStoredState("nursing-staff", initialStaff);
+  const [users, setUsers] = useStoredState("nursing-users", initialUsers);
+  const [services, setServices] = useStoredState("nursing-services", initialServices);
+  const [shifts, setShifts] = useStoredState("nursing-shifts", initialShifts);
+  const [schedules, setSchedules] = useStoredState("nursing-schedules", initialSchedules);
   const [modal, setModal] = useState<{ type: ModalType; item?: FormState } | null>(null);
   const [toast, setToast] = useState("");
+  const [serviceIds, setServiceIds] = useState<Record<string, string>>({});
+  const isAdmin = currentUser.role === "Administrador";
+  const isSupervisor = currentUser.role === "Supervisor";
+  const visibleNavigation = navigation.filter(({ id }) => {
+    if (isAdmin) return true;
+    if (isSupervisor) return id === "inicio" || id === "horarios" || id === "personal";
+    return id === "inicio" || id === "horarios" || id === "personal" || id === "claves";
+  });
+  const canCreate = isAdmin || (currentUser.role === "Jefe de enfermería" && (active === "horarios" || active === "personal"));
+  const canEditActive = isAdmin || (isSupervisor && active === "horarios") || (currentUser.role === "Jefe de enfermería" && (active === "horarios" || active === "personal"));
+
+  useEffect(() => {
+    const client = getSupabase();
+    if (!client || currentUser.demo || !currentUser.organizationId) return;
+
+    const loadWorkspace = async () => {
+      const [servicesResult, staffResult, profilesResult, shiftsResult, schedulesResult] = await Promise.all([
+        client.from("services").select("id, name, code, leader_name, coverage, is_active").order("name"),
+        client.from("staff").select("id, service_id, full_name, document, position, status").order("full_name"),
+        client.from("profiles").select("id, service_id, full_name, email, role, is_active").order("full_name"),
+        client.from("shift_codes").select("id, code, name, start_time, end_time, hours, color").order("code"),
+        client.from("schedules").select("id, service_id, name, month, year, status, coverage_percentage").order("year", { ascending: false }).order("month", { ascending: false }),
+      ]);
+
+      const firstError = [servicesResult.error, staffResult.error, profilesResult.error, shiftsResult.error, schedulesResult.error].find(Boolean);
+      if (firstError) {
+        showToast(`No se pudieron cargar los datos: ${firstError.message}`);
+        return;
+      }
+
+      const serviceRows = (servicesResult.data || []) as DbService[];
+      const staffRows = (staffResult.data || []) as DbStaff[];
+      const profileRows = (profilesResult.data || []) as DbProfile[];
+      const shiftRows = (shiftsResult.data || []) as DbShift[];
+      const scheduleRows = (schedulesResult.data || []) as DbSchedule[];
+      const serviceById = Object.fromEntries(serviceRows.map((service) => [service.id, service]));
+
+      setServiceIds(Object.fromEntries(serviceRows.flatMap((service) => [[service.name, service.id], [service.code, service.id]])));
+      setServices(serviceRows.map((service) => ({
+        id: service.id,
+        name: service.name,
+        code: service.code,
+        leader: service.leader_name || "Sin asignar",
+        staff: staffRows.filter((person) => person.service_id === service.id).length,
+        coverage: service.coverage,
+        status: service.is_active ? "Activo" : "Inactivo",
+      })));
+      setStaff(staffRows.map((person) => ({
+        id: person.id,
+        name: person.full_name,
+        document: person.document,
+        position: person.position,
+        service: serviceById[person.service_id]?.code || serviceById[person.service_id]?.name || "Sin servicio",
+        status: person.status === "Inactivo" ? "Vacaciones" : person.status,
+      })));
+      setUsers(profileRows.map((profile) => ({
+        id: profile.id,
+        name: profile.full_name,
+        email: profile.email,
+        role: profile.role,
+        service: profile.service_id ? serviceById[profile.service_id]?.code || "Sin servicio" : "Todos",
+        status: profile.is_active ? "Activo" : "Inactivo",
+      })));
+      setShifts(shiftRows.map((shift) => ({
+        id: shift.id,
+        code: shift.code,
+        name: shift.name,
+        time: shift.start_time && shift.end_time ? `${shift.start_time.slice(0, 5)} — ${shift.end_time.slice(0, 5)}` : "Día completo",
+        hours: Number(shift.hours),
+        color: shift.color,
+      })));
+      setSchedules(scheduleRows.map((schedule) => ({
+        id: schedule.id,
+        name: schedule.name,
+        service: serviceById[schedule.service_id]?.code || serviceById[schedule.service_id]?.name || "Sin servicio",
+        period: `${monthNames[schedule.month - 1]} ${schedule.year}`,
+        status: schedule.status,
+        coverage: Number(schedule.coverage_percentage),
+      })));
+    };
+
+    void loadWorkspace();
+  }, [currentUser.demo, currentUser.organizationId, setSchedules, setServices, setShifts, setStaff, setUsers]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -206,6 +303,10 @@ export function NursingControlApp() {
   };
 
   const switchModule = (id: ModuleId) => {
+    if (!visibleNavigation.some((item) => item.id === id)) {
+      showToast("Tu perfil no tiene acceso a este módulo");
+      return;
+    }
     setActive(id);
     setSidebarOpen(false);
     setSearch("");
@@ -215,8 +316,19 @@ export function NursingControlApp() {
   const openEdit = (type: ModalType, item: object) =>
     setModal({ type, item: Object.fromEntries(Object.entries(item).map(([key, value]) => [key, String(value)])) });
 
-  const removeItem = (type: ModalType, id: number) => {
+  const removeItem = async (type: ModalType, id: EntityId) => {
     if (!window.confirm("¿Deseas eliminar este registro? Esta acción no se puede deshacer.")) return;
+    const client = getSupabase();
+    if (client && !currentUser.demo && typeof id === "string") {
+      const table = { personal: "staff", usuarios: "profiles", servicios: "services", claves: "shift_codes", horarios: "schedules" }[type];
+      const result = type === "usuarios"
+        ? await client.from(table).update({ is_active: false }).eq("id", id)
+        : await client.from(table).delete().eq("id", id);
+      if (result.error) {
+        showToast(`No se pudo eliminar: ${result.error.message}`);
+        return;
+      }
+    }
     if (type === "personal") setStaff((items) => items.filter((item) => item.id !== id));
     if (type === "usuarios") setUsers((items) => items.filter((item) => item.id !== id));
     if (type === "servicios") setServices((items) => items.filter((item) => item.id !== id));
@@ -225,9 +337,43 @@ export function NursingControlApp() {
     showToast("Registro eliminado correctamente");
   };
 
-  const saveItem = (form: FormState) => {
+  const saveItem = async (form: FormState) => {
     if (!modal) return;
-    const id = Number(form.id) || Date.now();
+    let id: EntityId = form.id ? (/^\d+$/.test(form.id) ? Number(form.id) : form.id) : Date.now();
+    const client = getSupabase();
+
+    if (client && !currentUser.demo && currentUser.organizationId) {
+      const serviceId = serviceIds[form.service || ""];
+      let result: { data: { id: string } | null; error: { message: string } | null };
+
+      if (modal.type === "usuarios" && !form.id) {
+        const response = await client.functions.invoke("invite-user", {
+          body: { email: form.email, fullName: form.name, role: form.role, serviceId: serviceId || null },
+        });
+        result = {
+          data: response.data?.userId ? { id: response.data.userId as string } : null,
+          error: response.error ? { message: response.error.message } : null,
+        };
+      } else {
+        const payload = buildSupabasePayload(modal.type, form, currentUser, serviceId);
+        const table = { personal: "staff", usuarios: "profiles", servicios: "services", claves: "shift_codes", horarios: "schedules" }[modal.type];
+        const query = form.id
+          ? client.from(table).update(payload).eq("id", form.id)
+          : client.from(table).insert(payload);
+        const response = await query.select("id").single();
+        result = { data: response.data as { id: string } | null, error: response.error };
+      }
+
+      if (result.error || !result.data) {
+        showToast(`No se pudo guardar: ${result.error?.message || "respuesta inválida"}`);
+        return;
+      }
+      id = result.data.id;
+      if (modal.type === "servicios") {
+        setServiceIds((items) => ({ ...items, [form.name]: result.data!.id, [form.code]: result.data!.id }));
+      }
+    }
+
     if (modal.type === "personal") {
       const item = { ...form, id } as unknown as Staff;
       setStaff((items) => form.id ? items.map((old) => old.id === id ? item : old) : [item, ...items]);
@@ -253,6 +399,7 @@ export function NursingControlApp() {
   };
 
   const content = moduleCopy[active];
+  const headingTitle = active === "inicio" ? `Buenos días, ${currentUser.name.split(" ")[0]}` : content.title;
 
   return (
     <div className="app-shell">
@@ -264,7 +411,7 @@ export function NursingControlApp() {
         <button className="mobile-close" onClick={() => setSidebarOpen(false)} aria-label="Cerrar menú"><X /></button>
         <nav className="main-nav" aria-label="Navegación principal">
           <span className="nav-caption">MENÚ PRINCIPAL</span>
-          {navigation.map(({ id, label, icon: Icon }) => (
+          {visibleNavigation.map(({ id, label, icon: Icon }) => (
             <button key={id} className={active === id ? "active" : ""} onClick={() => switchModule(id)}>
               <Icon size={19} strokeWidth={1.9} /><span>{label}</span>
             </button>
@@ -276,10 +423,10 @@ export function NursingControlApp() {
             <strong>Acceso seguro</strong>
             <span>Los cambios quedan registrados en auditoría.</span>
           </div>
-          <button className="user-panel">
-            <span className="avatar">AT</span>
-            <span><strong>Ana Torres</strong><small>Administrador</small></span>
-            <MoreHorizontal size={18} />
+          <button className="user-panel" onClick={onLogout} title="Cerrar sesión">
+            <span className="avatar">{currentUser.name.split(" ").slice(0, 2).map((part) => part[0]).join("")}</span>
+            <span><strong>{currentUser.name}</strong><small>{currentUser.role}</small></span>
+            <LogOut size={17} />
           </button>
         </div>
       </aside>
@@ -303,8 +450,8 @@ export function NursingControlApp() {
 
         <div className="page">
           <section className="page-heading">
-            <div><span className="eyebrow">{content.eyebrow}</span><h1>{content.title}</h1><p>{content.description}</p></div>
-            {active !== "inicio" && (
+            <div><span className="eyebrow">{content.eyebrow}</span><h1>{headingTitle}</h1><p>{content.description}</p></div>
+            {active !== "inicio" && canCreate && (
               <button className="primary-button" onClick={() => openCreate()}><Plus size={18} /> Crear nuevo</button>
             )}
           </section>
@@ -315,14 +462,15 @@ export function NursingControlApp() {
               users={users}
               services={services}
               onNavigate={switchModule}
-              onCreate={() => { setActive("horarios"); setModal({ type: "horarios" }); }}
+              canViewUsers={isAdmin}
+              onCreate={canCreate ? () => { setActive("horarios"); setModal({ type: "horarios" }); } : undefined}
             />
           )}
           {active === "horarios" && (
-            <SchedulesModule schedules={schedules} shifts={shifts} staff={staff} search={search} onEdit={(item) => openEdit("horarios", item)} onDelete={(id) => removeItem("horarios", id)} />
+            <SchedulesModule schedules={schedules} shifts={shifts} staff={staff} search={search} canManage={canEditActive} onEdit={(item) => openEdit("horarios", item)} onDelete={(id) => removeItem("horarios", id)} />
           )}
           {active === "personal" && (
-            <StaffModule items={staff} search={search} onEdit={(item) => openEdit("personal", item)} onDelete={(id) => removeItem("personal", id)} />
+            <StaffModule items={staff} search={search} canManage={canEditActive} onEdit={(item) => openEdit("personal", item)} onDelete={(id) => removeItem("personal", id)} />
           )}
           {active === "usuarios" && (
             <UsersModule items={users} search={search} onEdit={(item) => openEdit("usuarios", item)} onDelete={(id) => removeItem("usuarios", id)} />
@@ -342,9 +490,9 @@ export function NursingControlApp() {
   );
 }
 
-function Dashboard({ schedules, users, services, onNavigate, onCreate }: {
+function Dashboard({ schedules, users, services, onNavigate, onCreate, canViewUsers }: {
   schedules: Schedule[]; users: User[]; services: Service[];
-  onNavigate: (id: ModuleId) => void; onCreate: () => void;
+  onNavigate: (id: ModuleId) => void; onCreate?: () => void; canViewUsers: boolean;
 }) {
   const cards = [
     { label: "Personal activo", value: "62", detail: "4 servicios", icon: Users, tone: "blue" },
@@ -385,13 +533,13 @@ function Dashboard({ schedules, users, services, onNavigate, onCreate }: {
               </button>
             ))}
           </div>
-          <button className="outline-button full" onClick={onCreate}><Plus size={17} /> Crear horario mensual</button>
+          {onCreate && <button className="outline-button full" onClick={onCreate}><Plus size={17} /> Crear horario mensual</button>}
         </section>
         <section className="panel roles-panel">
           <div className="panel-heading"><div><h2>Perfiles del sistema</h2><p>Accesos y responsabilidades</p></div></div>
           <div className="role-list">
             {roles.map(({ name, description, count, icon: Icon }) => (
-              <button key={name} onClick={() => onNavigate("usuarios")}>
+              <button key={name} onClick={() => canViewUsers && onNavigate("usuarios")} className={!canViewUsers ? "non-clickable" : ""}>
                 <span className="role-icon"><Icon size={20} /></span>
                 <span><strong>{name}</strong><small>{description}</small></span>
                 <b>{count}</b>
@@ -416,9 +564,9 @@ function Dashboard({ schedules, users, services, onNavigate, onCreate }: {
   );
 }
 
-function SchedulesModule({ schedules, shifts, staff, search, onEdit, onDelete }: {
+function SchedulesModule({ schedules, shifts, staff, search, canManage, onEdit, onDelete }: {
   schedules: Schedule[]; shifts: Shift[]; staff: Staff[]; search: string;
-  onEdit: (item: Schedule) => void; onDelete: (id: number) => void;
+  canManage: boolean; onEdit: (item: Schedule) => void; onDelete: (id: number) => void;
 }) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const filtered = schedules.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()));
@@ -426,8 +574,8 @@ function SchedulesModule({ schedules, shifts, staff, search, onEdit, onDelete }:
     return (
       <section className="panel">
         <Toolbar view={view} onView={setView} label="Agosto 2026" />
-        <DataTable headers={["Horario", "Servicio", "Periodo", "Cobertura", "Estado", "Acciones"]}>
-          {filtered.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.service}</td><td>{item.period}</td><td>{item.coverage}%</td><td><StatusBadge value={item.status} /></td><Actions onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} /></tr>)}
+        <DataTable headers={["Horario", "Servicio", "Periodo", "Cobertura", "Estado", ...(canManage ? ["Acciones"] : [])]}>
+          {filtered.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.service}</td><td>{item.period}</td><td>{item.coverage}%</td><td><StatusBadge value={item.status} /></td>{canManage && <Actions onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />}</tr>)}
         </DataTable>
       </section>
     );
@@ -438,7 +586,7 @@ function SchedulesModule({ schedules, shifts, staff, search, onEdit, onDelete }:
       <div className="planner-meta">
         <div><span>Servicio</span><strong>Unidad de Cuidados Intensivos (UCI)</strong></div>
         <div><span>Estado</span><StatusBadge value="En revisión" /></div>
-        <div className="planner-actions"><button className="outline-button"><FileDown size={16} /> Exportar</button><button className="approve-button"><Check size={16} /> Enviar a aprobación</button></div>
+        <div className="planner-actions"><button className="outline-button"><FileDown size={16} /> Exportar</button>{canManage && <button className="approve-button"><Check size={16} /> Enviar a aprobación</button>}</div>
       </div>
       <div className="schedule-grid-wrap">
         <table className="schedule-grid">
@@ -470,13 +618,13 @@ function Toolbar({ view, onView, label }: { view: "grid" | "list"; onView: (valu
   );
 }
 
-function StaffModule({ items, search, onEdit, onDelete }: { items: Staff[]; search: string; onEdit: (item: Staff) => void; onDelete: (id: number) => void }) {
+function StaffModule({ items, search, canManage, onEdit, onDelete }: { items: Staff[]; search: string; canManage: boolean; onEdit: (item: Staff) => void; onDelete: (id: number) => void }) {
   const filtered = filterRows(items, search);
   return (
     <section className="panel table-panel">
       <TableIntro count={filtered.length} label="colaboradores registrados" />
-      <DataTable headers={["Colaborador", "Documento", "Cargo", "Servicio", "Estado", "Acciones"]}>
-        {filtered.map((item) => <tr key={item.id}><td><PersonCell name={item.name} subtitle={`${item.position} · ${item.service}`} /></td><td>{item.document}</td><td>{item.position}</td><td><span className="soft-tag">{item.service}</span></td><td><StatusBadge value={item.status} /></td><Actions onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} /></tr>)}
+      <DataTable headers={["Colaborador", "Documento", "Cargo", "Servicio", "Estado", ...(canManage ? ["Acciones"] : [])]}>
+        {filtered.map((item) => <tr key={item.id}><td><PersonCell name={item.name} subtitle={`${item.position} · ${item.service}`} /></td><td>{item.document}</td><td>{item.position}</td><td><span className="soft-tag">{item.service}</span></td><td><StatusBadge value={item.status} /></td>{canManage && <Actions onEdit={() => onEdit(item)} onDelete={() => onDelete(item.id)} />}</tr>)}
       </DataTable>
     </section>
   );
@@ -593,6 +741,85 @@ function PermissionCard({ icon: Icon, title, text, tone }: { icon: LucideIcon; t
 
 function TableIntro({ count, label }: { count: number; label: string }) {
   return <div className="table-intro"><div><h2>Listado general</h2><p>{count} {label}</p></div><button className="filter-button">Todos los estados <ChevronDown size={15} /></button></div>;
+}
+
+function useStoredState<T>(key: string, initialValue: T) {
+  const [value, setValue] = useState(initialValue);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(key);
+      if (stored) setValue(JSON.parse(stored) as T);
+    } catch {
+      window.localStorage.removeItem(key);
+    } finally {
+      setHydrated(true);
+    }
+  }, [key]);
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem(key, JSON.stringify(value));
+  }, [hydrated, key, value]);
+
+  return [value, setValue] as const;
+}
+
+function buildSupabasePayload(type: ModalType, form: FormState, user: CurrentUser, serviceId?: string): Record<string, unknown> {
+  if (type === "personal") {
+    return {
+      organization_id: user.organizationId,
+      service_id: serviceId,
+      full_name: form.name,
+      document: form.document,
+      position: form.position,
+      status: form.status,
+    };
+  }
+  if (type === "usuarios") {
+    return {
+      service_id: serviceId || null,
+      full_name: form.name,
+      email: form.email,
+      role: form.role,
+      is_active: form.status === "Activo",
+    };
+  }
+  if (type === "servicios") {
+    return {
+      organization_id: user.organizationId,
+      name: form.name,
+      code: form.code.toUpperCase(),
+      leader_name: form.leader,
+      coverage: form.coverage,
+      is_active: form.status === "Activo",
+    };
+  }
+  if (type === "claves") {
+    const [startTime, endTime] = form.time.includes("—") ? form.time.split("—").map((value) => value.trim()) : [null, null];
+    return {
+      organization_id: user.organizationId,
+      code: form.code.toUpperCase(),
+      name: form.name,
+      start_time: startTime,
+      end_time: endTime,
+      hours: Number(form.hours),
+      color: form.color,
+      is_active: true,
+    };
+  }
+
+  const [monthName, yearValue] = form.period.split(" ");
+  return {
+    organization_id: user.organizationId,
+    service_id: serviceId,
+    name: form.name,
+    month: Math.max(1, monthNames.findIndex((month) => month.toLowerCase() === monthName?.toLowerCase()) + 1),
+    year: Number(yearValue) || new Date().getFullYear(),
+    status: form.status,
+    coverage_percentage: Number(form.coverage || 0),
+    created_by: user.id,
+  };
 }
 
 function filterRows<T extends object>(items: T[], search: string) {
