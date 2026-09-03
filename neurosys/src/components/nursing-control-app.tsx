@@ -28,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import type { CurrentUser } from "./authenticated-app";
 
@@ -49,7 +49,7 @@ type Staff = {
   document: string;
   position: string;
   service: string;
-  status: "Activo" | "Vacaciones";
+  status: "Activo" | "Vacaciones" | "Inactivo";
 };
 
 type User = {
@@ -176,7 +176,7 @@ const fieldConfig: Record<ModalType, { key: string; label: string; type?: string
     { key: "document", label: "Documento" },
     { key: "position", label: "Cargo", options: ["Enfermera", "Enfermero", "Auxiliar", "Responsable"] },
     { key: "service", label: "Servicio", options: ["UCI", "Emergencia", "Hospitalización", "Consulta externa"] },
-    { key: "status", label: "Estado", options: ["Activo", "Vacaciones"] },
+    { key: "status", label: "Estado", options: ["Activo", "Vacaciones", "Inactivo"] },
   ],
   usuarios: [
     { key: "name", label: "Nombre completo" },
@@ -214,6 +214,10 @@ export function NursingControlApp({ currentUser, onLogout }: { currentUser: Curr
   const [modal, setModal] = useState<{ type: ModalType; item?: FormState } | null>(null);
   const [toast, setToast] = useState("");
   const [serviceIds, setServiceIds] = useState<Record<string, string>>({});
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2600);
+  }, []);
   const isAdmin = currentUser.role === "Administrador";
   const isSupervisor = currentUser.role === "Supervisor";
   const visibleNavigation = navigation.filter(({ id }) => {
@@ -266,7 +270,7 @@ export function NursingControlApp({ currentUser, onLogout }: { currentUser: Curr
         document: person.document,
         position: person.position,
         service: serviceById[person.service_id]?.code || serviceById[person.service_id]?.name || "Sin servicio",
-        status: person.status === "Inactivo" ? "Vacaciones" : person.status,
+        status: person.status,
       })));
       setUsers(profileRows.map((profile) => ({
         id: profile.id,
@@ -295,12 +299,7 @@ export function NursingControlApp({ currentUser, onLogout }: { currentUser: Curr
     };
 
     void loadWorkspace();
-  }, [currentUser.demo, currentUser.organizationId, setSchedules, setServices, setShifts, setStaff, setUsers]);
-
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 2600);
-  };
+  }, [currentUser.demo, currentUser.organizationId, setSchedules, setServices, setShifts, setStaff, setUsers, showToast]);
 
   const switchModule = (id: ModuleId) => {
     if (!visibleNavigation.some((item) => item.id === id)) {
@@ -566,7 +565,7 @@ function Dashboard({ schedules, users, services, onNavigate, onCreate, canViewUs
 
 function SchedulesModule({ schedules, shifts, staff, search, canManage, onEdit, onDelete }: {
   schedules: Schedule[]; shifts: Shift[]; staff: Staff[]; search: string;
-  canManage: boolean; onEdit: (item: Schedule) => void; onDelete: (id: number) => void;
+  canManage: boolean; onEdit: (item: Schedule) => void; onDelete: (id: EntityId) => void;
 }) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const filtered = schedules.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()));
@@ -618,7 +617,7 @@ function Toolbar({ view, onView, label }: { view: "grid" | "list"; onView: (valu
   );
 }
 
-function StaffModule({ items, search, canManage, onEdit, onDelete }: { items: Staff[]; search: string; canManage: boolean; onEdit: (item: Staff) => void; onDelete: (id: number) => void }) {
+function StaffModule({ items, search, canManage, onEdit, onDelete }: { items: Staff[]; search: string; canManage: boolean; onEdit: (item: Staff) => void; onDelete: (id: EntityId) => void }) {
   const filtered = filterRows(items, search);
   return (
     <section className="panel table-panel">
@@ -630,7 +629,7 @@ function StaffModule({ items, search, canManage, onEdit, onDelete }: { items: St
   );
 }
 
-function UsersModule({ items, search, onEdit, onDelete }: { items: User[]; search: string; onEdit: (item: User) => void; onDelete: (id: number) => void }) {
+function UsersModule({ items, search, onEdit, onDelete }: { items: User[]; search: string; onEdit: (item: User) => void; onDelete: (id: EntityId) => void }) {
   const filtered = filterRows(items, search);
   return (
     <>
@@ -649,7 +648,7 @@ function UsersModule({ items, search, onEdit, onDelete }: { items: User[]; searc
   );
 }
 
-function ServicesModule({ items, search, onEdit, onDelete }: { items: Service[]; search: string; onEdit: (item: Service) => void; onDelete: (id: number) => void }) {
+function ServicesModule({ items, search, onEdit, onDelete }: { items: Service[]; search: string; onEdit: (item: Service) => void; onDelete: (id: EntityId) => void }) {
   const filtered = filterRows(items, search);
   return (
     <div className="service-grid">
@@ -665,7 +664,7 @@ function ServicesModule({ items, search, onEdit, onDelete }: { items: Service[];
   );
 }
 
-function ShiftsModule({ items, search, onEdit, onDelete }: { items: Shift[]; search: string; onEdit: (item: Shift) => void; onDelete: (id: number) => void }) {
+function ShiftsModule({ items, search, onEdit, onDelete }: { items: Shift[]; search: string; onEdit: (item: Shift) => void; onDelete: (id: EntityId) => void }) {
   const filtered = filterRows(items, search);
   return (
     <section className="panel table-panel">
@@ -748,14 +747,18 @@ function useStoredState<T>(key: string, initialValue: T) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    let storedValue: T | undefined;
     try {
       const stored = window.localStorage.getItem(key);
-      if (stored) setValue(JSON.parse(stored) as T);
+      if (stored) storedValue = JSON.parse(stored) as T;
     } catch {
       window.localStorage.removeItem(key);
-    } finally {
-      setHydrated(true);
     }
+    const timer = window.setTimeout(() => {
+      if (storedValue !== undefined) setValue(storedValue);
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [key]);
 
   useEffect(() => {
