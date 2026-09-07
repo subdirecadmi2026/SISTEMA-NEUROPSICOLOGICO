@@ -81,7 +81,7 @@ export function LoginPage() {
             {pending ? 'Entrando…' : 'Entrar'}
           </button>
           <p className="mt-4 text-xs text-ink-500">
-            Demo: admin@sachawasi.ec / password · también bodega@sachawasi.ec y mesero@sachawasi.ec
+            Demo: admin@sachawasi.ec / password · cajero@, cocina@, mesero@, bodega@
           </p>
         </div>
       </form>

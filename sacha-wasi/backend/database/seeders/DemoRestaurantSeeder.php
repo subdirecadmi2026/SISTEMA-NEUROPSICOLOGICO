@@ -2,22 +2,36 @@
 
 namespace Database\Seeders;
 
+use App\Enums\DocumentType;
 use App\Enums\InventoryBehavior;
 use App\Enums\ProductType;
 use App\Enums\UnitDimension;
 use App\Enums\WarehouseType;
 use App\Models\Branch;
+use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\Company;
+use App\Models\Coupon;
+use App\Models\Customer;
+use App\Models\DeliveryZone;
+use App\Models\DiningArea;
+use App\Models\DiningTable;
+use App\Models\Expense;
+use App\Models\FiscalSequence;
+use App\Models\GiftCard;
 use App\Models\KitchenStation;
 use App\Models\Product;
 use App\Models\Recipe;
+use App\Models\Reservation;
+use App\Models\Rider;
+use App\Models\Supplier;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Domain\Inventory\KardexService;
 use App\Domain\Recipes\RecipeCostingService;
+use App\Domain\Sales\SaleService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -129,6 +143,28 @@ class DemoRestaurantSeeder extends Seeder
         $mesero->assignRole('mesero');
         $mesero->branches()->sync([$matriz->id => ['is_default' => true]]);
 
+        $cajero = User::query()->create([
+            'company_id' => $company->id,
+            'current_branch_id' => $matriz->id,
+            'name' => 'Sofía Cárdenas',
+            'email' => 'cajero@sachawasi.ec',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $cajero->assignRole('cajero');
+        $cajero->branches()->sync([$matriz->id => ['is_default' => true]]);
+
+        $cocinero = User::query()->create([
+            'company_id' => $company->id,
+            'current_branch_id' => $matriz->id,
+            'name' => 'Marco Iza',
+            'email' => 'cocina@sachawasi.ec',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $cocinero->assignRole('cocina');
+        $cocinero->branches()->sync([$matriz->id => ['is_default' => true]]);
+
         $this->seedTaxes($company->id);
         $units = $this->seedUnits($company->id);
         $this->seedStations($company->id, $matriz->id);
@@ -140,10 +176,12 @@ class DemoRestaurantSeeder extends Seeder
         $this->seedRecipes($company->id, $dishes, $ingredients, $units);
         $this->seedOpeningStock($bodega, $ingredients, $admin);
 
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['salsa']->fresh('activeRecipe'));
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['locro']->fresh('activeRecipe'));
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['seco']->fresh('activeRecipe'));
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['jugo']->fresh('activeRecipe'));
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['salsa']->fresh()->activeRecipe);
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['locro']->fresh()->activeRecipe);
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['seco']->fresh()->activeRecipe);
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['jugo']->fresh()->activeRecipe);
+
+        $this->seedOperations($company, $matriz, $bodega, $admin, $cajero, $ingredients, $dishes);
     }
 
     private function seedTaxes(string $companyId): void
@@ -458,5 +496,202 @@ class DemoRestaurantSeeder extends Seeder
                 ->where('warehouse_id', $warehouse->id)
                 ->update(['min_qty' => max(1, ((float) $qty) * 0.2)]);
         }
+    }
+
+    private function seedOperations(
+        Company $company,
+        Branch $matriz,
+        Warehouse $bodega,
+        User $admin,
+        User $cajero,
+        array $ingredients,
+        array $dishes,
+    ): void {
+        $salon = DiningArea::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'name' => 'Salón principal',
+            'sort_order' => 1,
+        ]);
+
+        $tables = [];
+        foreach ([
+            ['M1', 2, 40, 40],
+            ['M2', 2, 180, 40],
+            ['M3', 4, 40, 160],
+            ['M4', 4, 180, 160],
+            ['M5', 4, 320, 40],
+            ['M6', 6, 320, 160],
+            ['M7', 4, 40, 280],
+            ['M8', 8, 180, 280],
+        ] as [$code, $seats, $x, $y]) {
+            $tables[$code] = DiningTable::query()->create([
+                'company_id' => $company->id,
+                'branch_id' => $matriz->id,
+                'dining_area_id' => $salon->id,
+                'name' => 'Mesa '.$code,
+                'code' => $code,
+                'qr_token' => 'floresta-'.strtolower($code),
+                'seats' => $seats,
+                'pos_x' => $x,
+                'pos_y' => $y,
+            ]);
+        }
+
+        $register = CashRegister::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'name' => 'Caja 1',
+            'code' => 'C1',
+        ]);
+
+        app(\App\Domain\Cash\CashService::class)->open($register, $cajero, '150.00');
+
+        FiscalSequence::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'document_type' => \App\Enums\DocumentType::Invoice,
+            'establishment_code' => '001',
+            'emission_point' => '001',
+            'next_number' => 1,
+        ]);
+
+        $supplier = Supplier::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Mercado Mayorista de Quito',
+            'trade_name' => 'Mayorista Sierra',
+            'ruc' => '1790456789001',
+            'city' => 'Quito',
+            'phone' => '+593 2 250 0000',
+        ]);
+
+        $po = app(\App\Domain\Purchasing\PurchaseService::class)->create([
+            'branch_id' => $matriz->id,
+            'warehouse_id' => $bodega->id,
+            'supplier_id' => $supplier->id,
+            'notes' => 'Reposición semanal de papa y pollo',
+            'items' => [
+                ['product_id' => $ingredients['papa']->id, 'quantity_ordered' => 10, 'unit_cost' => 0.78, 'lot_code' => 'PO-PAPA'],
+                ['product_id' => $ingredients['pollo']->id, 'quantity_ordered' => 8, 'unit_cost' => 3.55, 'lot_code' => 'PO-POLLO'],
+            ],
+        ], $admin);
+        app(\App\Domain\Purchasing\PurchaseService::class)->approve($po, $admin);
+        app(\App\Domain\Purchasing\PurchaseService::class)->receive($po, $admin);
+
+        $ana = Customer::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Ana Lucía Benítez',
+            'document_type' => 'cedula',
+            'document_number' => '1712345678',
+            'phone' => '0991112233',
+            'email' => 'ana.benitez@example.com',
+            'segment' => 'frecuente',
+            'points' => 40,
+            'lifetime_spend' => 86,
+        ]);
+        Customer::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Diego Morales',
+            'document_type' => 'cedula',
+            'document_number' => '1709876543',
+            'phone' => '0987654321',
+            'segment' => 'nuevo',
+        ]);
+
+        Coupon::query()->create([
+            'company_id' => $company->id,
+            'code' => 'SIERRA10',
+            'name' => '10% sierra',
+            'type' => 'percent',
+            'value' => 10,
+            'min_ticket' => 5,
+            'is_active' => true,
+        ]);
+
+        GiftCard::query()->create([
+            'company_id' => $company->id,
+            'customer_id' => $ana->id,
+            'code' => 'GIFT-SW-50',
+            'balance' => 50,
+            'status' => 'active',
+        ]);
+
+        Reservation::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'dining_table_id' => $tables['M6']->id,
+            'customer_id' => $ana->id,
+            'guest_name' => 'Ana Lucía Benítez',
+            'guest_phone' => '0991112233',
+            'party_size' => 4,
+            'reserved_at' => now()->setTime(20, 0),
+            'status' => 'confirmed',
+            'channel' => 'phone',
+            'notes' => 'Cumpleaños, mesa junto a la ventana',
+        ]);
+
+        $rider = Rider::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'name' => 'Kevin Toapanta',
+            'phone' => '0998887766',
+            'vehicle' => 'moto',
+            'is_available' => true,
+        ]);
+
+        $zona = DeliveryZone::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'name' => 'La Floresta',
+            'fee' => 1.50,
+            'eta_minutes' => 25,
+        ]);
+
+        Expense::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'user_id' => $admin->id,
+            'category' => 'servicios',
+            'description' => 'Gas y energía del día',
+            'amount' => 18.40,
+            'incurred_on' => now()->toDateString(),
+            'vendor' => 'CNEL / Gasnor',
+        ]);
+
+        app()->instance('currentCompanyId', $company->id);
+        app()->instance('currentBranchId', $matriz->id);
+
+        $sales = app(SaleService::class);
+        $sales->quickSale([
+            'branch_id' => $matriz->id,
+            'warehouse_id' => $bodega->id,
+            'dining_table_id' => $tables['M3']->id,
+            'customer_id' => $ana->id,
+            'channel' => 'salon',
+            'covers' => 2,
+            'guest_name' => 'Ana Lucía Benítez',
+            'document_type' => DocumentType::Invoice->value,
+            'items' => [
+                ['product_id' => $dishes['locro']->id, 'quantity' => 1],
+                ['product_id' => $dishes['jugo']->id, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['method' => 'cash', 'amount' => 9.00],
+            ],
+        ], $cajero);
+
+        $delivery = $sales->open([
+            'branch_id' => $matriz->id,
+            'warehouse_id' => $bodega->id,
+            'channel' => 'delivery',
+            'customer_id' => $ana->id,
+            'guest_name' => 'Ana Lucía Benítez',
+            'delivery_address' => 'Guipuzcoa y Valladolid',
+            'delivery_zone_id' => $zona->id,
+            'delivery_fee' => 1.50,
+            'rider_id' => $rider->id,
+        ], $cajero);
+        $sales->addItem($delivery, ['product_id' => $dishes['seco']->id, 'quantity' => 1]);
+        $sales->sendToKitchen($delivery, $cajero);
     }
 }

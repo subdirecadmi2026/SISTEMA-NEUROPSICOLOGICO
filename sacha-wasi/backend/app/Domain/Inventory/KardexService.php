@@ -201,6 +201,45 @@ class KardexService
         return $movements;
     }
 
+    /**
+     * Devuelve insumos de una venta anulada (misma explosión que consumeForSale).
+     *
+     * @return list<StockMovement>
+     */
+    public function restoreForSale(
+        Warehouse $warehouse,
+        Product $product,
+        string $quantity,
+        ?User $user = null,
+        ?string $referenceType = null,
+        ?string $referenceId = null,
+    ): array {
+        $leaves = $this->explosion->explodeForSale($product, $quantity);
+        $movements = [];
+
+        foreach ($leaves as $leaf) {
+            $avgCost = (string) (StockItem::query()
+                ->where('warehouse_id', $warehouse->id)
+                ->where('product_id', $leaf['product']->id)
+                ->value('avg_cost') ?: $leaf['product']->default_cost ?: '0');
+
+            $movements[] = $this->receive(
+                warehouse: $warehouse,
+                product: $leaf['product'],
+                quantity: $leaf['quantity'],
+                unitCost: $avgCost,
+                lotCode: 'DEV-VENTA',
+                type: StockMovementType::Return,
+                user: $user,
+                notes: "Anulación de venta {$product->name}",
+                referenceType: $referenceType,
+                referenceId: $referenceId,
+            );
+        }
+
+        return $movements;
+    }
+
     public function transfer(StockTransfer $transfer, ?User $user = null): StockTransfer
     {
         return DB::transaction(function () use ($transfer, $user) {

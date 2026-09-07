@@ -37,6 +37,12 @@ export function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Ventas de hoy" value={`$${Number(k.sales_today ?? 0).toFixed(2)}`} hint={`${k.tickets_today ?? 0} tickets · promedio $${Number(k.avg_ticket ?? 0).toFixed(2)}`} />
+        <Kpi label="Utilidad neta hoy" value={`$${Number(k.net_profit_today ?? 0).toFixed(2)}`} hint={`Food cost ${Number(k.food_cost_percent ?? 0)}%`} />
+        <Kpi label="Caja" value={k.cash_open ? `$${Number(k.cash_system ?? 0).toFixed(2)}` : 'Cerrada'} hint={k.cash_open ? 'Sesión abierta' : 'Abra caja para vender'} />
+        <Kpi label="Cocina / SRI" value={String(k.kitchen_open ?? 0)} hint={`${k.sri_authorized_today ?? 0} facturas autorizadas (simulador)`} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Productos activos" value={String(k.sellable_products)} hint={`${k.products} en catálogo`} />
         <Kpi label="Valor de inventario" value={`$${Number(k.inventory_value).toFixed(2)}`} hint="Costo promedio × stock" />
         <Kpi label="Stock bajo mínimo" value={String(k.low_stock)} hint="Alertas de reposición" />

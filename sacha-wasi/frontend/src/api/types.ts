@@ -18,6 +18,7 @@ export type Category = {
   show_on_pos: boolean
   products_count?: number
   children?: Category[]
+  products?: Product[]
 }
 
 export type Product = {

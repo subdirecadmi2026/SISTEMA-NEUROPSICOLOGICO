@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Domain\Inventory\InsufficientStockException;
 use App\Domain\Inventory\ImmutableKardexException;
 use App\Domain\Recipes\CircularRecipeException;
+use App\Domain\Sales\OpenCashSessionRequiredException;
+use App\Domain\Sales\OrderNotPayableException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -41,5 +43,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (ImmutableKardexException $e) {
             return response()->json(['message' => $e->getMessage()], 409);
+        });
+
+        $exceptions->render(function (OpenCashSessionRequiredException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        });
+
+        $exceptions->render(function (OrderNotPayableException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         });
     })->create();

@@ -33,6 +33,10 @@ class ProductController extends Controller
             $query->where('status', $request->string('status'));
         }
 
+        if ($request->boolean('sellable')) {
+            $query->where('is_sellable', true)->where('status', 'active');
+        }
+
         if ($request->filled('search')) {
             $search = $request->string('search')->toString();
             $query->where(function ($q) use ($search) {

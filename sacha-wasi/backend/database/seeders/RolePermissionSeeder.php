@@ -26,6 +26,34 @@ class RolePermissionSeeder extends Seeder
             ['pos.sell', 'POS', 'Vender'],
             ['pos.discount', 'POS', 'Aplicar descuentos'],
             ['pos.void', 'POS', 'Anular comprobantes'],
+            ['kds.view', 'Cocina', 'Ver KDS'],
+            ['kds.advance', 'Cocina', 'Avanzar tickets de cocina'],
+            ['tables.view', 'Sala', 'Ver mesas'],
+            ['tables.manage', 'Sala', 'Cambiar estado de mesas'],
+            ['cash.view', 'Caja', 'Ver caja'],
+            ['cash.open', 'Caja', 'Abrir caja'],
+            ['cash.move', 'Caja', 'Ingresos y retiros'],
+            ['cash.close', 'Caja', 'Cerrar caja y arqueo'],
+            ['fiscal.view', 'Facturación', 'Ver comprobantes'],
+            ['fiscal.retry', 'Facturación', 'Reintentar autorización SRI'],
+            ['customers.view', 'CRM', 'Ver clientes'],
+            ['customers.manage', 'CRM', 'Gestionar clientes'],
+            ['suppliers.view', 'Compras', 'Ver proveedores'],
+            ['suppliers.manage', 'Compras', 'Gestionar proveedores'],
+            ['purchases.view', 'Compras', 'Ver órdenes de compra'],
+            ['purchases.manage', 'Compras', 'Crear órdenes de compra'],
+            ['purchases.approve', 'Compras', 'Aprobar órdenes'],
+            ['purchases.receive', 'Compras', 'Recibir mercadería'],
+            ['reservations.view', 'Reservas', 'Ver reservas'],
+            ['reservations.manage', 'Reservas', 'Gestionar reservas'],
+            ['delivery.view', 'Delivery', 'Ver entregas'],
+            ['delivery.manage', 'Delivery', 'Asignar riders'],
+            ['expenses.view', 'Finanzas', 'Ver gastos'],
+            ['expenses.manage', 'Finanzas', 'Registrar gastos'],
+            ['reports.view', 'Reportes', 'Ver reportes'],
+            ['audit.view', 'Seguridad', 'Ver bitácora'],
+            ['settings.view', 'Configuración', 'Ver configuración'],
+            ['settings.manage', 'Configuración', 'Editar configuración'],
             ['users.manage', 'Seguridad', 'Administrar usuarios y permisos'],
         ];
 
@@ -51,10 +79,10 @@ class RolePermissionSeeder extends Seeder
             'gerente' => [
                 'label' => 'Gerente',
                 'description' => 'Operación y reportería de sucursal',
-                'permissions' => array_diff(
+                'permissions' => array_values(array_diff(
                     Permission::query()->pluck('name')->all(),
                     ['users.manage']
-                ),
+                )),
             ],
             'bodega' => [
                 'label' => 'Bodega',
@@ -66,37 +94,59 @@ class RolePermissionSeeder extends Seeder
                     'inventory.adjust',
                     'inventory.transfer',
                     'inventory.count',
+                    'purchases.view',
+                    'purchases.receive',
+                    'suppliers.view',
                 ]),
             ],
             'mesero' => [
                 'label' => 'Mesero',
-                'description' => 'Consulta de menú y venta',
-                'permissions' => array_merge($catalog, ['pos.sell']),
+                'description' => 'Sala, menú y toma de pedidos',
+                'permissions' => array_merge($catalog, [
+                    'pos.sell', 'tables.view', 'tables.manage', 'kds.view',
+                    'customers.view', 'reservations.view', 'reservations.manage',
+                ]),
             ],
             'cajero' => [
                 'label' => 'Cajero',
-                'description' => 'POS y cobro',
-                'permissions' => array_merge($catalog, ['pos.sell', 'pos.discount', 'inventory.stock.view']),
+                'description' => 'POS, cobro y caja',
+                'permissions' => array_merge($catalog, [
+                    'pos.sell', 'pos.discount', 'inventory.stock.view',
+                    'cash.view', 'cash.open', 'cash.move', 'cash.close',
+                    'fiscal.view', 'customers.view', 'customers.manage', 'tables.view',
+                ]),
             ],
             'cocina' => [
                 'label' => 'Cocina',
-                'description' => 'Consulta de recetas y KDS',
-                'permissions' => ['catalog.products.view', 'catalog.recipes.view'],
+                'description' => 'KDS y recetas',
+                'permissions' => ['catalog.products.view', 'catalog.recipes.view', 'kds.view', 'kds.advance'],
             ],
             'compras' => [
                 'label' => 'Compras',
                 'description' => 'Abastecimiento',
-                'permissions' => array_merge($catalog, ['inventory.stock.view', 'inventory.receive']),
+                'permissions' => array_merge($catalog, [
+                    'inventory.stock.view', 'inventory.receive',
+                    'suppliers.view', 'suppliers.manage',
+                    'purchases.view', 'purchases.manage', 'purchases.approve', 'purchases.receive',
+                ]),
             ],
             'contabilidad' => [
                 'label' => 'Contabilidad',
-                'description' => 'Consulta financiera y kardex',
-                'permissions' => array_merge($catalog, ['inventory.stock.view', 'inventory.kardex.view']),
+                'description' => 'Consulta financiera, SRI y kardex',
+                'permissions' => array_merge($catalog, [
+                    'inventory.stock.view', 'inventory.kardex.view',
+                    'fiscal.view', 'fiscal.retry', 'reports.view',
+                    'expenses.view', 'expenses.manage', 'audit.view', 'cash.view',
+                ]),
             ],
             'supervisor' => [
                 'label' => 'Supervisor',
                 'description' => 'Supervisión de sala y caja',
-                'permissions' => array_merge($catalog, ['pos.sell', 'pos.discount', 'pos.void', 'inventory.stock.view']),
+                'permissions' => array_merge($catalog, [
+                    'pos.sell', 'pos.discount', 'pos.void', 'inventory.stock.view',
+                    'tables.view', 'tables.manage', 'kds.view', 'cash.view',
+                    'fiscal.view', 'reports.view', 'customers.view',
+                ]),
             ],
         ];
 
