@@ -22,7 +22,13 @@ class KitchenController extends Controller
             ->with(['order.table', 'product', 'kitchenStation'])
             ->whereHas('order', function ($q) use ($request) {
                 $q->where('branch_id', $this->branchId($request))
-                    ->whereIn('status', ['open', 'in_kitchen', 'ready', 'delivered']);
+                    ->where(function ($inner) {
+                        $inner->whereIn('status', ['open', 'in_kitchen', 'ready', 'delivered'])
+                            ->orWhere(function ($billed) {
+                                $billed->where('status', 'billed')
+                                    ->where('paid_at', '>=', now()->subHours(8));
+                            });
+                    });
             })
             ->whereIn('kitchen_status', ['pending', 'preparing', 'ready'])
             ->orderBy('fired_at')

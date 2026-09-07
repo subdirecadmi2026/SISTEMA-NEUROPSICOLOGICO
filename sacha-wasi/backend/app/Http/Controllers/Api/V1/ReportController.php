@@ -31,7 +31,8 @@ class ReportController extends Controller
         $tickets = (clone $sales)->count();
         $expenses = (float) Expense::query()
             ->where('branch_id', $branchId)
-            ->whereBetween('incurred_on', [$from->toDateString(), $to->toDateString()])
+            ->whereDate('incurred_on', '>=', $from->toDateString())
+            ->whereDate('incurred_on', '<=', $to->toDateString())
             ->sum('amount');
 
         $byChannel = Order::query()

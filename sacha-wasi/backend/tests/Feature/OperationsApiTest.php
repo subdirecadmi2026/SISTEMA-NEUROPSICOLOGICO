@@ -182,6 +182,25 @@ class OperationsApiTest extends TestCase
         $this->assertSame(1, Order::query()->count());
     }
 
+    public function test_reports_include_expenses_in_net_profit(): void
+    {
+        $this->actingAsAdmin();
+        \App\Models\Expense::query()->create([
+            'company_id' => $this->company->id,
+            'branch_id' => $this->branch->id,
+            'user_id' => $this->admin->id,
+            'category' => 'servicios',
+            'description' => 'Gas',
+            'amount' => 10,
+            'incurred_on' => now()->toDateString(),
+        ]);
+
+        $this->getJson('/api/v1/reports')
+            ->assertOk()
+            ->assertJsonPath('expenses', 10)
+            ->assertJsonPath('net_profit', -10);
+    }
+
     /**
      * @return array{0: \App\Models\Product, 1: \App\Models\Product}
      */
