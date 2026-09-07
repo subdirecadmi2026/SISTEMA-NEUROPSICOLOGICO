@@ -1,0 +1,461 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Enums\InventoryBehavior;
+use App\Enums\ProductType;
+use App\Enums\UnitDimension;
+use App\Enums\WarehouseType;
+use App\Models\Branch;
+use App\Models\Category;
+use App\Models\Company;
+use App\Models\KitchenStation;
+use App\Models\Product;
+use App\Models\Recipe;
+use App\Models\TaxRate;
+use App\Models\Unit;
+use App\Models\User;
+use App\Models\Warehouse;
+use App\Domain\Inventory\KardexService;
+use App\Domain\Recipes\RecipeCostingService;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+class DemoRestaurantSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $company = Company::query()->create([
+            'name' => 'Sacha Wasi',
+            'trade_name' => 'Sacha Wasi — Cocina de la Sierra',
+            'ruc' => '1790012345001',
+            'legal_name' => 'Sacha Wasi Gastronomía SAS',
+            'email' => 'hola@sachawasi.ec',
+            'phone' => '+593 2 394 0100',
+            'address' => 'Av. 12 de Octubre y Veintimilla',
+            'city' => 'Quito',
+            'province' => 'Pichincha',
+            'country_code' => 'EC',
+            'timezone' => 'America/Guayaquil',
+            'currency_code' => 'USD',
+        ]);
+
+        $matriz = Branch::query()->create([
+            'company_id' => $company->id,
+            'code' => 'UIO-01',
+            'name' => 'Matriz La Floresta',
+            'email' => 'floresta@sachawasi.ec',
+            'phone' => '+593 2 394 0101',
+            'address' => 'Calle Guipuzcoa y Valladolid, La Floresta',
+            'city' => 'Quito',
+            'sri_establishment_code' => '001',
+            'opens_at' => '12:00:00',
+            'closes_at' => '23:00:00',
+        ]);
+
+        $valle = Branch::query()->create([
+            'company_id' => $company->id,
+            'code' => 'UIO-02',
+            'name' => 'Sucursal Cumbayá',
+            'email' => 'cumbaya@sachawasi.ec',
+            'address' => 'Plaza Cumbayá',
+            'city' => 'Quito',
+            'sri_establishment_code' => '002',
+            'opens_at' => '12:00:00',
+            'closes_at' => '22:30:00',
+        ]);
+
+        $bodega = Warehouse::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'code' => 'BOD',
+            'name' => 'Bodega seca',
+            'type' => WarehouseType::Dry,
+            'is_default' => true,
+        ]);
+
+        Warehouse::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $matriz->id,
+            'code' => 'COC',
+            'name' => 'Cocina',
+            'type' => WarehouseType::Kitchen,
+        ]);
+
+        Warehouse::query()->create([
+            'company_id' => $company->id,
+            'branch_id' => $valle->id,
+            'code' => 'BOD',
+            'name' => 'Bodega Cumbayá',
+            'type' => WarehouseType::General,
+            'is_default' => true,
+        ]);
+
+        $admin = User::query()->create([
+            'company_id' => $company->id,
+            'current_branch_id' => $matriz->id,
+            'name' => 'Camila Ayala',
+            'email' => 'admin@sachawasi.ec',
+            'phone' => '+593 99 000 0001',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $admin->assignRole('administrador');
+        $admin->branches()->sync([
+            $matriz->id => ['is_default' => true],
+            $valle->id => ['is_default' => false],
+        ]);
+
+        $bodeguero = User::query()->create([
+            'company_id' => $company->id,
+            'current_branch_id' => $matriz->id,
+            'name' => 'Luis Paredes',
+            'email' => 'bodega@sachawasi.ec',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $bodeguero->assignRole('bodega');
+        $bodeguero->branches()->sync([$matriz->id => ['is_default' => true]]);
+
+        $mesero = User::query()->create([
+            'company_id' => $company->id,
+            'current_branch_id' => $matriz->id,
+            'name' => 'Ana Quishpe',
+            'email' => 'mesero@sachawasi.ec',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $mesero->assignRole('mesero');
+        $mesero->branches()->sync([$matriz->id => ['is_default' => true]]);
+
+        $this->seedTaxes($company->id);
+        $units = $this->seedUnits($company->id);
+        $this->seedStations($company->id, $matriz->id);
+        $categories = $this->seedCategories($company->id);
+        $iva = TaxRate::query()->where('company_id', $company->id)->where('code', 'IVA15')->first();
+
+        $ingredients = $this->seedIngredients($company->id, $categories['insumos']->id, $units, $iva?->id);
+        $dishes = $this->seedDishes($company->id, $categories, $units, $iva?->id);
+        $this->seedRecipes($company->id, $dishes, $ingredients, $units);
+        $this->seedOpeningStock($bodega, $ingredients, $admin);
+
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['locro']->activeRecipe);
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['seco']->activeRecipe);
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['salsa']->activeRecipe);
+    }
+
+    private function seedTaxes(string $companyId): void
+    {
+        foreach ([
+            ['IVA0', 'IVA 0%', '0', '0', false],
+            ['IVA5', 'IVA 5%', '5', '5', false],
+            ['IVA15', 'IVA 15%', '15', '4', true],
+        ] as [$code, $name, $percent, $sri, $default]) {
+            TaxRate::query()->create([
+                'company_id' => $companyId,
+                'code' => $code,
+                'name' => $name,
+                'percent' => $percent,
+                'sri_code' => $sri,
+                'is_default' => $default,
+            ]);
+        }
+    }
+
+    private function seedUnits(string $companyId): array
+    {
+        $defs = [
+            'g' => ['Gramo', UnitDimension::Mass, 1],
+            'kg' => ['Kilogramo', UnitDimension::Mass, 1000],
+            'ml' => ['Mililitro', UnitDimension::Volume, 1],
+            'l' => ['Litro', UnitDimension::Volume, 1000],
+            'und' => ['Unidad', UnitDimension::Count, 1],
+            'porcion' => ['Porción', UnitDimension::Count, 1],
+        ];
+
+        $units = [];
+        foreach ($defs as $symbol => [$name, $dimension, $factor]) {
+            $units[$symbol] = Unit::query()->create([
+                'company_id' => $companyId,
+                'name' => $name,
+                'symbol' => $symbol,
+                'dimension' => $dimension,
+                'factor_to_base' => $factor,
+                'is_system' => true,
+            ]);
+        }
+
+        return $units;
+    }
+
+    private function seedStations(string $companyId, string $branchId): void
+    {
+        foreach ([
+            ['Fogón', '#C45C26', 18, 1],
+            ['Plancha', '#B45309', 12, 2],
+            ['Parrilla', '#9A3412', 20, 3],
+            ['Bebidas', '#1D4E89', 5, 4],
+            ['Postres', '#7C3AED', 10, 5],
+        ] as [$name, $color, $sla, $order]) {
+            KitchenStation::query()->create([
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'name' => $name,
+                'color' => $color,
+                'sla_minutes' => $sla,
+                'sort_order' => $order,
+            ]);
+        }
+    }
+
+    private function seedCategories(string $companyId): array
+    {
+        $rows = [
+            'entradas' => ['Entradas', '#C45C26', 1, true],
+            'fuertes' => ['Platos fuertes', '#1B4D3E', 2, true],
+            'bebidas' => ['Bebidas', '#1D4E89', 3, true],
+            'postres' => ['Postres', '#7C3AED', 4, true],
+            'insumos' => ['Insumos', '#57534E', 90, false],
+        ];
+
+        $categories = [];
+        foreach ($rows as $key => [$name, $color, $order, $pos]) {
+            $categories[$key] = Category::query()->create([
+                'company_id' => $companyId,
+                'name' => $name,
+                'slug' => Str::slug($name),
+                'color' => $color,
+                'sort_order' => $order,
+                'show_on_pos' => $pos,
+                'show_on_qr_menu' => $pos,
+            ]);
+        }
+
+        Category::query()->create([
+            'company_id' => $companyId,
+            'parent_id' => $categories['fuertes']->id,
+            'name' => 'Sopas de la sierra',
+            'slug' => 'sopas-de-la-sierra',
+            'color' => '#3D6B4F',
+            'sort_order' => 1,
+        ]);
+
+        return $categories;
+    }
+
+    private function seedIngredients(string $companyId, string $categoryId, array $units, ?string $taxId): array
+    {
+        $items = [
+            'papa' => ['Papa chaucha', 'kg', 0.80, 0],
+            'leche' => ['Leche entera', 'l', 1.10, 0],
+            'queso' => ['Queso fresco', 'kg', 4.80, 0],
+            'cebolla' => ['Cebolla blanca', 'kg', 0.90, 0],
+            'ajo' => ['Ajo', 'kg', 3.50, 0],
+            'cilantro' => ['Cilantro', 'kg', 2.40, 0],
+            'pollo' => ['Pollo (pieza)', 'kg', 3.60, 0],
+            'comino' => ['Comino', 'g', 0.012, 0],
+            'arroz' => ['Arroz flor', 'kg', 1.20, 0],
+            'naranjilla' => ['Naranjilla', 'kg', 2.10, 0],
+            'azucar' => ['Azúcar', 'kg', 1.15, 0],
+            'agua' => ['Agua', 'l', 0.00, 0],
+        ];
+
+        $products = [];
+        foreach ($items as $key => [$name, $unit, $cost, $price]) {
+            $products[$key] = Product::query()->create([
+                'company_id' => $companyId,
+                'category_id' => $categoryId,
+                'base_unit_id' => $units[$unit]->id,
+                'purchase_unit_id' => $units[$unit]->id,
+                'tax_rate_id' => $taxId,
+                'type' => ProductType::Ingredient,
+                'inventory_behavior' => InventoryBehavior::Tracked,
+                'name' => $name,
+                'sku' => 'INS-'.strtoupper($key),
+                'default_cost' => $cost,
+                'default_price' => $price,
+                'tracks_lots' => true,
+                'is_sellable' => false,
+                'is_purchasable' => true,
+            ]);
+        }
+
+        return $products;
+    }
+
+    private function seedDishes(string $companyId, array $categories, array $units, ?string $taxId): array
+    {
+        $fogon = KitchenStation::query()->where('company_id', $companyId)->where('name', 'Fogón')->first();
+        $bebidas = KitchenStation::query()->where('company_id', $companyId)->where('name', 'Bebidas')->first();
+
+        $salsa = Product::query()->create([
+            'company_id' => $companyId,
+            'category_id' => $categories['insumos']->id,
+            'base_unit_id' => $units['ml']->id,
+            'type' => ProductType::Prepared,
+            'inventory_behavior' => InventoryBehavior::RecipeExploded,
+            'kitchen_station_id' => $fogon?->id,
+            'name' => 'Salsa de cilantro',
+            'sku' => 'PREP-SALSA',
+            'default_price' => 0,
+            'tracks_lots' => false,
+            'is_sellable' => false,
+            'is_purchasable' => false,
+            'prep_time_minutes' => 10,
+        ]);
+
+        $locro = Product::query()->create([
+            'company_id' => $companyId,
+            'category_id' => $categories['fuertes']->id,
+            'base_unit_id' => $units['porcion']->id,
+            'tax_rate_id' => $taxId,
+            'type' => ProductType::Prepared,
+            'inventory_behavior' => InventoryBehavior::RecipeExploded,
+            'kitchen_station_id' => $fogon?->id,
+            'name' => 'Locro de papa',
+            'sku' => 'PLT-LOCRO',
+            'default_price' => 6.50,
+            'tracks_lots' => false,
+            'is_sellable' => true,
+            'prep_time_minutes' => 18,
+            'allergens' => ['lácteos'],
+        ]);
+
+        $seco = Product::query()->create([
+            'company_id' => $companyId,
+            'category_id' => $categories['fuertes']->id,
+            'base_unit_id' => $units['porcion']->id,
+            'tax_rate_id' => $taxId,
+            'type' => ProductType::Prepared,
+            'inventory_behavior' => InventoryBehavior::RecipeExploded,
+            'kitchen_station_id' => $fogon?->id,
+            'name' => 'Seco de pollo',
+            'sku' => 'PLT-SECO',
+            'default_price' => 8.90,
+            'tracks_lots' => false,
+            'is_sellable' => true,
+            'prep_time_minutes' => 22,
+        ]);
+
+        $jugo = Product::query()->create([
+            'company_id' => $companyId,
+            'category_id' => $categories['bebidas']->id,
+            'base_unit_id' => $units['und']->id,
+            'tax_rate_id' => $taxId,
+            'type' => ProductType::Prepared,
+            'inventory_behavior' => InventoryBehavior::RecipeExploded,
+            'kitchen_station_id' => $bebidas?->id,
+            'name' => 'Jugo de naranjilla',
+            'sku' => 'BEB-NARA',
+            'default_price' => 2.50,
+            'tracks_lots' => false,
+            'is_sellable' => true,
+            'prep_time_minutes' => 4,
+        ]);
+
+        return compact('salsa', 'locro', 'seco', 'jugo');
+    }
+
+    private function seedRecipes(string $companyId, array $dishes, array $ins, array $units): void
+    {
+        $salsa = Recipe::query()->create([
+            'company_id' => $companyId,
+            'product_id' => $dishes['salsa']->id,
+            'yield_unit_id' => $units['ml']->id,
+            'name' => 'Salsa de cilantro',
+            'yield_quantity' => 100,
+            'process_waste_percent' => 5,
+            'is_active' => true,
+        ]);
+        $salsa->items()->createMany([
+            ['component_product_id' => $ins['cilantro']->id, 'unit_id' => $units['g']->id, 'quantity' => 40, 'waste_percent' => 8, 'sort_order' => 1],
+            ['component_product_id' => $ins['ajo']->id, 'unit_id' => $units['g']->id, 'quantity' => 10, 'waste_percent' => 5, 'sort_order' => 2],
+            ['component_product_id' => $ins['agua']->id, 'unit_id' => $units['ml']->id, 'quantity' => 50, 'waste_percent' => 0, 'sort_order' => 3],
+        ]);
+
+        $locro = Recipe::query()->create([
+            'company_id' => $companyId,
+            'product_id' => $dishes['locro']->id,
+            'yield_unit_id' => $units['porcion']->id,
+            'name' => 'Locro de papa porción',
+            'yield_quantity' => 1,
+            'process_waste_percent' => 3,
+            'is_active' => true,
+        ]);
+        $locro->items()->createMany([
+            ['component_product_id' => $ins['papa']->id, 'unit_id' => $units['g']->id, 'quantity' => 280, 'waste_percent' => 12, 'sort_order' => 1],
+            ['component_product_id' => $ins['leche']->id, 'unit_id' => $units['ml']->id, 'quantity' => 180, 'waste_percent' => 0, 'sort_order' => 2],
+            ['component_product_id' => $ins['queso']->id, 'unit_id' => $units['g']->id, 'quantity' => 40, 'waste_percent' => 2, 'sort_order' => 3],
+            ['component_product_id' => $ins['cebolla']->id, 'unit_id' => $units['g']->id, 'quantity' => 30, 'waste_percent' => 8, 'sort_order' => 4],
+            ['component_product_id' => $dishes['salsa']->id, 'unit_id' => $units['ml']->id, 'quantity' => 20, 'waste_percent' => 0, 'sort_order' => 5],
+        ]);
+
+        $seco = Recipe::query()->create([
+            'company_id' => $companyId,
+            'product_id' => $dishes['seco']->id,
+            'yield_unit_id' => $units['porcion']->id,
+            'name' => 'Seco de pollo porción',
+            'yield_quantity' => 1,
+            'process_waste_percent' => 4,
+            'is_active' => true,
+        ]);
+        $seco->items()->createMany([
+            ['component_product_id' => $ins['pollo']->id, 'unit_id' => $units['g']->id, 'quantity' => 220, 'waste_percent' => 8, 'sort_order' => 1],
+            ['component_product_id' => $ins['arroz']->id, 'unit_id' => $units['g']->id, 'quantity' => 90, 'waste_percent' => 2, 'sort_order' => 2],
+            ['component_product_id' => $ins['cebolla']->id, 'unit_id' => $units['g']->id, 'quantity' => 40, 'waste_percent' => 8, 'sort_order' => 3],
+            ['component_product_id' => $ins['comino']->id, 'unit_id' => $units['g']->id, 'quantity' => 2, 'waste_percent' => 0, 'sort_order' => 4],
+            ['component_product_id' => $dishes['salsa']->id, 'unit_id' => $units['ml']->id, 'quantity' => 15, 'waste_percent' => 0, 'sort_order' => 5],
+        ]);
+
+        $jugo = Recipe::query()->create([
+            'company_id' => $companyId,
+            'product_id' => $dishes['jugo']->id,
+            'yield_unit_id' => $units['und']->id,
+            'name' => 'Jugo de naranjilla 12 oz',
+            'yield_quantity' => 1,
+            'is_active' => true,
+        ]);
+        $jugo->items()->createMany([
+            ['component_product_id' => $ins['naranjilla']->id, 'unit_id' => $units['g']->id, 'quantity' => 180, 'waste_percent' => 18, 'sort_order' => 1],
+            ['component_product_id' => $ins['azucar']->id, 'unit_id' => $units['g']->id, 'quantity' => 15, 'waste_percent' => 0, 'sort_order' => 2],
+            ['component_product_id' => $ins['agua']->id, 'unit_id' => $units['ml']->id, 'quantity' => 200, 'waste_percent' => 0, 'sort_order' => 3],
+        ]);
+    }
+
+    private function seedOpeningStock(Warehouse $warehouse, array $ingredients, User $user): void
+    {
+        $kardex = app(KardexService::class);
+        $opening = [
+            'papa' => ['25', '0.80', '2026-10-01', 'LOTE-PAPA-01'],
+            'leche' => ['20', '1.10', '2026-09-14', 'LOTE-LECHE-01'],
+            'queso' => ['8', '4.80', '2026-09-20', 'LOTE-QUESO-01'],
+            'cebolla' => ['10', '0.90', '2026-09-25', 'LOTE-CEB-01'],
+            'ajo' => ['3', '3.50', '2026-11-01', 'LOTE-AJO-01'],
+            'cilantro' => ['2', '2.40', '2026-09-12', 'LOTE-CIL-01'],
+            'pollo' => ['18', '3.60', '2026-09-11', 'LOTE-POLLO-01'],
+            'arroz' => ['30', '1.20', null, 'LOTE-ARROZ-01'],
+            'naranjilla' => ['12', '2.10', '2026-09-16', 'LOTE-NARA-01'],
+            'azucar' => ['15', '1.15', null, 'LOTE-AZU-01'],
+            'agua' => ['100', '0', null, 'LOTE-AGUA-01'],
+            'comino' => ['500', '0.012', null, 'LOTE-COM-01'],
+        ];
+
+        foreach ($opening as $key => [$qty, $cost, $expires, $lot]) {
+            $kardex->receive(
+                warehouse: $warehouse,
+                product: $ingredients[$key],
+                quantity: $qty,
+                unitCost: $cost,
+                lotCode: $lot,
+                expiresAt: $expires,
+                user: $user,
+                notes: 'Inventario inicial de demostración',
+            );
+
+            $ingredients[$key]->stockItems()
+                ->where('warehouse_id', $warehouse->id)
+                ->update(['min_qty' => max(1, ((float) $qty) * 0.2)]);
+        }
+    }
+}

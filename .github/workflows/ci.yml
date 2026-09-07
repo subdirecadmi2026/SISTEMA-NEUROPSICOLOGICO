@@ -1,4 +1,4 @@
-name: NeuroSys CI
+name: CI
 
 on:
   pull_request:
@@ -6,7 +6,8 @@ on:
     branches: [main]
 
 jobs:
-  quality:
+  neurosys:
+    name: NeuroSys
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -21,4 +22,38 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run build
+
+  sacha-wasi-api:
+    name: Sacha Wasi API
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sacha-wasi/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, sqlite3, pdo_sqlite, bcmath, intl
+          coverage: none
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Tests
+        run: php artisan test --compact
+
+  sacha-wasi-app:
+    name: Sacha Wasi App
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sacha-wasi/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sacha-wasi/frontend/package-lock.json
+      - run: npm ci
       - run: npm run build
