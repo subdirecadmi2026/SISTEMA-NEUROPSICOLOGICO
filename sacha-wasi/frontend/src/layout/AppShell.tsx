@@ -131,7 +131,10 @@ export function AppShell() {
           <header className="flex items-center justify-between border-b border-cream-100 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-forest-900/80">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-clay-600">Sacha Wasi · Ecuador</p>
-              <h1 className="font-display text-xl">{titles[location.pathname] ?? 'Operación'}</h1>
+              <h1 className="font-display text-xl">
+                {titles[location.pathname]
+                  ?? (location.pathname.includes('/imprimir') ? 'Imprimir factura' : 'Operación')}
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               <button

@@ -393,7 +393,7 @@ class DemoRestaurantSeeder extends Seeder
             'tracks_lots' => false,
             'is_sellable' => true,
             'prep_time_minutes' => 4,
-            'image_path' => 'https://images.unsplash.com/photo-1623065427902-21dd6dc8f06b?auto=format&fit=crop&w=800&q=80',
+            'image_path' => 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?auto=format&fit=crop&w=800&q=80',
         ]);
 
         return compact('salsa', 'locro', 'seco', 'jugo');

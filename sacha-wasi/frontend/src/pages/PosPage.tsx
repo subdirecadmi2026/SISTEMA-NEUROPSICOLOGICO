@@ -189,7 +189,18 @@ export function PosPage() {
           {visible.map((p) => (
             <button key={p.id} type="button" onClick={() => add(p)} className="overflow-hidden rounded-2xl border border-cream-100 bg-white text-left hover:border-forest-700 dark:border-white/10 dark:bg-forest-900">
               <div className="h-32 bg-cream-100 dark:bg-forest-800">
-                {p.image_url ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-sm text-ink-500">Sin foto</div>}
+                {p.image_url ? (
+                  <img
+                    src={p.image_url}
+                    alt={p.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <div className="grid h-full place-items-center text-sm text-ink-500">Sin foto</div>
+                )}
               </div>
               <div className="p-3">
                 <p className="font-display text-lg">{p.name}</p>

@@ -53,7 +53,18 @@ export function PublicMenuPage() {
                   if (found) return cur.map((l) => l.product.id === p.id ? { ...l, qty: l.qty + 1 } : l)
                   return [...cur, { product: p, qty: 1 }]
                 })}>
-                  {p.image_url ? <img src={p.image_url} alt="" className="h-14 w-14 rounded-lg object-cover" /> : <span className="h-14 w-14 rounded-lg bg-cream-100" />}
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt=""
+                      className="h-14 w-14 rounded-lg object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <span className="h-14 w-14 rounded-lg bg-cream-100" />
+                  )}
                   <span className="flex-1">{p.name}</span>
                   <span>${Number(p.default_price).toFixed(2)}</span>
                 </button>

@@ -98,7 +98,14 @@ export function ProductsPage() {
                   <td className="px-3 py-2">
                     <label className="block h-14 w-14 cursor-pointer overflow-hidden rounded-xl bg-cream-100 dark:bg-forest-800">
                       {p.image_url ? (
-                        <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
+                        <img
+                          src={p.image_url}
+                          alt={p.name}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
                       ) : (
                         <span className="grid h-full place-items-center text-[10px] text-ink-500">Subir</span>
                       )}
