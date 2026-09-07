@@ -32,7 +32,7 @@ class FiscalController extends Controller
     {
         $this->allow($request, 'fiscal.view');
 
-        return response()->json($fiscalDocument->load(['order.items', 'customer', 'issuer']));
+        return response()->json($fiscalDocument->load(['order.items', 'order.payments', 'customer', 'issuer']));
     }
 
     public function retry(Request $request, FiscalDocument $fiscalDocument): JsonResponse

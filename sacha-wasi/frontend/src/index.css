@@ -40,3 +40,14 @@ html.dark body {
 .font-display {
   font-family: var(--font-display);
 }
+
+@media print {
+  aside,
+  header,
+  .print\:hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+}

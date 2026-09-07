@@ -17,6 +17,7 @@ export function ProductsPage() {
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
   const [form, setForm] = useState({ name: '', type: 'prepared', default_price: '6.50', default_cost: '0' })
+  const [photo, setPhoto] = useState<File | null>(null)
 
   async function load(term = search) {
     const query = term ? `?search=${encodeURIComponent(term)}` : ''
@@ -33,16 +34,30 @@ export function ProductsPage() {
     setError('')
     try {
       const unit = units.find((u) => u.symbol === (form.type === 'ingredient' ? 'kg' : 'porcion')) || units[0]
-      await api.createProduct({
+      const created = await api.createProduct({
         ...form,
         base_unit_id: unit.id,
         is_sellable: form.type !== 'ingredient',
         is_purchasable: form.type === 'ingredient',
       })
+      if (photo && created.id) {
+        await api.uploadProductImage(created.id, photo)
+      }
       setForm({ name: '', type: 'prepared', default_price: '6.50', default_cost: '0' })
+      setPhoto(null)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error')
+    }
+  }
+
+  async function onPhoto(product: Product, file: File) {
+    setError('')
+    try {
+      await api.uploadProductImage(product.id, file)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo subir la foto')
     }
   }
 
@@ -64,7 +79,8 @@ export function ProductsPage() {
         <table className="w-full text-left text-sm">
           <thead className="text-ink-500">
             <tr>
-              <th className="px-3 py-2">Producto</th>
+              <th className="px-3 py-2">Foto</th>
+              <th>Producto</th>
               <th>SKU</th>
               <th>Tipo</th>
               <th>Costo</th>
@@ -80,6 +96,24 @@ export function ProductsPage() {
               return (
                 <tr key={p.id} className="border-t border-cream-100 dark:border-white/10">
                   <td className="px-3 py-2">
+                    <label className="block h-14 w-14 cursor-pointer overflow-hidden rounded-xl bg-cream-100 dark:bg-forest-800">
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="grid h-full place-items-center text-[10px] text-ink-500">Subir</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) void onPhoto(p, file)
+                        }}
+                      />
+                    </label>
+                  </td>
+                  <td className="py-2">
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-ink-500">{p.category?.name ?? 'Sin categoría'}</div>
                   </td>
@@ -94,7 +128,7 @@ export function ProductsPage() {
           </tbody>
         </table>
       </div>
-      <form onSubmit={onSubmit} className="grid gap-3 rounded-2xl border border-cream-100 bg-white p-4 md:grid-cols-4 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="grid gap-3 rounded-2xl border border-cream-100 bg-white p-4 md:grid-cols-5 dark:border-white/10 dark:bg-forest-900">
         <input className="rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         <select className="rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
           {types.map((t) => (
@@ -104,8 +138,9 @@ export function ProductsPage() {
           ))}
         </select>
         <input className="rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" placeholder="Precio" value={form.default_price} onChange={(e) => setForm({ ...form, default_price: e.target.value })} />
+        <input type="file" accept="image/*" className="rounded-xl border px-3 py-2 text-sm dark:border-white/10 dark:bg-forest-800" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
         <button className="rounded-xl bg-clay-600 py-2 text-white">Crear producto</button>
-        {error ? <p className="md:col-span-4 text-sm text-clay-600">{error}</p> : null}
+        {error ? <p className="md:col-span-5 text-sm text-clay-600">{error}</p> : null}
       </form>
     </div>
   )

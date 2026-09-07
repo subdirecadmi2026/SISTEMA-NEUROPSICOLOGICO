@@ -145,4 +145,26 @@ class CatalogApiTest extends TestCase
     {
         $this->getJson('/api/v1/products')->assertUnauthorized();
     }
+
+    public function test_admin_can_upload_product_image(): void
+    {
+        $this->actingAsAdmin();
+        $product = Product::factory()->prepared()->create([
+            'company_id' => $this->company->id,
+            'base_unit_id' => $this->units['porcion']->id,
+            'name' => 'Locro con foto',
+        ]);
+
+        $file = \Illuminate\Http\UploadedFile::fake()->image('locro.jpg', 80, 80);
+
+        $this->post("/api/v1/products/{$product->id}/image", [
+            'image' => $file,
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('image_path', 'products/'.$product->id.'.jpg');
+
+        $this->assertFileExists(storage_path('app/public/products/'.$product->id.'.jpg'));
+
+        $this->get('/api/v1/media/products/'.$product->id.'.jpg')->assertOk();
+    }
 }

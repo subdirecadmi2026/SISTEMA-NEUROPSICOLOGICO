@@ -64,6 +64,21 @@ class Product extends Model
         ];
     }
 
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image_path) {
+            return null;
+        }
+
+        if (str_starts_with($this->image_path, 'http://') || str_starts_with($this->image_path, 'https://')) {
+            return $this->image_path;
+        }
+
+        return '/api/v1/media/'.ltrim($this->image_path, '/');
+    }
+
     protected static function booted(): void
     {
         static::creating(function (Product $product): void {

@@ -201,6 +201,57 @@ class OperationsApiTest extends TestCase
             ->assertJsonPath('net_profit', -10);
     }
 
+    public function test_split_cash_and_transfer_records_change(): void
+    {
+        $this->actingAsAdmin();
+        [$soup] = $this->seedSellableSoup();
+        $this->openCash();
+
+        $order = $this->postJson('/api/v1/orders/quick-sale', [
+            'items' => [['product_id' => $soup->id, 'quantity' => 1]],
+            'payments' => [
+                [
+                    'method' => 'cash',
+                    'amount' => 5,
+                    'tendered_amount' => 10,
+                    'guest_label' => 'Mesa A',
+                ],
+                [
+                    'method' => 'transfer',
+                    'amount' => 3.5,
+                    'reference' => 'BANCO-001',
+                    'guest_label' => 'Mesa B',
+                ],
+            ],
+        ])->assertCreated();
+
+        $order->assertJsonPath('status', 'billed');
+        $this->assertSame('10.00', $order->json('payments.0.tendered_amount'));
+        $this->assertSame('5.00', $order->json('payments.0.change_amount'));
+        $this->assertSame('Mesa A', $order->json('payments.0.guest_label'));
+        $this->assertSame('transfer', $order->json('payments.1.method'));
+        $this->assertNotEmpty($order->json('latest_fiscal_document.id'));
+    }
+
+    public function test_cash_tendered_above_total_is_treated_as_change(): void
+    {
+        $this->actingAsAdmin();
+        [$soup] = $this->seedSellableSoup();
+        $this->openCash();
+
+        $this->postJson('/api/v1/orders/quick-sale', [
+            'items' => [['product_id' => $soup->id, 'quantity' => 1]],
+            'payments' => [[
+                'method' => 'cash',
+                'amount' => 20,
+                'guest_label' => 'Cliente',
+            ]],
+        ])->assertCreated()
+            ->assertJsonPath('payments.0.amount', '8.50')
+            ->assertJsonPath('payments.0.tendered_amount', '20.00')
+            ->assertJsonPath('payments.0.change_amount', '11.50');
+    }
+
     /**
      * @return array{0: \App\Models\Product, 1: \App\Models\Product}
      */

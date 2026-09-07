@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 
 type Invoice = {
@@ -55,6 +56,7 @@ export function InvoicesPage() {
                 <td>{row.sri_status}{row.is_contingency ? ' · contingencia' : ''}</td>
                 <td className="font-mono text-[11px]">{row.access_key}</td>
                 <td>
+                  <Link className="mr-2 text-forest-700 underline" to={`/facturas/${row.id}/imprimir`}>Imprimir</Link>
                   {row.sri_status !== 'authorized' && row.sri_status !== 'voided' ? (
                     <button className="text-forest-700 underline" onClick={() => void api.retryInvoice(row.id).then(load)}>Reintentar</button>
                   ) : null}

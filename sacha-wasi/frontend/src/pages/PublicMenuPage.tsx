@@ -48,12 +48,13 @@ export function PublicMenuPage() {
             <h2 className="font-display text-xl">{c.name}</h2>
             <div className="mt-2 grid gap-2">
               {(c.products ?? []).map((p) => (
-                <button key={p.id} type="button" className="flex justify-between rounded-xl bg-white p-3 text-left" onClick={() => setCart((cur) => {
+                <button key={p.id} type="button" className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 text-left" onClick={() => setCart((cur) => {
                   const found = cur.find((l) => l.product.id === p.id)
                   if (found) return cur.map((l) => l.product.id === p.id ? { ...l, qty: l.qty + 1 } : l)
                   return [...cur, { product: p, qty: 1 }]
                 })}>
-                  <span>{p.name}</span>
+                  {p.image_url ? <img src={p.image_url} alt="" className="h-14 w-14 rounded-lg object-cover" /> : <span className="h-14 w-14 rounded-lg bg-cream-100" />}
+                  <span className="flex-1">{p.name}</span>
                   <span>${Number(p.default_price).toFixed(2)}</span>
                 </button>
               ))}

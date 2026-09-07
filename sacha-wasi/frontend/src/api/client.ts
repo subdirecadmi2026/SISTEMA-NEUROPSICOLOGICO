@@ -56,7 +56,12 @@ export const api = {
   categories: () => request<import('./types').Category[]>('/categories'),
   createCategory: (body: object) => request('/categories', { method: 'POST', body: JSON.stringify(body) }),
   products: (params = '') => request<{ data: import('./types').Product[] }>(`/products${params}`),
-  createProduct: (body: object) => request('/products', { method: 'POST', body: JSON.stringify(body) }),
+  createProduct: (body: object) => request<import('./types').Product>('/products', { method: 'POST', body: JSON.stringify(body) }),
+  uploadProductImage: (id: string, file: File) => {
+    const body = new FormData()
+    body.append('image', file)
+    return request<import('./types').Product>(`/products/${id}/image`, { method: 'POST', body })
+  },
   recipes: () => request<import('./types').Recipe[]>('/recipes'),
   createRecipe: (body: object) => request('/recipes', { method: 'POST', body: JSON.stringify(body) }),
   productCost: (id: string) => request<Record<string, unknown>>(`/products/${id}/cost`),
@@ -90,6 +95,7 @@ export const api = {
   cashClose: (sessionId: string, body: object) =>
     request(`/cash/sessions/${sessionId}/close`, { method: 'POST', body: JSON.stringify(body) }),
   invoices: () => request<{ data: Record<string, unknown>[] }>('/fiscal-documents'),
+  invoice: (id: string) => request<Record<string, unknown>>(`/fiscal-documents/${id}`),
   retryInvoice: (id: string) => request(`/fiscal-documents/${id}/retry`, { method: 'POST' }),
   customers: (search = '') =>
     request<{ data: Record<string, unknown>[] }>(`/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),

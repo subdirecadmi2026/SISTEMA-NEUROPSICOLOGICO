@@ -208,9 +208,33 @@ class SaleService
             $order->refresh();
 
             $paid = '0';
-            foreach ($payments as $row) {
+            $remaining = (string) $order->total;
+            foreach ($payments as $index => $row) {
                 $method = PaymentMethod::from($row['method']);
                 $amount = Decimal::round((string) $row['amount'], 2);
+                $tendered = isset($row['tendered_amount']) && $row['tendered_amount'] !== null && $row['tendered_amount'] !== ''
+                    ? Decimal::round((string) $row['tendered_amount'], 2)
+                    : null;
+
+                if ($method === PaymentMethod::Cash && $tendered === null && Decimal::cmp($amount, $remaining, 2) > 0) {
+                    $tendered = $amount;
+                    $amount = $remaining;
+                }
+
+                if (Decimal::cmp($amount, $remaining, 2) > 0) {
+                    throw new OrderNotPayableException('El monto aplicado supera el saldo del pedido.');
+                }
+
+                $change = '0.00';
+                if ($method === PaymentMethod::Cash) {
+                    $handed = $tendered ?? $amount;
+                    if (Decimal::cmp($handed, $amount, 2) < 0) {
+                        throw new OrderNotPayableException('El efectivo recibido no cubre la parte de '.($row['guest_label'] ?? 'esta persona').'.');
+                    }
+                    $change = Decimal::round(Decimal::sub($handed, $amount, 2), 2);
+                    $tendered = $handed;
+                }
+
                 if ($method === PaymentMethod::GiftCard && ! empty($row['reference'])) {
                     $this->redeemGiftCard($row['reference'], $amount);
                 }
@@ -222,6 +246,9 @@ class SaleService
                     'method' => $method,
                     'amount' => $amount,
                     'reference' => $row['reference'] ?? null,
+                    'guest_label' => $row['guest_label'] ?? ('Persona '.($index + 1)),
+                    'tendered_amount' => $tendered,
+                    'change_amount' => $method === PaymentMethod::Cash ? $change : null,
                 ]);
 
                 if ($method === PaymentMethod::Cash) {
@@ -231,13 +258,14 @@ class SaleService
                         type: 'sale',
                         amount: $amount,
                         method: 'cash',
-                        notes: "Venta {$order->number}",
+                        notes: "Venta {$order->number}".(isset($row['guest_label']) ? " · {$row['guest_label']}" : ''),
                         referenceType: $order->getMorphClass(),
                         referenceId: $order->id,
                     );
                 }
 
                 $paid = Decimal::add($paid, $amount, 2);
+                $remaining = Decimal::round(Decimal::sub($remaining, $amount, 2), 2);
             }
 
             if (Decimal::cmp($paid, (string) $order->total, 2) < 0) {

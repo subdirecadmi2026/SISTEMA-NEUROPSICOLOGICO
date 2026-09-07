@@ -32,6 +32,8 @@ export type Product = {
   default_price: string
   is_sellable: boolean
   is_purchasable: boolean
+  image_path?: string | null
+  image_url?: string | null
   category?: { id: string; name: string } | null
   base_unit?: { id: string; symbol: string; name: string } | null
   active_recipe?: { id: string } | null

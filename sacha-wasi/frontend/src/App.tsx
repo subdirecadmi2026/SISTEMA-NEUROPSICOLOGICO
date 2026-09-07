@@ -22,6 +22,7 @@ import { ReportsPage } from './pages/ReportsPage'
 import { AuditPage } from './pages/AuditPage'
 import { UsersPage } from './pages/UsersPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { InvoicePrintPage } from './pages/InvoicePrintPage'
 import { PublicMenuPage } from './pages/PublicMenuPage'
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/mesas" element={<TablesPage />} />
             <Route path="/caja" element={<CashPage />} />
             <Route path="/facturas" element={<InvoicesPage />} />
+            <Route path="/facturas/:id/imprimir" element={<InvoicePrintPage />} />
             <Route path="/categorias" element={<CategoriesPage />} />
             <Route path="/productos" element={<ProductsPage />} />
             <Route path="/recetas" element={<RecipesPage />} />

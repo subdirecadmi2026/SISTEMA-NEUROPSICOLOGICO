@@ -54,10 +54,12 @@ class ProductController extends Controller
         abort_unless($request->user()->can('catalog.products.manage'), 403);
 
         $data = $this->validated($request);
+        unset($data['image']);
         $data['company_id'] = $request->user()->company_id;
         $product = Product::query()->create($data);
 
         $this->syncRelations($product, $request);
+        $this->storeImage($request, $product);
 
         return response()->json($this->fresh($product), 201);
     }
@@ -73,8 +75,22 @@ class ProductController extends Controller
     {
         abort_unless($request->user()->can('catalog.products.manage'), 403);
 
-        $product->update($this->validated($request, $product->id));
+        $data = $this->validated($request, $product->id);
+        unset($data['image']);
+        $product->update($data);
         $this->syncRelations($product, $request);
+        $this->storeImage($request, $product);
+
+        return response()->json($this->fresh($product));
+    }
+
+    public function uploadImage(Request $request, Product $product): JsonResponse
+    {
+        abort_unless($request->user()->can('catalog.products.manage'), 403);
+        $request->validate([
+            'image' => ['required', 'file', 'image', 'max:4096', 'mimes:jpeg,jpg,png,webp,gif'],
+        ]);
+        $this->storeImage($request, $product);
 
         return response()->json($this->fresh($product));
     }
@@ -169,6 +185,19 @@ class ProductController extends Controller
             'channel_prices' => ['sometimes', 'array'],
             'combo_items' => ['sometimes', 'array'],
             'option_groups' => ['sometimes', 'array'],
+            'image' => ['sometimes', 'file', 'image', 'max:4096', 'mimes:jpeg,jpg,png,webp,gif'],
         ]);
+    }
+
+    private function storeImage(Request $request, Product $product): void
+    {
+        if (! $request->hasFile('image')) {
+            return;
+        }
+
+        $file = $request->file('image');
+        $name = $product->id.'.'.strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $file->storeAs('products', $name, 'public');
+        $product->update(['image_path' => 'products/'.$name]);
     }
 }

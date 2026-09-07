@@ -359,6 +359,7 @@ class DemoRestaurantSeeder extends Seeder
             'is_sellable' => true,
             'prep_time_minutes' => 18,
             'allergens' => ['lácteos'],
+            'image_path' => 'https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?auto=format&fit=crop&w=800&q=80',
         ]);
 
         $seco = Product::query()->create([
@@ -375,6 +376,7 @@ class DemoRestaurantSeeder extends Seeder
             'tracks_lots' => false,
             'is_sellable' => true,
             'prep_time_minutes' => 22,
+            'image_path' => 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=800&q=80',
         ]);
 
         $jugo = Product::query()->create([
@@ -391,6 +393,7 @@ class DemoRestaurantSeeder extends Seeder
             'tracks_lots' => false,
             'is_sellable' => true,
             'prep_time_minutes' => 4,
+            'image_path' => 'https://images.unsplash.com/photo-1623065427902-21dd6dc8f06b?auto=format&fit=crop&w=800&q=80',
         ]);
 
         return compact('salsa', 'locro', 'seco', 'jugo');

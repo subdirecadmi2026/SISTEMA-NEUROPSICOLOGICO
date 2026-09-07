@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\ExpenseController;
 use App\Http\Controllers\Api\V1\FiscalController;
 use App\Http\Controllers\Api\V1\InventoryController;
 use App\Http\Controllers\Api\V1\KitchenController;
+use App\Http\Controllers\Api\V1\MediaController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\PublicMenuController;
@@ -30,6 +31,7 @@ Route::post('/auth/login', [AuthController::class, 'login'])
 Route::get('/public/menu/{qrToken}', [PublicMenuController::class, 'show']);
 Route::post('/public/menu/{qrToken}/orders', [PublicMenuController::class, 'order'])
     ->middleware('throttle:20,1');
+Route::get('/media/products/{file}', [MediaController::class, 'show'])->where('file', '[A-Za-z0-9._-]+');
 
 Route::middleware(['auth:sanctum', \App\Http\Middleware\SetCurrentContext::class])->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me']);
@@ -45,6 +47,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\SetCurrentContext::class
 
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('products', ProductController::class);
+    Route::post('/products/{product}/image', [ProductController::class, 'uploadImage']);
     Route::apiResource('recipes', RecipeController::class)->except(['destroy']);
     Route::get('/products/{product}/cost', [RecipeController::class, 'cost']);
     Route::get('/products/{product}/explode', [InventoryController::class, 'consumePreview']);
