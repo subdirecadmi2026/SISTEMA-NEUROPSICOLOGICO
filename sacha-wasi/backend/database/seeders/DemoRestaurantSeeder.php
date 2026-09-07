@@ -140,9 +140,10 @@ class DemoRestaurantSeeder extends Seeder
         $this->seedRecipes($company->id, $dishes, $ingredients, $units);
         $this->seedOpeningStock($bodega, $ingredients, $admin);
 
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['locro']->activeRecipe);
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['seco']->activeRecipe);
-        app(RecipeCostingService::class)->refreshCachedCost($dishes['salsa']->activeRecipe);
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['salsa']->fresh('activeRecipe'));
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['locro']->fresh('activeRecipe'));
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['seco']->fresh('activeRecipe'));
+        app(RecipeCostingService::class)->refreshCachedCost($dishes['jugo']->fresh('activeRecipe'));
     }
 
     private function seedTaxes(string $companyId): void
