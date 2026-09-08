@@ -20,22 +20,33 @@ NeuroSys (ERP clínico) permanece en [`../neurosys`](../neurosys).
 
 ## Arranque local
 
+Necesitas PHP 8.3, Composer y Node 22.
+
 ```sh
-# API
+cd sacha-wasi
+# Primera vez
+cd backend && composer install && cp -n .env.example .env && php artisan key:generate && php artisan migrate:fresh --seed && cd ..
+cd frontend && npm install && cd ..
+
+# Cada vez
+chmod +x ./dev.sh && ./dev.sh
+```
+
+O en dos terminales:
+
+```sh
+# API — debe escuchar en 0.0.0.0 para que Cursor reenvíe el puerto a tu PC
 cd backend
-composer install
-cp .env.example .env   # si aún no existe
-php artisan key:generate
-php artisan migrate:fresh --seed
-php artisan serve --host=127.0.0.1 --port=8000
+php artisan serve --host=0.0.0.0 --port=8000
 
 # App (otra terminal)
 cd frontend
-npm install
 npm run dev
 ```
 
-Abre `http://127.0.0.1:5173`.
+Abre **en tu navegador** `http://localhost:5173` (no uses la pestaña de Chrome del agente).
+
+Si estás en un **Cloud Agent de Cursor**: el icono de enchufe (puertos) arriba a la derecha del panel del agente debe mostrar `5173` y `8000`. Activa el agente y abre `http://localhost:5173` en Chrome/Safari de tu computadora. Si el puerto local está ocupado, Cursor usa otro; míralo en ese menú de puertos.
 
 ### Usuarios de demostración
 
