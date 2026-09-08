@@ -11,9 +11,9 @@ type Dashboard = {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
-      <p className="text-xs uppercase tracking-wide text-ink-500">{label}</p>
-      <p className="font-display mt-2 text-3xl">{value}</p>
+    <div className="sw-card rounded-2xl p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-clay-600">{label}</p>
+      <p className="font-display mt-2 text-3xl text-forest-800 dark:text-cream-50">{value}</p>
       {hint ? <p className="mt-1 text-xs text-ink-500">{hint}</p> : null}
     </div>
   )
@@ -49,7 +49,7 @@ export function DashboardPage() {
         <Kpi label="Lotes vencidos" value={String(k.expired_lots)} hint="No deben venderse" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+        <section className="sw-card rounded-2xl p-4">
           <h2 className="font-display text-lg">Stock crítico</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {data.low_stock.length === 0 ? <li>Sin alertas de mínimo.</li> : null}
@@ -63,7 +63,7 @@ export function DashboardPage() {
             ))}
           </ul>
         </section>
-        <section className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+        <section className="sw-card rounded-2xl p-4">
           <h2 className="font-display text-lg">Caducidad próxima</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {data.expiring_lots.length === 0 ? <li>Sin lotes por vencer esta semana.</li> : null}
@@ -78,7 +78,7 @@ export function DashboardPage() {
           </ul>
         </section>
       </div>
-      <section className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+      <section className="sw-card rounded-2xl p-4">
         <h2 className="font-display text-lg">Últimos movimientos de kardex</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm">

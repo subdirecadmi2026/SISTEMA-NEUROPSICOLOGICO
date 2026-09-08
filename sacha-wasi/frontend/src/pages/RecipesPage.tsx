@@ -61,7 +61,7 @@ export function RecipesPage() {
     <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
       <div className="space-y-4">
         {recipes.map((recipe) => (
-          <article key={recipe.id} className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+          <article key={recipe.id} className="sw-card rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-clay-600">v{recipe.version}</p>
@@ -97,14 +97,14 @@ export function RecipesPage() {
       </div>
       <div className="space-y-4">
         {cost ? (
-          <section className="rounded-2xl border border-cream-100 bg-forest-900 p-4 text-cream-50">
+          <section className="rounded-2xl bg-forest-950 p-4 text-cream-50 ring-1 ring-copper-400/30">
             <h3 className="font-display text-lg">Costeo</h3>
             <p>Costo: ${Number(cost.unit_cost).toFixed(4)}</p>
             <p>Precio: ${Number(cost.sale_price).toFixed(2)}</p>
             <p>Margen: {Number(cost.margin_percent).toFixed(1)}%</p>
           </section>
         ) : null}
-        <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+        <form onSubmit={onSubmit} className="sw-card space-y-3 rounded-2xl p-4">
           <h3 className="font-display text-lg">Nueva receta</h3>
           <select className="w-full rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} required>
             <option value="">Plato preparado</option>

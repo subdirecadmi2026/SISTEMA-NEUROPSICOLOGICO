@@ -173,7 +173,7 @@ export function PosPage() {
   }
 
   return (
-    <div className="grid min-h-[calc(100svh-57px)] lg:grid-cols-[1fr_360px]">
+    <div className="grid min-h-[calc(100svh-73px)] bg-cream-50 lg:grid-cols-[1fr_360px] dark:bg-forest-950">
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
           <button className={`rounded-full px-3 py-1 text-sm ${!categoryId ? 'bg-forest-800 text-white' : 'bg-white dark:bg-forest-900'}`} onClick={() => setCategoryId('')}>
@@ -187,7 +187,7 @@ export function PosPage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {visible.map((p) => (
-            <button key={p.id} type="button" onClick={() => add(p)} className="overflow-hidden rounded-2xl border border-cream-100 bg-white text-left hover:border-forest-700 dark:border-white/10 dark:bg-forest-900">
+            <button key={p.id} type="button" onClick={() => add(p)} className="sw-card overflow-hidden rounded-2xl text-left hover:ring-1 hover:ring-forest-700">
               <div className="h-32 bg-cream-100 dark:bg-forest-800">
                 {p.image_url ? (
                   <img
@@ -211,7 +211,7 @@ export function PosPage() {
           ))}
         </div>
       </div>
-      <aside className="border-l border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+      <aside className="border-l border-cream-200 bg-cream-50 p-4 dark:border-white/10 dark:bg-forest-900">
         <p className="text-xs uppercase tracking-wide text-ink-500">Ticket</p>
         <select className="mt-2 w-full rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" value={tableId} onChange={(e) => setTableId(e.target.value)}>
           <option value="">Mostrador / para llevar</option>

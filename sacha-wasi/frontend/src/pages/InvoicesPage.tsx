@@ -35,7 +35,7 @@ export function InvoicesPage() {
         Simulador SRI · ambiente de pruebas. Estos comprobantes no se envían al SRI real ni tienen validez tributaria.
       </p>
       {error ? <p className="text-clay-600">{error}</p> : null}
-      <div className="overflow-x-auto rounded-2xl border border-cream-100 bg-white dark:border-white/10 dark:bg-forest-900">
+      <div className="sw-card overflow-x-auto rounded-2xl">
         <table className="w-full text-left text-sm">
           <thead className="text-ink-500">
             <tr>

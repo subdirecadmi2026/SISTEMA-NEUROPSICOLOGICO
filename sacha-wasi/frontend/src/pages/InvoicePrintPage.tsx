@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
+import { BrandMark } from '../brand/BrandMark'
 
 type Invoice = {
   id: string
@@ -43,23 +44,24 @@ export function InvoicePrintPage() {
   const number = `${doc.establishment_code}-${doc.emission_point}-${doc.sequential}`
 
   return (
-    <div className="mx-auto max-w-xl bg-white p-6 text-ink-900 print:max-w-none print:p-0">
+    <div className="mx-auto max-w-xl bg-cream-50 p-6 text-ink-900 print:max-w-none print:bg-white print:p-0">
       <div className="mb-4 flex gap-2 print:hidden">
-        <button className="rounded-xl bg-forest-800 px-4 py-2 text-white" onClick={() => window.print()}>Imprimir</button>
-        <Link className="rounded-xl border px-4 py-2" to="/facturas">Volver</Link>
+        <button className="sw-btn rounded-xl px-4 py-2" onClick={() => window.print()}>Imprimir</button>
+        <Link className="rounded-xl border border-cream-200 px-4 py-2" to="/facturas">Volver</Link>
       </div>
-      <header className="border-b pb-3 text-center">
-        <p className="font-display text-2xl">{user?.company?.trade_name ?? user?.company?.name ?? 'Sacha Wasi'}</p>
+      <header className="border-b border-cream-200 pb-4 text-center">
+        <BrandMark className="mx-auto h-14 w-14" />
+        <p className="font-display mt-3 text-2xl text-forest-800">{user?.company?.trade_name ?? user?.company?.name ?? 'Sacha Wasi'}</p>
         <p className="text-sm">{user?.current_branch?.name} · {user?.current_branch?.city}</p>
-        <p className="mt-2 text-xs uppercase tracking-wide">Factura {number}</p>
-        <p className="text-xs">Ambiente de pruebas SRI · no tiene validez tributaria</p>
+        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-clay-600">Factura {number}</p>
+        <p className="text-xs text-ink-500">Ambiente de pruebas SRI · no tiene validez tributaria</p>
       </header>
       <p className="mt-3 text-sm">Cliente: {doc.customer_name ?? 'CONSUMIDOR FINAL'}</p>
       <p className="text-sm">Doc: {doc.customer_document}</p>
       <p className="text-sm">Pedido: {doc.order?.number}</p>
       <table className="mt-4 w-full text-sm">
         <thead>
-          <tr className="border-b text-left">
+          <tr className="border-b border-cream-200 text-left">
             <th className="py-1">Cant.</th>
             <th>Detalle</th>
             <th className="text-right">Total</th>
@@ -67,7 +69,7 @@ export function InvoicePrintPage() {
         </thead>
         <tbody>
           {(doc.order?.items ?? []).map((item, i) => (
-            <tr key={i} className="border-b">
+            <tr key={i} className="border-b border-cream-100">
               <td className="py-1">{Number(item.quantity)}</td>
               <td>{item.name}</td>
               <td className="text-right">${Number(item.line_total).toFixed(2)}</td>
@@ -77,7 +79,7 @@ export function InvoicePrintPage() {
       </table>
       <p className="mt-3 text-right text-sm">Subtotal ${Number(doc.subtotal).toFixed(2)}</p>
       <p className="text-right text-sm">IVA ${Number(doc.tax_amount).toFixed(2)}</p>
-      <p className="text-right font-display text-2xl">Total ${Number(doc.total).toFixed(2)}</p>
+      <p className="text-right font-display text-2xl text-forest-800">Total ${Number(doc.total).toFixed(2)}</p>
       <h3 className="mt-4 text-sm font-medium">Pagos</h3>
       <ul className="text-sm">
         {(doc.order?.payments ?? []).map((p, i) => (

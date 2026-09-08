@@ -24,7 +24,7 @@ export function ReservationsPage() {
   return (
     <div className="space-y-4">
       {error ? <p className="text-clay-600">{error}</p> : null}
-      <form onSubmit={onSubmit} className="grid gap-2 rounded-2xl border bg-white p-4 md:grid-cols-6 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="sw-card grid gap-2 rounded-2xl p-4 md:grid-cols-6">
         <input required placeholder="Huésped" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.guest_name} onChange={(e) => setForm({ ...form, guest_name: e.target.value })} />
         <input placeholder="Teléfono" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.guest_phone} onChange={(e) => setForm({ ...form, guest_phone: e.target.value })} />
         <input type="number" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.party_size} onChange={(e) => setForm({ ...form, party_size: e.target.value })} />
@@ -36,7 +36,7 @@ export function ReservationsPage() {
       </form>
       <ul className="space-y-2 text-sm">
         {rows.map((r) => (
-          <li key={String(r.id)} className="flex items-center justify-between rounded-xl border bg-white p-3 dark:border-white/10 dark:bg-forest-900">
+            <li key={String(r.id)} className="sw-card flex items-center justify-between rounded-xl p-3">
             <span>{String(r.guest_name)} · {String(r.status)} · {String(r.reserved_at)}</span>
             <button className="text-forest-700" onClick={() => void api.updateReservation(String(r.id), 'seated').then(load)}>Sentar</button>
           </li>

@@ -42,6 +42,8 @@ export const api = {
     }),
   me: () => request<User>('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  switchBranch: (branch_id: string) =>
+    request<User>('/auth/switch-branch', { method: 'POST', body: JSON.stringify({ branch_id }) }),
   dashboard: () => request<Record<string, unknown>>('/dashboard'),
   lookups: () =>
     request<{
@@ -87,6 +89,8 @@ export const api = {
   advanceKitchen: (itemId: string, status: string) =>
     request(`/kitchen/items/${itemId}/advance`, { method: 'POST', body: JSON.stringify({ status }) }),
   tables: () => request<Record<string, unknown>[]>('/tables'),
+  updateTableStatus: (id: string, status: string) =>
+    request(`/tables/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   cashRegisters: () => request<Record<string, unknown>[]>('/cash/registers'),
   cashCurrent: () => request<Record<string, unknown> | null>('/cash/current'),
   cashOpen: (body: object) => request('/cash/open', { method: 'POST', body: JSON.stringify(body) }),

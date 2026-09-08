@@ -10,7 +10,6 @@ import {
   LogOut,
   Moon,
   Sun,
-  Leaf,
   Armchair,
   Banknote,
   FileText,
@@ -23,31 +22,57 @@ import {
   Shield,
   Settings,
   UserCog,
+  Menu,
+  X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { BrandMark } from '../brand/BrandMark'
 
-const nav = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, perm: null },
-  { to: '/pos', label: 'POS', icon: ShoppingBag, perm: 'pos.sell' },
-  { to: '/cocina', label: 'Cocina', icon: CookingPot, perm: 'kds.view' },
-  { to: '/mesas', label: 'Mesas', icon: Armchair, perm: 'tables.view' },
-  { to: '/caja', label: 'Caja', icon: Banknote, perm: 'cash.view' },
-  { to: '/facturas', label: 'Facturas', icon: FileText, perm: 'fiscal.view' },
-  { to: '/categorias', label: 'Categorías', icon: UtensilsCrossed, perm: 'catalog.categories.view' },
-  { to: '/productos', label: 'Productos', icon: Boxes, perm: 'catalog.products.view' },
-  { to: '/recetas', label: 'Recetas', icon: BookOpen, perm: 'catalog.recipes.view' },
-  { to: '/inventario', label: 'Inventario', icon: Warehouse, perm: 'inventory.stock.view' },
-  { to: '/compras', label: 'Compras', icon: Truck, perm: 'purchases.view' },
-  { to: '/proveedores', label: 'Proveedores', icon: Boxes, perm: 'suppliers.view' },
-  { to: '/clientes', label: 'Clientes', icon: Users, perm: 'customers.view' },
-  { to: '/reservas', label: 'Reservas', icon: CalendarDays, perm: 'reservations.view' },
-  { to: '/delivery', label: 'Delivery', icon: Bike, perm: 'delivery.view' },
-  { to: '/gastos', label: 'Gastos', icon: Receipt, perm: 'expenses.view' },
-  { to: '/reportes', label: 'Reportes', icon: BarChart3, perm: 'reports.view' },
-  { to: '/auditoria', label: 'Auditoría', icon: Shield, perm: 'audit.view' },
-  { to: '/usuarios', label: 'Usuarios', icon: UserCog, perm: 'users.manage' },
-  { to: '/configuracion', label: 'Configuración', icon: Settings, perm: 'settings.view' },
+type NavItem = { to: string; label: string; icon: ComponentType<{ className?: string }>; perm: string | null }
+type NavGroup = { label: string; items: NavItem[] }
+
+const groups: NavGroup[] = [
+  {
+    label: 'Sala',
+    items: [
+      { to: '/', label: 'Inicio', icon: LayoutDashboard, perm: null },
+      { to: '/pos', label: 'Punto de venta', icon: ShoppingBag, perm: 'pos.sell' },
+      { to: '/cocina', label: 'Cocina', icon: CookingPot, perm: 'kds.view' },
+      { to: '/mesas', label: 'Mesas', icon: Armchair, perm: 'tables.view' },
+      { to: '/caja', label: 'Caja', icon: Banknote, perm: 'cash.view' },
+      { to: '/reservas', label: 'Reservas', icon: CalendarDays, perm: 'reservations.view' },
+      { to: '/delivery', label: 'Delivery', icon: Bike, perm: 'delivery.view' },
+    ],
+  },
+  {
+    label: 'Carta',
+    items: [
+      { to: '/categorias', label: 'Categorías', icon: UtensilsCrossed, perm: 'catalog.categories.view' },
+      { to: '/productos', label: 'Productos', icon: Boxes, perm: 'catalog.products.view' },
+      { to: '/recetas', label: 'Recetas', icon: BookOpen, perm: 'catalog.recipes.view' },
+    ],
+  },
+  {
+    label: 'Bodega',
+    items: [
+      { to: '/inventario', label: 'Inventario', icon: Warehouse, perm: 'inventory.stock.view' },
+      { to: '/compras', label: 'Compras', icon: Truck, perm: 'purchases.view' },
+      { to: '/proveedores', label: 'Proveedores', icon: Boxes, perm: 'suppliers.view' },
+    ],
+  },
+  {
+    label: 'Oficina',
+    items: [
+      { to: '/facturas', label: 'Facturas SRI', icon: FileText, perm: 'fiscal.view' },
+      { to: '/clientes', label: 'Clientes', icon: Users, perm: 'customers.view' },
+      { to: '/gastos', label: 'Gastos', icon: Receipt, perm: 'expenses.view' },
+      { to: '/reportes', label: 'Reportes', icon: BarChart3, perm: 'reports.view' },
+      { to: '/auditoria', label: 'Auditoría', icon: Shield, perm: 'audit.view' },
+      { to: '/usuarios', label: 'Usuarios', icon: UserCog, perm: 'users.manage' },
+      { to: '/configuracion', label: 'Configuración', icon: Settings, perm: 'settings.view' },
+    ],
+  },
 ]
 
 const titles: Record<string, string> = {
@@ -73,45 +98,42 @@ const titles: Record<string, string> = {
   '/configuracion': 'Configuración',
 }
 
-export function AppShell() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [dark, setDark] = useState(() => localStorage.getItem('sw_theme') === 'dark')
-  const perms = user?.permissions ?? []
-  const fullBleed = location.pathname === '/pos' || location.pathname === '/cocina'
+function canSee(perms: string[], perm: string | null): boolean {
+  if (!perm) return true
+  return perms.includes(perm) || perms.includes('users.manage')
+}
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    localStorage.setItem('sw_theme', dark ? 'dark' : 'light')
-  }, [dark])
-
+function SidebarNav({
+  perms,
+  onNavigate,
+}: {
+  perms: string[]
+  onNavigate?: () => void
+}) {
   return (
-    <div className="min-h-svh bg-cream-50 text-ink-900 dark:bg-forest-950 dark:text-cream-50">
-      <div className="flex min-h-svh">
-        <aside className="hidden w-64 shrink-0 border-r border-cream-100 bg-forest-900 text-cream-50 md:flex md:flex-col">
-          <div className="flex items-center gap-3 px-5 py-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-clay-600">
-              <Leaf className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-display text-lg leading-tight">Sacha Wasi</p>
-              <p className="text-xs text-forest-100/70">ERP gastronómico</p>
-            </div>
-          </div>
-          <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-            {nav
-              .filter((item) => !item.perm || perms.includes(item.perm) || perms.includes('users.manage'))
-              .map((item) => {
+    <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+      {groups.map((group) => {
+        const items = group.items.filter((item) => canSee(perms, item.perm))
+        if (items.length === 0) return null
+        return (
+          <div key={group.label}>
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-copper-400/80">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {items.map((item) => {
                 const Icon = item.icon
                 return (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.to === '/'}
+                    onClick={onNavigate}
                     className={({ isActive }) =>
                       `flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
-                        isActive ? 'bg-forest-800 text-white' : 'text-forest-100/80 hover:bg-forest-800/60'
+                        isActive
+                          ? 'bg-forest-800 text-cream-50 shadow-inner ring-1 ring-copper-400/30'
+                          : 'text-cream-100/75 hover:bg-forest-900 hover:text-cream-50'
                       }`
                     }
                   >
@@ -120,27 +142,116 @@ export function AppShell() {
                   </NavLink>
                 )
               })}
-          </nav>
-          <div className="border-t border-white/10 p-4 text-xs text-forest-100/70">
-            <p className="font-medium text-cream-50">{user?.name}</p>
-            <p>{user?.current_branch?.name}</p>
-            <p className="capitalize">{user?.roles?.[0]}</p>
+            </div>
           </div>
+        )
+      })}
+    </nav>
+  )
+}
+
+export function AppShell() {
+  const { user, logout, switchBranch } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [dark, setDark] = useState(() => localStorage.getItem('sw_theme') === 'dark')
+  const [open, setOpen] = useState(false)
+  const perms = user?.permissions ?? []
+  const fullBleed = location.pathname === '/pos' || location.pathname === '/cocina'
+  const branches = user?.branches ?? []
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('sw_theme', dark ? 'dark' : 'light')
+  }, [dark])
+
+  const brand = (
+    <div className="flex items-center gap-3 px-5 py-6">
+      <BrandMark className="h-11 w-11 shrink-0" />
+      <div>
+        <p className="font-display text-lg leading-tight tracking-tight text-cream-50">Sacha Wasi</p>
+        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-copper-400/90">ERP · Floresta</p>
+      </div>
+    </div>
+  )
+
+  const footer = (
+    <div className="space-y-3 border-t border-white/10 p-4 text-xs text-cream-100/70">
+      <p className="font-medium text-cream-50">{user?.name}</p>
+      <p className="capitalize">{user?.roles?.[0]}</p>
+      {branches.length > 1 ? (
+        <label className="block">
+          Sucursal
+          <select
+            className="mt-1 w-full rounded-lg border border-white/15 bg-forest-900 px-2 py-1.5 text-cream-50"
+            value={user?.current_branch?.id ?? ''}
+            onChange={async (e) => {
+              await switchBranch(e.target.value)
+              window.location.reload()
+            }}
+          >
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p>{user?.current_branch?.name}</p>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="min-h-svh bg-cream-50 text-ink-900 dark:bg-forest-950 dark:text-cream-50">
+      <div className="flex min-h-svh">
+        <aside className="hidden w-64 shrink-0 flex-col bg-forest-950 text-cream-50 md:flex">
+          {brand}
+          <SidebarNav perms={perms} />
+          {footer}
         </aside>
+
+        {open ? (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <button type="button" className="absolute inset-0 bg-forest-950/55" onClick={() => setOpen(false)} aria-label="Cerrar menú" />
+            <aside className="relative flex h-full w-72 max-w-[86vw] flex-col bg-forest-950 text-cream-50 shadow-2xl">
+              <button type="button" className="absolute right-3 top-4 rounded-lg p-1 text-cream-100/70" onClick={() => setOpen(false)}>
+                <X className="h-5 w-5" />
+              </button>
+              {brand}
+              <SidebarNav perms={perms} onNavigate={() => setOpen(false)} />
+              {footer}
+            </aside>
+          </div>
+        ) : null}
+
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-cream-100 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-forest-900/80">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-clay-600">Sacha Wasi · Ecuador</p>
-              <h1 className="font-display text-xl">
-                {titles[location.pathname]
-                  ?? (location.pathname.includes('/imprimir') ? 'Imprimir factura' : 'Operación')}
-              </h1>
+          <header className="flex items-center justify-between border-b border-cream-200 bg-cream-50/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-forest-900/80">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-cream-200 bg-white p-2 text-forest-800 md:hidden dark:border-white/10 dark:bg-forest-800 dark:text-cream-50"
+                onClick={() => setOpen(true)}
+                aria-label="Abrir menú"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-clay-600">
+                  {user?.company?.trade_name ?? 'Sacha Wasi'} · {user?.current_branch?.city ?? 'Ecuador'}
+                </p>
+                <h1 className="font-display text-xl">
+                  {titles[location.pathname]
+                    ?? (location.pathname.includes('/imprimir') ? 'Imprimir factura' : 'Operación')}
+                </h1>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setDark((v) => !v)}
-                className="rounded-full border border-cream-100 p-2 dark:border-white/10"
+                className="rounded-full border border-cream-200 p-2 dark:border-white/10"
                 aria-label="Cambiar tema"
               >
                 {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -151,7 +262,7 @@ export function AppShell() {
                   await logout()
                   navigate('/login')
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-forest-800 px-3 py-2 text-sm text-white"
+                className="inline-flex items-center gap-1 rounded-full bg-forest-800 px-3 py-2 text-sm text-cream-50"
               >
                 <LogOut className="h-4 w-4" />
                 Salir

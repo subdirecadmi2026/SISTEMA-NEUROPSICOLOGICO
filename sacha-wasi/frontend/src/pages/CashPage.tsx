@@ -9,6 +9,7 @@ export function CashPage() {
   const [registerId, setRegisterId] = useState('')
   const [opening, setOpening] = useState('150')
   const [counts, setCounts] = useState<Record<string, string>>({})
+  const [move, setMove] = useState({ type: 'in', amount: '', notes: '' })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -41,12 +42,23 @@ export function CashPage() {
     await load()
   }
 
+  async function onMove(e: FormEvent) {
+    e.preventDefault()
+    if (!session?.id) return
+    await api.cashMove(String(session.id), move)
+    setMove({ type: 'in', amount: '', notes: '' })
+    setNotice('Movimiento registrado')
+    await load()
+  }
+
+  const movements = (session?.movements as Array<{ id: string; type: string; amount: string; notes?: string }> | undefined) ?? []
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {error ? <p className="col-span-2 text-clay-600">{error}</p> : null}
       {notice ? <p className="col-span-2 text-forest-700">{notice}</p> : null}
-      <section className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
-        <h2 className="font-display text-lg">Sesión actual</h2>
+      <section className="sw-card rounded-2xl p-4">
+        <h2 className="font-display text-lg text-forest-800 dark:text-cream-50">Sesión actual</h2>
         {session ? (
           <div className="mt-3 space-y-1 text-sm">
             <p>Estado: {String(session.status)}</p>
@@ -56,27 +68,53 @@ export function CashPage() {
           </div>
         ) : (
           <form onSubmit={open} className="mt-3 space-y-2">
-            <select className="w-full rounded-xl border px-3 py-2 dark:bg-forest-800" value={registerId} onChange={(e) => setRegisterId(e.target.value)}>
+            <select className="sw-input" value={registerId} onChange={(e) => setRegisterId(e.target.value)}>
               {registers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
-            <input className="w-full rounded-xl border px-3 py-2 dark:bg-forest-800" value={opening} onChange={(e) => setOpening(e.target.value)} />
-            <button className="rounded-xl bg-forest-800 px-4 py-2 text-white">Abrir caja</button>
+            <input className="sw-input" value={opening} onChange={(e) => setOpening(e.target.value)} />
+            <button className="sw-btn rounded-xl px-4 py-2">Abrir caja</button>
           </form>
         )}
       </section>
       {session ? (
-        <form onSubmit={close} className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
-          <h2 className="font-display text-lg">Arqueo USD</h2>
+        <form onSubmit={close} className="sw-card rounded-2xl p-4">
+          <h2 className="font-display text-lg text-forest-800 dark:text-cream-50">Arqueo USD</h2>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {denoms.map((d) => (
               <label key={d} className="text-sm">
                 ${d}
-                <input className="mt-1 w-full rounded-xl border px-3 py-2 dark:bg-forest-800" value={counts[d] ?? ''} onChange={(e) => setCounts({ ...counts, [d]: e.target.value })} />
+                <input className="sw-input mt-1" value={counts[d] ?? ''} onChange={(e) => setCounts({ ...counts, [d]: e.target.value })} />
               </label>
             ))}
           </div>
           <button className="mt-4 rounded-xl bg-clay-600 px-4 py-2 text-white">Cerrar caja</button>
         </form>
+      ) : null}
+      {session ? (
+        <section className="sw-card rounded-2xl p-4 lg:col-span-2">
+          <h2 className="font-display text-lg text-forest-800 dark:text-cream-50">Entradas y salidas</h2>
+          <form onSubmit={onMove} className="mt-3 grid gap-2 md:grid-cols-4">
+            <select className="sw-input" value={move.type} onChange={(e) => setMove({ ...move, type: e.target.value })}>
+              <option value="in">Entrada</option>
+              <option value="out">Salida</option>
+              <option value="drop">Drop / retiro</option>
+              <option value="expense">Gasto de caja</option>
+              <option value="tip">Propina</option>
+            </select>
+            <input required placeholder="Monto" className="sw-input" value={move.amount} onChange={(e) => setMove({ ...move, amount: e.target.value })} />
+            <input placeholder="Nota" className="sw-input" value={move.notes} onChange={(e) => setMove({ ...move, notes: e.target.value })} />
+            <button className="sw-btn rounded-xl">Registrar</button>
+          </form>
+          <ul className="mt-3 space-y-1 text-sm">
+            {movements.length === 0 ? <li className="text-ink-500">Sin movimientos extra.</li> : null}
+            {movements.map((m) => (
+              <li key={m.id} className="flex justify-between border-t border-cream-100 py-2">
+                <span className="capitalize">{m.type} · {m.notes || '—'}</span>
+                <span>${Number(m.amount).toFixed(2)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
     </div>
   )

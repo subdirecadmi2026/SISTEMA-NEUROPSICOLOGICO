@@ -21,7 +21,7 @@ export function CustomersPage() {
   return (
     <div className="space-y-4">
       {error ? <p className="text-clay-600">{error}</p> : null}
-      <form onSubmit={onSubmit} className="grid gap-2 rounded-2xl border border-cream-100 bg-white p-4 md:grid-cols-5 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="sw-card grid gap-2 rounded-2xl p-4 md:grid-cols-5">
         <input required placeholder="Nombre" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input placeholder="Cédula" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.document_number} onChange={(e) => setForm({ ...form, document_number: e.target.value })} />
         <input placeholder="Teléfono" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />

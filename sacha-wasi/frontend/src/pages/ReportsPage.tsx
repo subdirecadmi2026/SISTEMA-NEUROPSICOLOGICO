@@ -3,9 +3,9 @@ import { api } from '../api/client'
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
-      <p className="text-xs uppercase tracking-wide text-ink-500">{label}</p>
-      <p className="font-display mt-2 text-3xl">{value}</p>
+    <div className="sw-card rounded-2xl p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-clay-600">{label}</p>
+      <p className="font-display mt-2 text-3xl text-forest-800 dark:text-cream-50">{value}</p>
     </div>
   )
 }
@@ -34,13 +34,13 @@ export function ReportsPage() {
       </div>
       <p className="text-sm text-ink-500">Food cost {Number(data.food_cost_percent)}% · ticket promedio ${Number(data.avg_ticket).toFixed(2)} · gastos ${Number(data.expenses).toFixed(2)}</p>
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-2xl border bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+        <section className="sw-card rounded-2xl p-4">
           <h2 className="font-display text-lg">Por canal</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {channels.map((c) => <li key={c.channel}>{c.channel}: {c.tickets} tickets · ${Number(c.total).toFixed(2)}</li>)}
           </ul>
         </section>
-        <section className="rounded-2xl border bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+        <section className="sw-card rounded-2xl p-4">
           <h2 className="font-display text-lg">Platos más vendidos</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {products.map((p) => <li key={p.name}>{p.name}: {Number(p.qty).toFixed(0)} · ${Number(p.total).toFixed(2)}</li>)}

@@ -20,7 +20,7 @@ export function ExpensesPage() {
   return (
     <div className="space-y-4">
       {error ? <p className="text-clay-600">{error}</p> : null}
-      <form onSubmit={onSubmit} className="grid gap-2 rounded-2xl border bg-white p-4 md:grid-cols-6 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="sw-card grid gap-2 rounded-2xl p-4 md:grid-cols-6">
         <select className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
           <option value="servicios">Servicios</option>
           <option value="nomina">Nómina</option>
@@ -35,7 +35,11 @@ export function ExpensesPage() {
         <button className="rounded-xl bg-forest-800 text-white">Registrar</button>
       </form>
       <ul className="space-y-2 text-sm">
-        {rows.map((r) => <li key={String(r.id)} className="rounded-xl border bg-white p-3 dark:border-white/10 dark:bg-forest-900">{String(r.incurred_on)} · {String(r.category)} · {String(r.description)} · ${Number(r.amount).toFixed(2)}</li>)}
+        {rows.map((r) => (
+          <li key={String(r.id)} className="sw-card rounded-xl p-3">
+            {String(r.incurred_on)} · {String(r.category)} · {String(r.description)} · ${Number(r.amount).toFixed(2)}
+          </li>
+        ))}
       </ul>
     </div>
   )

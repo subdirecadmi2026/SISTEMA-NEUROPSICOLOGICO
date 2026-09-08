@@ -3,19 +3,22 @@
 @theme {
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-  --color-forest-950: #0b1612;
-  --color-forest-900: #12211b;
-  --color-forest-800: #1b4d3e;
-  --color-forest-700: #2d6a54;
-  --color-forest-600: #3d8b6a;
-  --color-forest-100: #e4f0ea;
+  --color-forest-950: #06110c;
+  --color-forest-900: #0c1f18;
+  --color-forest-800: #143d30;
+  --color-forest-700: #1a5240;
+  --color-forest-600: #2d6b52;
+  --color-forest-100: #dce8e1;
   --color-clay-600: #c45c26;
   --color-clay-500: #d9773a;
-  --color-cream-50: #f7f3ea;
-  --color-cream-100: #efe7d6;
-  --color-ink-900: #171512;
-  --color-ink-700: #3f3a34;
-  --color-ink-500: #6f675e;
+  --color-copper-400: #c4a574;
+  --color-cream-50: #f3ead6;
+  --color-cream-100: #e6d7b8;
+  --color-cream-200: #dccdb0;
+  --color-cream-300: #cbb896;
+  --color-ink-900: #14110c;
+  --color-ink-700: #3a3228;
+  --color-ink-500: #6b5e4e;
 }
 
 html,
@@ -27,18 +30,76 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: var(--color-cream-50);
   color: var(--color-ink-900);
+  background-color: var(--color-cream-50);
+  background-image:
+    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(20, 61, 48, 0.12), transparent 55%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(20, 61, 48, 0.015) 3px,
+      rgba(20, 61, 48, 0.015) 4px
+    );
 }
 
 .dark body,
 html.dark body {
-  background: var(--color-forest-950);
+  background-color: var(--color-forest-950);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(45, 107, 82, 0.18), transparent 50%);
   color: #f4efe6;
 }
 
 .font-display {
   font-family: var(--font-display);
+}
+
+.sw-card {
+  border: 1px solid color-mix(in srgb, var(--color-forest-800) 18%, var(--color-cream-100));
+  background: color-mix(in srgb, white 82%, var(--color-cream-50));
+  box-shadow: 0 10px 30px rgba(6, 17, 12, 0.08);
+}
+
+.dark .sw-card {
+  border-color: rgba(196, 165, 116, 0.18);
+  background: var(--color-forest-900);
+}
+
+.sw-btn {
+  background: var(--color-forest-800);
+  color: var(--color-cream-50);
+}
+
+.sw-btn:hover {
+  background: var(--color-forest-700);
+}
+
+.sw-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-cream-200);
+  background: color-mix(in srgb, white 88%, var(--color-cream-50));
+  padding: 0.5rem 0.75rem;
+  color: var(--color-ink-900);
+}
+
+.dark .sw-input {
+  border-color: rgba(196, 165, 116, 0.22);
+  background: var(--color-forest-800);
+  color: var(--color-cream-50);
+}
+
+.sw-chip {
+  border-radius: 999px;
+  background: color-mix(in srgb, white 80%, var(--color-cream-50));
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.sw-chip-active {
+  background: var(--color-forest-800);
+  color: var(--color-cream-50);
 }
 
 @media print {

@@ -75,7 +75,7 @@ export function ProductsPage() {
           Buscar
         </button>
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-cream-100 bg-white dark:border-white/10 dark:bg-forest-900">
+      <div className="overflow-x-auto sw-card rounded-2xl">
         <table className="w-full text-left text-sm">
           <thead className="text-ink-500">
             <tr>
@@ -135,7 +135,7 @@ export function ProductsPage() {
           </tbody>
         </table>
       </div>
-      <form onSubmit={onSubmit} className="grid gap-3 rounded-2xl border border-cream-100 bg-white p-4 md:grid-cols-5 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="sw-card grid gap-3 rounded-2xl p-4 md:grid-cols-5">
         <input className="rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
         <select className="rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
           {types.map((t) => (

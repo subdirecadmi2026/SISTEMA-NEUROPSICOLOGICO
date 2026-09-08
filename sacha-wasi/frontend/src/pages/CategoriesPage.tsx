@@ -5,7 +5,7 @@ import type { Category } from '../api/types'
 export function CategoriesPage() {
   const [items, setItems] = useState<Category[]>([])
   const [name, setName] = useState('')
-  const [color, setColor] = useState('#1B4D3E')
+  const [color, setColor] = useState('#143D30')
   const [error, setError] = useState('')
 
   async function load() {
@@ -32,8 +32,8 @@ export function CategoriesPage() {
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <section className="grid gap-3 sm:grid-cols-2">
         {items.map((cat) => (
-          <article key={cat.id} className="rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
-            <div className="mb-3 h-2 rounded-full" style={{ background: cat.color || '#1B4D3E' }} />
+          <article key={cat.id} className="sw-card rounded-2xl p-4">
+            <div className="mb-3 h-2 rounded-full" style={{ background: cat.color || '#143D30' }} />
             <h2 className="font-display text-xl">{cat.name}</h2>
             <p className="text-sm text-ink-500">{cat.products_count ?? 0} productos</p>
             {cat.children?.length ? (
@@ -44,7 +44,7 @@ export function CategoriesPage() {
           </article>
         ))}
       </section>
-      <form onSubmit={onSubmit} className="h-fit rounded-2xl border border-cream-100 bg-white p-4 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="sw-card h-fit rounded-2xl p-4">
         <h2 className="font-display text-lg">Nueva categoría</h2>
         <label className="mt-3 block text-sm">
           Nombre

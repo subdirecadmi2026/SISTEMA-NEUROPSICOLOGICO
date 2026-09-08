@@ -10,7 +10,7 @@ export function AuditPage() {
   }, [])
 
   return (
-    <div className="overflow-x-auto rounded-2xl border bg-white dark:border-white/10 dark:bg-forest-900">
+    <div className="sw-card overflow-x-auto rounded-2xl">
       {error ? <p className="p-3 text-clay-600">{error}</p> : null}
       <table className="w-full text-left text-sm">
         <thead className="text-ink-500"><tr><th className="px-3 py-2">Cuando</th><th>Usuario</th><th>Acción</th></tr></thead>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Check, Clock, Leaf, Minus, Plus } from 'lucide-react'
+import { Check, Clock, Minus, Plus } from 'lucide-react'
 import { api } from '../api/client'
+import { BrandMark } from '../brand/BrandMark'
 
 type MenuProduct = {
   id: string
@@ -117,7 +118,7 @@ export function PublicMenuPage() {
     return (
       <div className="grid min-h-svh place-items-center bg-forest-950 px-6 text-center text-cream-50">
         <div>
-          <Leaf className="mx-auto mb-4 h-8 w-8 text-clay-500" />
+          <BrandMark className="mx-auto mb-4 h-14 w-14" />
           <p className="font-display text-2xl">No encontramos esta mesa</p>
           <p className="mt-2 text-sm text-forest-100">{error}</p>
         </div>
@@ -127,7 +128,7 @@ export function PublicMenuPage() {
 
   if (!data) {
     return (
-      <div className="min-h-svh bg-[#f4efe4]">
+      <div className="min-h-svh bg-cream-50">
         <div className="h-64 animate-pulse bg-forest-900" />
         <div className="mx-auto max-w-6xl space-y-4 p-5">
           <div className="h-8 w-40 animate-pulse rounded bg-cream-100" />
@@ -146,7 +147,7 @@ export function PublicMenuPage() {
     return (
       <div className="grid min-h-svh place-items-center bg-forest-950 px-6 text-center text-cream-50">
         <div className="max-w-sm">
-          <Leaf className="mx-auto mb-4 h-6 w-6 text-clay-500" />
+          <BrandMark className="mx-auto mb-4 h-14 w-14" />
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-forest-700">
             <Check className="h-8 w-8" />
           </div>
@@ -169,14 +170,14 @@ export function PublicMenuPage() {
   }
 
   return (
-    <div className="min-h-svh bg-[#f4efe4] text-ink-900">
+    <div className="min-h-svh bg-cream-50 text-ink-900">
       <header className="relative isolate overflow-hidden text-cream-50">
         <img src={HERO} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/70 to-forest-900/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/75 to-forest-800/35" />
         <div className="relative mx-auto max-w-6xl px-5 pb-8 pt-10">
           <div className="flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.22em] backdrop-blur">
-              <Leaf className="h-3.5 w-3.5 text-clay-500" />
+            <span className="inline-flex items-center gap-2 rounded-full bg-forest-950/40 px-3 py-1 text-[11px] uppercase tracking-[0.22em] backdrop-blur">
+              <BrandMark className="h-6 w-6" />
               {city} · Ecuador
             </span>
             <span className="rounded-full border border-white/20 px-3 py-1 text-xs">
@@ -190,7 +191,7 @@ export function PublicMenuPage() {
         </div>
       </header>
 
-      <nav className="sticky top-0 z-10 border-b border-cream-100/80 bg-[#f4efe4]/95 backdrop-blur">
+      <nav className="sticky top-0 z-10 border-b border-cream-200/80 bg-cream-50/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-5 py-3">
           {categories.map((category) => (
             <button
@@ -220,7 +221,7 @@ export function PublicMenuPage() {
               {category.products.map((product) => {
                 const qty = qtyOf.get(product.id) ?? 0
                 return (
-                  <article key={product.id} className="flex h-full flex-col overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(18,33,27,0.08)]">
+                  <article key={product.id} className="sw-card flex h-full flex-col overflow-hidden rounded-3xl">
                     <div className="relative h-36 bg-cream-100 md:h-40">
                       {product.image_url ? (
                         <img
@@ -291,7 +292,7 @@ export function PublicMenuPage() {
             {trayOpen ? (
               <div className="p-4">
                 <div className="mb-3 flex items-baseline justify-between">
-                  <button type="button" className="text-xs uppercase tracking-[0.2em] text-clay-500" onClick={() => setTrayOpen(false)}>
+                  <button type="button" className="text-xs uppercase tracking-[0.2em] text-copper-400" onClick={() => setTrayOpen(false)}>
                     Cerrar
                   </button>
                   <p className="font-display text-2xl">{money(total)}</p>
@@ -334,7 +335,7 @@ export function PublicMenuPage() {
                 onClick={() => setTrayOpen(true)}
               >
                 <span>
-                  <span className="block text-[11px] uppercase tracking-[0.2em] text-clay-500">Su pedido</span>
+                  <span className="block text-[11px] uppercase tracking-[0.2em] text-copper-400">Su pedido</span>
                   <span className="text-sm">{items} {items === 1 ? 'plato' : 'platos'}</span>
                 </span>
                 <span className="rounded-full bg-clay-600 px-4 py-2 text-sm font-medium">{money(total)} · Pedir</span>

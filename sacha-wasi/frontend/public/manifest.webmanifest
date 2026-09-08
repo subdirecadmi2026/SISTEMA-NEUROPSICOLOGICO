@@ -4,8 +4,8 @@
   "description": "ERP gastronómico",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1B4D3E",
-  "theme_color": "#1B4D3E",
+  "background_color": "#0C1F18",
+  "theme_color": "#143D30",
   "lang": "es-EC",
   "icons": [
     {

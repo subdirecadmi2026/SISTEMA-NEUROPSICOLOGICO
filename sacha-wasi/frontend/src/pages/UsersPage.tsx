@@ -27,7 +27,7 @@ export function UsersPage() {
   return (
     <div className="space-y-4">
       {error ? <p className="text-clay-600">{error}</p> : null}
-      <form onSubmit={onSubmit} className="grid gap-2 rounded-2xl border bg-white p-4 md:grid-cols-5 dark:border-white/10 dark:bg-forest-900">
+      <form onSubmit={onSubmit} className="sw-card grid gap-2 rounded-2xl p-4 md:grid-cols-5">
         <input required placeholder="Nombre" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input required type="email" placeholder="Email" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         <input required type="password" className="rounded-xl border px-3 py-2 dark:bg-forest-800" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
@@ -38,7 +38,7 @@ export function UsersPage() {
       </form>
       <ul className="space-y-2 text-sm">
         {rows.map((r) => (
-          <li key={String(r.id)} className="rounded-xl border bg-white p-3 dark:border-white/10 dark:bg-forest-900">
+            <li key={String(r.id)} className="sw-card rounded-xl p-3">
             {String(r.name)} · {String(r.email)} · {(r.roles as Array<{ name: string }> | undefined)?.map((x) => x.name).join(', ')}
           </li>
         ))}

@@ -7,6 +7,7 @@ type AuthState = {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  switchBranch: (branchId: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -43,6 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(null)
           setUser(null)
         }
+      },
+      switchBranch: async (branchId: string) => {
+        const next = await api.switchBranch(branchId)
+        setUser(next)
       },
     }),
     [user, loading],
