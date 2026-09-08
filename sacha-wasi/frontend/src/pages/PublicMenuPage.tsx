@@ -129,10 +129,14 @@ export function PublicMenuPage() {
     return (
       <div className="min-h-svh bg-[#f4efe4]">
         <div className="h-64 animate-pulse bg-forest-900" />
-        <div className="mx-auto max-w-lg space-y-4 p-5">
+        <div className="mx-auto max-w-6xl space-y-4 p-5">
           <div className="h-8 w-40 animate-pulse rounded bg-cream-100" />
-          <div className="h-40 animate-pulse rounded-3xl bg-cream-100" />
-          <div className="h-40 animate-pulse rounded-3xl bg-cream-100" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
+            <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
+            <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
+            <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
+          </div>
         </div>
       </div>
     )
@@ -169,7 +173,7 @@ export function PublicMenuPage() {
       <header className="relative isolate overflow-hidden text-cream-50">
         <img src={HERO} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/70 to-forest-900/30" />
-        <div className="relative mx-auto max-w-lg px-5 pb-8 pt-10">
+        <div className="relative mx-auto max-w-6xl px-5 pb-8 pt-10">
           <div className="flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.22em] backdrop-blur">
               <Leaf className="h-3.5 w-3.5 text-clay-500" />
@@ -187,7 +191,7 @@ export function PublicMenuPage() {
       </header>
 
       <nav className="sticky top-0 z-10 border-b border-cream-100/80 bg-[#f4efe4]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-lg gap-2 overflow-x-auto px-5 py-3">
+        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-5 py-3">
           {categories.map((category) => (
             <button
               key={category.id}
@@ -205,19 +209,19 @@ export function PublicMenuPage() {
         </div>
       </nav>
 
-      <main className={`mx-auto max-w-lg space-y-10 px-5 py-6 ${items > 0 ? 'pb-28' : 'pb-10'}`}>
+      <main className={`mx-auto max-w-6xl space-y-10 px-5 py-6 ${items > 0 ? 'pb-28' : 'pb-10'}`}>
         {categories.map((category) => (
           <section key={category.id} id={`cat-${category.id}`} className="scroll-mt-16">
             <div className="mb-4 flex items-end justify-between">
               <h2 className="font-display text-2xl">{category.name}</h2>
-              <span className="h-px flex-1 mx-4 mb-2 bg-forest-800/20" />
+              <span className="mx-4 mb-2 h-px flex-1 bg-forest-800/20" />
             </div>
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {category.products.map((product) => {
                 const qty = qtyOf.get(product.id) ?? 0
                 return (
-                  <article key={product.id} className="overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(18,33,27,0.08)]">
-                    <div className="relative h-44 bg-cream-100">
+                  <article key={product.id} className="flex h-full flex-col overflow-hidden rounded-3xl bg-white shadow-[0_12px_40px_rgba(18,33,27,0.08)]">
+                    <div className="relative h-36 bg-cream-100 md:h-40">
                       {product.image_url ? (
                         <img
                           src={product.image_url}
@@ -228,46 +232,46 @@ export function PublicMenuPage() {
                           }}
                         />
                       ) : null}
-                      <span className="absolute bottom-3 right-3 rounded-full bg-cream-50/95 px-3 py-1 font-display text-lg text-forest-900 shadow-sm">
+                      <span className="absolute bottom-2 right-2 rounded-full bg-cream-50/95 px-2.5 py-0.5 font-display text-base text-forest-900 shadow-sm">
                         {money(Number(product.default_price))}
                       </span>
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-display text-xl leading-tight">{product.name}</h3>
+                    <div className="flex flex-1 flex-col p-3">
+                      <h3 className="font-display text-lg leading-tight">{product.name}</h3>
                       {product.description ? (
-                        <p className="mt-1.5 text-sm leading-relaxed text-ink-500">{product.description}</p>
+                        <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-ink-500">{product.description}</p>
                       ) : null}
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-ink-500">
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wide text-ink-500">
                         {product.prep_time_minutes ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-cream-50 px-2 py-1">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-cream-50 px-2 py-0.5">
                             <Clock className="h-3 w-3" />
                             {product.prep_time_minutes} min
                           </span>
                         ) : null}
                         {(product.allergens ?? []).map((allergen) => (
-                          <span key={allergen} className="rounded-full bg-cream-50 px-2 py-1">
+                          <span key={allergen} className="rounded-full bg-cream-50 px-2 py-0.5">
                             {allergen}
                           </span>
                         ))}
                       </div>
-                      <div className="mt-4 flex items-center justify-end">
+                      <div className="mt-auto flex items-center justify-end pt-3">
                         {qty === 0 ? (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-full bg-forest-800 px-4 py-2 text-sm text-white"
+                            className="inline-flex items-center gap-1 rounded-full bg-forest-800 px-3 py-1.5 text-sm text-white"
                             onClick={() => setQty(product, 1)}
                           >
                             <Plus className="h-4 w-4" />
                             Agregar
                           </button>
                         ) : (
-                          <div className="inline-flex items-center gap-3 rounded-full bg-cream-50 px-2 py-1">
-                            <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-white" onClick={() => setQty(product, qty - 1)} aria-label="Quitar">
-                              <Minus className="h-4 w-4" />
+                          <div className="inline-flex items-center gap-2 rounded-full bg-cream-50 px-1.5 py-1">
+                            <button type="button" className="grid h-7 w-7 place-items-center rounded-full bg-white" onClick={() => setQty(product, qty - 1)} aria-label="Quitar">
+                              <Minus className="h-3.5 w-3.5" />
                             </button>
-                            <span className="w-4 text-center font-medium">{qty}</span>
-                            <button type="button" className="grid h-8 w-8 place-items-center rounded-full bg-forest-800 text-white" onClick={() => setQty(product, qty + 1)} aria-label="Agregar">
-                              <Plus className="h-4 w-4" />
+                            <span className="w-4 text-center text-sm font-medium">{qty}</span>
+                            <button type="button" className="grid h-7 w-7 place-items-center rounded-full bg-forest-800 text-white" onClick={() => setQty(product, qty + 1)} aria-label="Agregar">
+                              <Plus className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         )}

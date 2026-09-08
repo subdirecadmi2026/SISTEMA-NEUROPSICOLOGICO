@@ -399,7 +399,38 @@ class DemoRestaurantSeeder extends Seeder
             'image_path' => 'https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?auto=format&fit=crop&w=800&q=80',
         ]);
 
-        return compact('salsa', 'locro', 'seco', 'jugo');
+        $extras = [];
+        foreach ([
+            ['entradas', 'Ceviche de chochos', 'ENT-CHOCHO', 'Ceviche serrano de chochos, tomate, cebolla y cilantro. Fresco y con tostado.', 4.80, 10, null, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80', 'porcion'],
+            ['entradas', 'Empanadas de viento', 'ENT-EMPA', 'Masa hojaldrada, queso fresco y azúcar. Calientes, para picar en mesa.', 3.50, 8, ['gluten', 'lácteos'], 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80', 'porcion'],
+            ['fuertes', 'Llapingachos', 'PLT-LLAPI', 'Tortillas de papa chaucha rellenas de queso, con salsa de maní y ensalada.', 7.20, 16, ['lácteos', 'maní'], 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80', 'porcion'],
+            ['fuertes', 'Trucha al ajillo', 'PLT-TRUCHA', 'Trucha de río, ajo, hierbas y papas doradas. Del páramo a la mesa.', 11.50, 20, ['pescado'], 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=800&q=80', 'porcion'],
+            ['bebidas', 'Canelazo de panela', 'BEB-CANEL', 'Aguardiente de caña, canela y panela. Se sirve caliente.', 3.20, 6, null, 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=800&q=80', 'und'],
+            ['postres', 'Helado de mortiño', 'POS-MORTI', 'Helado artesanal de mortiño de páramo. Ácido y cremoso.', 3.90, 5, ['lácteos'], 'https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=800&q=80', 'und'],
+            ['postres', 'Quimbolito', 'POS-QUIMB', 'Bizcocho al vapor de maíz, pasas y panela. Receta de casa.', 2.80, 12, ['gluten', 'huevo'], 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80', 'und'],
+        ] as [$cat, $name, $sku, $description, $price, $mins, $allergens, $image, $unit]) {
+            $station = $cat === 'bebidas' ? $bebidas : $fogon;
+            $extras[$sku] = Product::query()->create([
+                'company_id' => $companyId,
+                'category_id' => $categories[$cat]->id,
+                'base_unit_id' => $units[$unit]->id,
+                'tax_rate_id' => $taxId,
+                'type' => ProductType::Prepared,
+                'inventory_behavior' => InventoryBehavior::None,
+                'kitchen_station_id' => $station?->id,
+                'name' => $name,
+                'sku' => $sku,
+                'description' => $description,
+                'default_price' => $price,
+                'tracks_lots' => false,
+                'is_sellable' => true,
+                'prep_time_minutes' => $mins,
+                'allergens' => $allergens,
+                'image_path' => $image,
+            ]);
+        }
+
+        return array_merge(compact('salsa', 'locro', 'seco', 'jugo'), $extras);
     }
 
     private function seedRecipes(string $companyId, array $dishes, array $ins, array $units): void
