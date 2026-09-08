@@ -32,6 +32,9 @@ export type Product = {
   default_price: string
   is_sellable: boolean
   is_purchasable: boolean
+  description?: string | null
+  prep_time_minutes?: number | null
+  allergens?: string[] | null
   image_path?: string | null
   image_url?: string | null
   category?: { id: string; name: string } | null

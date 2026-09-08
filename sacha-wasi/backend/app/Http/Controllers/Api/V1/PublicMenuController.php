@@ -25,7 +25,24 @@ class PublicMenuController extends Controller
             ->where('is_active', true)
             ->with(['products' => fn ($q) => $q->where('is_sellable', true)->where('status', 'active')->orderBy('name')])
             ->orderBy('sort_order')
-            ->get();
+            ->get()
+            ->filter(fn (Category $category) => $category->products->isNotEmpty())
+            ->map(fn (Category $category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'color' => $category->color,
+                'sort_order' => $category->sort_order,
+                'products' => $category->products->map(fn (Product $product) => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'default_price' => $product->default_price,
+                    'image_url' => $product->image_url,
+                    'prep_time_minutes' => $product->prep_time_minutes,
+                    'allergens' => $product->allergens ?? [],
+                ])->values(),
+            ])
+            ->values();
 
         return response()->json([
             'table' => $table->only(['id', 'name', 'code', 'seats']),

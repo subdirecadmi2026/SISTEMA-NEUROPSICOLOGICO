@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Cash\CashService;
 use App\Domain\Inventory\KardexService;
 use App\Models\CashRegister;
+use App\Models\Category;
 use App\Models\DiningArea;
 use App\Models\DiningTable;
 use App\Models\FiscalDocument;
@@ -149,9 +150,13 @@ class OperationsApiTest extends TestCase
             'seats' => 2,
         ]);
 
-        $this->getJson('/api/v1/public/menu/test-m1')
+        $menu = $this->getJson('/api/v1/public/menu/test-m1')
             ->assertOk()
             ->assertJsonPath('table.code', 'M1');
+
+        $this->assertNotEmpty($menu->json('categories'));
+        $this->assertArrayHasKey('image_url', $menu->json('categories.0.products.0'));
+        $this->assertArrayNotHasKey('default_cost', $menu->json('categories.0.products.0'));
 
         $this->postJson('/api/v1/public/menu/test-m1/orders', [
             'guest_name' => 'Invitado QR',
@@ -258,7 +263,13 @@ class OperationsApiTest extends TestCase
     private function seedSellableSoup(): array
     {
         $tomato = $this->ingredient('Tomate', '2.00');
+        $category = Category::factory()->create([
+            'company_id' => $this->company->id,
+            'name' => 'Sopas',
+            'show_on_qr_menu' => true,
+        ]);
         $soup = $this->prepared('Locro prueba', '8.50');
+        $soup->update(['category_id' => $category->id]);
 
         app(KardexService::class)->receive(
             warehouse: $this->warehouse,
