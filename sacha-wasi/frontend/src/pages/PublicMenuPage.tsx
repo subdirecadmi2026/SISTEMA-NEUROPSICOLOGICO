@@ -46,6 +46,7 @@ export function PublicMenuPage() {
   const [pending, setPending] = useState(false)
   const [sent, setSent] = useState(false)
   const [activeCategory, setActiveCategory] = useState('')
+  const [trayOpen, setTrayOpen] = useState(false)
 
   useEffect(() => {
     if (!qrToken) return
@@ -68,6 +69,10 @@ export function PublicMenuPage() {
 
   const items = cart.reduce((sum, line) => sum + line.qty, 0)
   const total = cart.reduce((sum, line) => sum + line.qty * Number(line.product.default_price), 0)
+
+  useEffect(() => {
+    if (items === 0) setTrayOpen(false)
+  }, [items])
 
   const qtyOf = useMemo(() => {
     const map = new Map<string, number>()
@@ -137,6 +142,7 @@ export function PublicMenuPage() {
     return (
       <div className="grid min-h-svh place-items-center bg-forest-950 px-6 text-center text-cream-50">
         <div className="max-w-sm">
+          <Leaf className="mx-auto mb-4 h-6 w-6 text-clay-500" />
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-forest-700">
             <Check className="h-8 w-8" />
           </div>
@@ -199,7 +205,7 @@ export function PublicMenuPage() {
         </div>
       </nav>
 
-      <main className={`mx-auto max-w-lg space-y-10 px-5 py-6 ${items > 0 ? 'pb-56' : 'pb-10'}`}>
+      <main className={`mx-auto max-w-lg space-y-10 px-5 py-6 ${items > 0 ? 'pb-28' : 'pb-10'}`}>
         {categories.map((category) => (
           <section key={category.id} id={`cat-${category.id}`} className="scroll-mt-16">
             <div className="mb-4 flex items-end justify-between">
@@ -276,42 +282,60 @@ export function PublicMenuPage() {
       </main>
 
       {items > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-cream-100 bg-forest-950/95 p-4 text-cream-50 backdrop-blur">
-          <div className="mx-auto max-w-lg">
-            <div className="mb-3 flex items-baseline justify-between">
-              <p className="text-xs uppercase tracking-[0.2em] text-clay-500">Su pedido</p>
-              <p className="font-display text-2xl">{money(total)}</p>
-            </div>
-            <ul className="mb-3 max-h-24 space-y-1 overflow-y-auto text-sm text-cream-100/90">
-              {cart.map((line) => (
-                <li key={line.product.id} className="flex justify-between gap-3">
-                  <span>{line.qty} × {line.product.name}</span>
-                  <span>{money(line.qty * Number(line.product.default_price))}</span>
-                </li>
-              ))}
-            </ul>
-            <input
-              className="w-full rounded-2xl border-0 bg-white px-3 py-2.5 text-sm text-ink-900"
-              placeholder="¿Cómo le llamamos en mesa?"
-              value={guest}
-              onChange={(e) => setGuest(e.target.value)}
-            />
-            <input
-              className="mt-2 w-full rounded-2xl border-0 bg-white/90 px-3 py-2.5 text-sm text-ink-900"
-              placeholder="Indicación para cocina (opcional)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-            {error ? <p className="mt-2 text-sm text-clay-500">{error}</p> : null}
-            <button
-              type="button"
-              disabled={pending}
-              className="mt-3 w-full rounded-2xl bg-clay-600 py-3.5 font-medium text-white disabled:opacity-60"
-              onClick={() => void order()}
-            >
-              {pending ? 'Enviando a cocina…' : 'Enviar pedido a cocina'}
-            </button>
-            <p className="mt-2 text-center text-[11px] text-forest-100/70">El mesero cobra en mesa · simulador interno</p>
+        <div className="fixed inset-x-0 bottom-0 z-20 p-4">
+          <div className="mx-auto max-w-lg overflow-hidden rounded-3xl bg-forest-950 text-cream-50 shadow-[0_-12px_40px_rgba(11,22,18,0.35)]">
+            {trayOpen ? (
+              <div className="p-4">
+                <div className="mb-3 flex items-baseline justify-between">
+                  <button type="button" className="text-xs uppercase tracking-[0.2em] text-clay-500" onClick={() => setTrayOpen(false)}>
+                    Cerrar
+                  </button>
+                  <p className="font-display text-2xl">{money(total)}</p>
+                </div>
+                <ul className="mb-3 max-h-24 space-y-1 overflow-y-auto text-sm text-cream-100/90">
+                  {cart.map((line) => (
+                    <li key={line.product.id} className="flex justify-between gap-3">
+                      <span>{line.qty} × {line.product.name}</span>
+                      <span>{money(line.qty * Number(line.product.default_price))}</span>
+                    </li>
+                  ))}
+                </ul>
+                <input
+                  className="w-full rounded-2xl border-0 bg-white px-3 py-2.5 text-sm text-ink-900"
+                  placeholder="¿Cómo le llamamos en mesa?"
+                  value={guest}
+                  onChange={(e) => setGuest(e.target.value)}
+                />
+                <input
+                  className="mt-2 w-full rounded-2xl border-0 bg-white/90 px-3 py-2.5 text-sm text-ink-900"
+                  placeholder="Indicación para cocina (opcional)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+                {error ? <p className="mt-2 text-sm text-clay-500">{error}</p> : null}
+                <button
+                  type="button"
+                  disabled={pending}
+                  className="mt-3 w-full rounded-2xl bg-clay-600 py-3.5 font-medium text-white disabled:opacity-60"
+                  onClick={() => void order()}
+                >
+                  {pending ? 'Enviando a cocina…' : 'Enviar pedido a cocina'}
+                </button>
+                <p className="mt-2 text-center text-[11px] text-forest-100/70">El mesero cobra en mesa · simulador interno</p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+                onClick={() => setTrayOpen(true)}
+              >
+                <span>
+                  <span className="block text-[11px] uppercase tracking-[0.2em] text-clay-500">Su pedido</span>
+                  <span className="text-sm">{items} {items === 1 ? 'plato' : 'platos'}</span>
+                </span>
+                <span className="rounded-full bg-clay-600 px-4 py-2 text-sm font-medium">{money(total)} · Pedir</span>
+              </button>
+            )}
           </div>
         </div>
       ) : null}
