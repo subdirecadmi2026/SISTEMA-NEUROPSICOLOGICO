@@ -185,7 +185,7 @@ export function PosPage() {
             </button>
           ))}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {visible.map((p) => (
             <button key={p.id} type="button" onClick={() => add(p)} className="overflow-hidden rounded-2xl border border-cream-100 bg-white text-left hover:border-forest-700 dark:border-white/10 dark:bg-forest-900">
               <div className="h-32 bg-cream-100 dark:bg-forest-800">

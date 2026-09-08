@@ -131,7 +131,7 @@ export function PublicMenuPage() {
         <div className="h-64 animate-pulse bg-forest-900" />
         <div className="mx-auto max-w-6xl space-y-4 p-5">
           <div className="h-8 w-40 animate-pulse rounded bg-cream-100" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-4 gap-3">
             <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
             <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
             <div className="h-56 animate-pulse rounded-3xl bg-cream-100" />
@@ -216,7 +216,7 @@ export function PublicMenuPage() {
               <h2 className="font-display text-2xl">{category.name}</h2>
               <span className="mx-4 mb-2 h-px flex-1 bg-forest-800/20" />
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            <div className="grid grid-cols-4 gap-3 md:gap-4">
               {category.products.map((product) => {
                 const qty = qtyOf.get(product.id) ?? 0
                 return (
