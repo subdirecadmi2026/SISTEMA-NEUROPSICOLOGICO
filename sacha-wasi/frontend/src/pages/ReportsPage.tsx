@@ -3,9 +3,9 @@ import { api } from '../api/client'
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="sw-card rounded-2xl p-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-clay-600">{label}</p>
-      <p className="font-display mt-2 text-3xl text-forest-800 dark:text-cream-50">{value}</p>
+    <div className="sw-card rounded-none p-5">
+      <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-clay-600">{label}</p>
+      <p className="font-display mt-3 text-[2rem] leading-none text-forest-800">{value}</p>
     </div>
   )
 }

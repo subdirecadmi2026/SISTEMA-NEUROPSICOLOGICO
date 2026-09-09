@@ -5,7 +5,7 @@ type Props = {
   size?: number
 } & SVGProps<SVGSVGElement>
 
-/** Marca Sacha Wasi: hoja de selva + casa andina, verde oscuro y cobre. */
+/** Sello Sacha Wasi: anillo de oro, hoja de selva sobre bosque oscuro. */
 export function BrandMark({ className = 'h-10 w-10', size, ...rest }: Props) {
   return (
     <svg
@@ -18,27 +18,34 @@ export function BrandMark({ className = 'h-10 w-10', size, ...rest }: Props) {
       aria-hidden
       {...rest}
     >
-      <rect width="64" height="64" rx="16" fill="#143D30" />
-      <rect x="3" y="3" width="58" height="58" rx="14" stroke="#C4A574" strokeWidth="1.4" opacity="0.7" />
-      <path d="M32 12l16 12v22c0 2.2-1.8 4-4 4H20c-2.2 0-4-1.8-4-4V24L32 12z" fill="#0C1F18" />
-      <path d="M16 24.5L32 12.5 48 24.5" stroke="#C45C26" strokeWidth="2.2" strokeLinejoin="round" />
+      <circle cx="32" cy="32" r="32" fill="#10291F" />
+      <circle cx="32" cy="32" r="28.5" stroke="#C4A574" strokeWidth="1.4" />
+      <circle cx="32" cy="32" r="25.5" stroke="#C4A574" strokeWidth="0.6" opacity="0.55" />
       <path
-        d="M22 38c7-11 16-14 24-16-5 8-7 16-4 22-9-1-16-1-20-6z"
-        fill="#2D6B52"
-      />
-      <path
-        d="M24 28c5 3 8 8 10 14"
+        d="M32 14c-2.2 7.4-10.8 12.8-14.2 21.2-2.2 5.4.6 12.2 7.4 14.4 2.4.8 4.6.6 6.8-.2"
         stroke="#E8D5A8"
-        strokeWidth="2"
+        strokeWidth="1.7"
         strokeLinecap="round"
       />
-      <circle cx="32" cy="40" r="2" fill="#C45C26" />
+      <path
+        d="M32 14c2.2 7.4 10.8 12.8 14.2 21.2 2.2 5.4-.6 12.2-7.4 14.4-2.4.8-4.6.6-6.8-.2"
+        stroke="#E8D5A8"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path d="M32 14v32" stroke="#C45C26" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M22 27c4.2 1.6 7.4 1.2 10-1.4M42 27c-4.2 1.6-7.4 1.2-10-1.4M24 36c3.6 1.2 6.2.8 8-1.8M40 36c-3.6 1.2-6.2.8-8-1.8"
+        stroke="#2D6B52"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
     </svg>
   )
 }
 
 export function BrandWordmark({
-  subtitle = 'ERP gastronómico',
+  subtitle = 'Cocina de la sierra',
   tone = 'onDark',
 }: {
   subtitle?: string
@@ -48,10 +55,10 @@ export function BrandWordmark({
   const cap = tone === 'onLight' ? 'text-clay-600' : 'text-copper-400'
   return (
     <div className="flex items-center gap-3">
-      <BrandMark className="h-11 w-11 shrink-0 drop-shadow-sm" />
+      <BrandMark className="h-12 w-12 shrink-0" />
       <div>
-        <p className={`font-display text-xl leading-none tracking-tight ${title}`}>Sacha Wasi</p>
-        <p className={`mt-1 text-[11px] uppercase tracking-[0.22em] ${cap}`}>{subtitle}</p>
+        <p className={`font-display text-[1.65rem] leading-none tracking-tight ${title}`}>Sacha Wasi</p>
+        <p className={`mt-1.5 text-[10px] font-medium uppercase tracking-[0.28em] ${cap}`}>{subtitle}</p>
       </div>
     </div>
   )

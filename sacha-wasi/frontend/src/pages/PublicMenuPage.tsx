@@ -170,23 +170,25 @@ export function PublicMenuPage() {
   }
 
   return (
-    <div className="min-h-svh bg-cream-50 text-ink-900">
+    <div className="min-h-svh bg-[#f7f1e4] text-ink-900">
       <header className="relative isolate overflow-hidden text-cream-50">
         <img src={HERO} alt="" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-forest-950 via-forest-950/75 to-forest-800/35" />
-        <div className="relative mx-auto max-w-6xl px-5 pb-8 pt-10">
-          <div className="flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full bg-forest-950/40 px-3 py-1 text-[11px] uppercase tracking-[0.22em] backdrop-blur">
-              <BrandMark className="h-6 w-6" />
-              {city} · Ecuador
-            </span>
-            <span className="rounded-full border border-white/20 px-3 py-1 text-xs">
+        <div className="relative mx-auto max-w-6xl px-5 pb-10 pt-10">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <BrandMark className="h-12 w-12" />
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-copper-400">{city} · Ecuador</p>
+                <h1 className="font-display mt-1 text-4xl leading-none md:text-5xl">{companyName}</h1>
+              </div>
+            </div>
+            <span className="rounded-full border border-copper-400/50 px-3 py-1 text-xs text-cream-50">
               {table?.name} · {table?.seats ?? '—'} pax
             </span>
           </div>
-          <h1 className="font-display mt-8 text-5xl leading-none">{companyName}</h1>
-          <p className="mt-3 max-w-sm text-sm text-cream-100/85">
-            Carta digital de mesa. Elija a su ritmo; el cobro se hace con el mesero, sin pasarela.
+          <p className="mt-5 max-w-md text-sm text-cream-100/85">
+            Carta digital de mesa. Elija a su ritmo; el cobro se hace con el mesero.
           </p>
         </div>
       </header>

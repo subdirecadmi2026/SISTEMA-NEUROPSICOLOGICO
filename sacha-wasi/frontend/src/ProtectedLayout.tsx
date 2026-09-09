@@ -6,7 +6,7 @@ export function ProtectedLayout() {
   const { user, loading } = useAuth()
   if (loading) {
     return (
-      <div className="grid min-h-svh place-items-center bg-cream-50 text-forest-800 dark:bg-forest-950 dark:text-cream-50">
+      <div className="grid min-h-svh place-items-center bg-cream-50 text-forest-800">
         Cargando Sacha Wasi…
       </div>
     )

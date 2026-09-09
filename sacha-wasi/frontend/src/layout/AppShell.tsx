@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { BrandMark } from '../brand/BrandMark'
+import { BrandWordmark } from '../brand/BrandMark'
 
 type NavItem = { to: string; label: string; icon: ComponentType<{ className?: string }>; perm: string | null }
 type NavGroup = { label: string; items: NavItem[] }
@@ -130,10 +130,10 @@ function SidebarNav({
                     end={item.to === '/'}
                     onClick={onNavigate}
                     className={({ isActive }) =>
-                      `flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+                      `flex items-center gap-2 border-l-2 px-3 py-2 text-sm transition ${
                         isActive
-                          ? 'bg-forest-800 text-cream-50 shadow-inner ring-1 ring-copper-400/30'
-                          : 'text-cream-100/75 hover:bg-forest-900 hover:text-cream-50'
+                          ? 'border-copper-400 bg-white/5 text-cream-50'
+                          : 'border-transparent text-cream-100/70 hover:bg-white/5 hover:text-cream-50'
                       }`
                     }
                   >
@@ -154,7 +154,7 @@ export function AppShell() {
   const { user, logout, switchBranch } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [dark, setDark] = useState(() => localStorage.getItem('sw_theme') === 'dark')
+  const [dark, setDark] = useState(false)
   const [open, setOpen] = useState(false)
   const perms = user?.permissions ?? []
   const fullBleed = location.pathname === '/pos' || location.pathname === '/cocina'
@@ -162,16 +162,11 @@ export function AppShell() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
-    localStorage.setItem('sw_theme', dark ? 'dark' : 'light')
   }, [dark])
 
   const brand = (
-    <div className="flex items-center gap-3 px-5 py-6">
-      <BrandMark className="h-11 w-11 shrink-0" />
-      <div>
-        <p className="font-display text-lg leading-tight tracking-tight text-cream-50">Sacha Wasi</p>
-        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-copper-400/90">ERP · Floresta</p>
-      </div>
+    <div className="px-5 py-6">
+      <BrandWordmark subtitle="Floresta · ERP" />
     </div>
   )
 
@@ -206,7 +201,7 @@ export function AppShell() {
   return (
     <div className="min-h-svh bg-cream-50 text-ink-900 dark:bg-forest-950 dark:text-cream-50">
       <div className="flex min-h-svh">
-        <aside className="hidden w-64 shrink-0 flex-col bg-forest-950 text-cream-50 md:flex">
+        <aside className="hidden w-[17.5rem] shrink-0 flex-col border-r border-copper-400/20 bg-forest-950 text-cream-50 md:flex">
           {brand}
           <SidebarNav perms={perms} />
           {footer}
@@ -215,7 +210,7 @@ export function AppShell() {
         {open ? (
           <div className="fixed inset-0 z-50 md:hidden">
             <button type="button" className="absolute inset-0 bg-forest-950/55" onClick={() => setOpen(false)} aria-label="Cerrar menú" />
-            <aside className="relative flex h-full w-72 max-w-[86vw] flex-col bg-forest-950 text-cream-50 shadow-2xl">
+            <aside className="relative flex h-full w-72 max-w-[86vw] flex-col border-r border-copper-400/20 bg-forest-950 text-cream-50 shadow-2xl">
               <button type="button" className="absolute right-3 top-4 rounded-lg p-1 text-cream-100/70" onClick={() => setOpen(false)}>
                 <X className="h-5 w-5" />
               </button>
@@ -227,7 +222,7 @@ export function AppShell() {
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-cream-200 bg-cream-50/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-forest-900/80">
+          <header className="flex items-center justify-between border-b border-cream-200 bg-[#fffaf3]/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-forest-900/80">
             <div className="flex items-center gap-3">
               <button
                 type="button"
