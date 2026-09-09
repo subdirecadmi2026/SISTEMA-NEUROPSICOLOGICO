@@ -173,14 +173,14 @@ export function PosPage() {
   }
 
   return (
-    <div className="grid min-h-[calc(100svh-73px)] bg-cream-50 lg:grid-cols-[1fr_360px] dark:bg-forest-950">
+    <div className="grid min-h-[calc(100svh-73px)] bg-forest-950 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
-          <button className={`rounded-full px-3 py-1 text-sm ${!categoryId ? 'bg-forest-800 text-white' : 'bg-white dark:bg-forest-900'}`} onClick={() => setCategoryId('')}>
+          <button className={`rounded-full px-3 py-1 text-sm ${!categoryId ? 'bg-copper-400 text-forest-950' : 'bg-forest-900 text-cream-100'}`} onClick={() => setCategoryId('')}>
             Todas
           </button>
           {categories.filter((c) => c.show_on_pos !== false).map((c) => (
-            <button key={c.id} className={`rounded-full px-3 py-1 text-sm ${categoryId === c.id ? 'bg-forest-800 text-white' : 'bg-white dark:bg-forest-900'}`} onClick={() => setCategoryId(c.id)}>
+            <button key={c.id} className={`rounded-full px-3 py-1 text-sm ${categoryId === c.id ? 'bg-copper-400 text-forest-950' : 'bg-forest-900 text-cream-100'}`} onClick={() => setCategoryId(c.id)}>
               {c.name}
             </button>
           ))}
@@ -211,7 +211,7 @@ export function PosPage() {
           ))}
         </div>
       </div>
-      <aside className="border-l border-cream-200 bg-cream-50 p-4 dark:border-white/10 dark:bg-forest-900">
+      <aside className="border-l border-copper-400/20 bg-forest-900 p-4 text-cream-50">
         <p className="text-xs uppercase tracking-wide text-ink-500">Ticket</p>
         <select className="mt-2 w-full rounded-xl border px-3 py-2 dark:border-white/10 dark:bg-forest-800" value={tableId} onChange={(e) => setTableId(e.target.value)}>
           <option value="">Mostrador / para llevar</option>

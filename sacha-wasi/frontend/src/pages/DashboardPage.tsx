@@ -11,10 +11,10 @@ type Dashboard = {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="sw-card rounded-none p-5">
-      <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-clay-600">{label}</p>
-      <p className="font-display mt-3 text-[2rem] leading-none text-forest-800">{value}</p>
-      {hint ? <p className="mt-2 text-xs text-ink-500">{hint}</p> : null}
+    <div className="rounded-none border border-copper-400/25 bg-forest-900 p-5">
+      <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-copper-400">{label}</p>
+      <p className="font-display mt-3 text-[2rem] leading-none text-cream-50">{value}</p>
+      {hint ? <p className="mt-2 text-xs text-cream-100/70">{hint}</p> : null}
     </div>
   )
 }
@@ -49,8 +49,8 @@ export function DashboardPage() {
         <Kpi label="Lotes vencidos" value={String(k.expired_lots)} hint="No deben venderse" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="sw-card rounded-2xl p-4">
-          <h2 className="font-display text-lg">Stock crítico</h2>
+        <section className="sw-card rounded-none p-4">
+          <h2 className="font-display text-lg text-cream-50">Stock crítico</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {data.low_stock.length === 0 ? <li>Sin alertas de mínimo.</li> : null}
             {data.low_stock.map((row) => (
@@ -63,8 +63,8 @@ export function DashboardPage() {
             ))}
           </ul>
         </section>
-        <section className="sw-card rounded-2xl p-4">
-          <h2 className="font-display text-lg">Caducidad próxima</h2>
+        <section className="sw-card rounded-none p-4">
+          <h2 className="font-display text-lg text-cream-50">Caducidad próxima</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {data.expiring_lots.length === 0 ? <li>Sin lotes por vencer esta semana.</li> : null}
             {data.expiring_lots.map((lot) => (
@@ -78,11 +78,11 @@ export function DashboardPage() {
           </ul>
         </section>
       </div>
-      <section className="sw-card rounded-2xl p-4">
-        <h2 className="font-display text-lg">Últimos movimientos de kardex</h2>
+      <section className="sw-card rounded-none p-4">
+        <h2 className="font-display text-lg text-cream-50">Últimos movimientos de kardex</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-ink-500">
+            <thead className="text-copper-400">
               <tr>
                 <th className="py-2">Cuando</th>
                 <th>Producto</th>

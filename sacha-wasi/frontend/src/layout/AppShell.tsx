@@ -8,8 +8,6 @@ import {
   BookOpen,
   Warehouse,
   LogOut,
-  Moon,
-  Sun,
   Armchair,
   Banknote,
   FileText,
@@ -154,15 +152,14 @@ export function AppShell() {
   const { user, logout, switchBranch } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [dark, setDark] = useState(false)
   const [open, setOpen] = useState(false)
   const perms = user?.permissions ?? []
   const fullBleed = location.pathname === '/pos' || location.pathname === '/cocina'
   const branches = user?.branches ?? []
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-  }, [dark])
+    document.documentElement.classList.add('dark')
+  }, [])
 
   const brand = (
     <div className="px-5 py-6">
@@ -199,7 +196,7 @@ export function AppShell() {
   )
 
   return (
-    <div className="min-h-svh bg-cream-50 text-ink-900 dark:bg-forest-950 dark:text-cream-50">
+    <div className="min-h-svh bg-forest-950 text-cream-50">
       <div className="flex min-h-svh">
         <aside className="hidden w-[17.5rem] shrink-0 flex-col border-r border-copper-400/20 bg-forest-950 text-cream-50 md:flex">
           {brand}
@@ -222,18 +219,18 @@ export function AppShell() {
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-cream-200 bg-[#fffaf3]/90 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-forest-900/80">
+          <header className="flex items-center justify-between border-b border-copper-400/20 bg-forest-900 px-4 py-3">
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="rounded-lg border border-cream-200 bg-white p-2 text-forest-800 md:hidden dark:border-white/10 dark:bg-forest-800 dark:text-cream-50"
+                className="rounded-lg border border-copper-400/30 bg-forest-800 p-2 text-cream-50 md:hidden"
                 onClick={() => setOpen(true)}
                 aria-label="Abrir menú"
               >
                 <Menu className="h-5 w-5" />
               </button>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-clay-600">
+                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-copper-400">
                   {user?.company?.trade_name ?? 'Sacha Wasi'} · {user?.current_branch?.city ?? 'Ecuador'}
                 </p>
                 <h1 className="font-display text-xl">
@@ -245,19 +242,11 @@ export function AppShell() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setDark((v) => !v)}
-                className="rounded-full border border-cream-200 p-2 dark:border-white/10"
-                aria-label="Cambiar tema"
-              >
-                {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
-              <button
-                type="button"
                 onClick={async () => {
                   await logout()
                   navigate('/login')
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-forest-800 px-3 py-2 text-sm text-cream-50"
+                className="inline-flex items-center gap-1 rounded-full border border-copper-400/30 bg-forest-800 px-3 py-2 text-sm text-cream-50"
               >
                 <LogOut className="h-4 w-4" />
                 Salir
