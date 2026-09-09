@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --color-forest-950: #0b1c16;
+  --color-forest-900: #10291f;
+  --color-forest-800: #16382c;
+  --color-forest-700: #1f4d3c;
+  --color-forest-600: #2d6b52;
+  --color-forest-100: #dce8e1;
+  --color-clay-600: #b85c38;
+  --color-clay-500: #c97348;
+  --color-copper-400: #c4a574;
+  --color-cream-50: #f7f1e4;
+  --color-cream-100: #ebe1cc;
+  --color-cream-200: #dccdb0;
+  --color-cream-300: #cbb896;
+  --color-ink-900: #1c1610;
+  --color-ink-700: #3f3529;
+  --color-ink-500: #6f6252;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink-900);
+  background-color: var(--color-cream-50);
+  background-image:
+    radial-gradient(ellipse 90% 50% at 50% -20%, rgba(16, 41, 31, 0.08), transparent 50%);
+}
+
+html.dark body {
+  background-color: var(--color-forest-950);
+  background-image: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(45, 107, 82, 0.16), transparent 50%);
+  color: #f4efe6;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.sw-card {
+  border: 1px solid var(--color-cream-200);
+  background: #fffaf3;
+  box-shadow: 0 1px 0 rgba(196, 165, 116, 0.25), 0 18px 40px rgba(16, 41, 31, 0.06);
+}
+
+html.dark .sw-card {
+  border-color: rgba(196, 165, 116, 0.22);
+  background: #13251e;
+  box-shadow: none;
+}
+
+.sw-btn {
+  background: var(--color-forest-800);
+  color: var(--color-cream-50);
+}
+
+.sw-btn:hover {
+  background: var(--color-forest-700);
+}
+
+.sw-input {
+  width: 100%;
+  border-radius: 0.6rem;
+  border: 1px solid var(--color-cream-200);
+  background: #fffaf3;
+  padding: 0.65rem 0.85rem;
+  color: var(--color-ink-900);
+}
+
+.sw-input:focus {
+  outline: none;
+  border-color: var(--color-forest-700);
+  box-shadow: 0 0 0 3px rgba(22, 56, 44, 0.12);
+}
+
+.sw-gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-copper-400), transparent);
+}
